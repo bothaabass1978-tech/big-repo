@@ -1,0 +1,229 @@
+// ---------------------------------------------------------------------------
+// 04_input.js — keyboard / mouse / gamepad. Raw mouse deltas, pointer lock,
+// edge-triggered state, rebindable actions.
+// ---------------------------------------------------------------------------
+(function () {
+  const I = {};
+  Z.Input = I;
+
+  const keys = Object.create(null);      // code -> true while held
+  const keyEdge = Object.create(null);   // code -> frame index of press
+  const keyUpEdge = Object.create(null);
+  let frame = 0;
+
+  const mouse = { buttons: 0, dx: 0, dy: 0, wheel: 0, x: 0, y: 0 };
+  const mbEdge = [0, 0, 0, 0, 0];
+  const mbUpEdge = [0, 0, 0, 0, 0];
+
+  I.locked = false;
+  I.enabled = true;
+  I.sensitivity = 1.0;       // multiplier on raw deltas
+  I.adsSensScale = 0.75;
+  I.invertY = false;
+  I.gamepad = null;
+  I.gamepadDeadzone = 0.18;
+  I.lastInputWasGamepad = false;
+
+  // Default action bindings. Z.Menu can rewrite these.
+  I.binds = {
+    forward: ['KeyW', 'ArrowUp'],
+    back: ['KeyS', 'ArrowDown'],
+    left: ['KeyA', 'ArrowLeft'],
+    right: ['KeyD', 'ArrowRight'],
+    jump: ['Space'],
+    crouch: ['ControlLeft', 'KeyC'],
+    sprint: ['ShiftLeft'],
+    use: ['KeyF'],
+    reload: ['KeyR'],
+    melee: ['KeyV'],
+    grenade: ['KeyG'],
+    swap: ['KeyQ', 'Digit1', 'Digit2'],
+    pause: ['Escape'],
+    scores: ['Tab'],
+  };
+
+  let canvas = null;
+
+  function onKeyDown(e) {
+    if (!I.enabled) return;
+    // Never swallow devtools / reload
+    if (e.code === 'F5' || e.code === 'F12' || (e.ctrlKey && e.code === 'KeyR')) return;
+    if (!keys[e.code]) keyEdge[e.code] = frame;
+    keys[e.code] = true;
+    I.lastInputWasGamepad = false;
+    if (e.code === 'Tab' || e.code === 'Space' || e.code.startsWith('Arrow')) e.preventDefault();
+  }
+  function onKeyUp(e) {
+    keys[e.code] = false;
+    keyUpEdge[e.code] = frame;
+  }
+  function onBlur() {
+    for (const k in keys) keys[k] = false;
+    mouse.buttons = 0;
+  }
+
+  function onMouseMove(e) {
+    if (I.locked) {
+      // movementX/Y are already raw when pointer-locked
+      mouse.dx += e.movementX || 0;
+      mouse.dy += e.movementY || 0;
+    }
+    mouse.x = e.clientX; mouse.y = e.clientY;
+    I.lastInputWasGamepad = false;
+  }
+  function onMouseDown(e) {
+    if (!I.enabled) return;
+    const b = e.button;
+    if (!(mouse.buttons & (1 << b))) mbEdge[b] = frame;
+    mouse.buttons |= (1 << b);
+    I.lastInputWasGamepad = false;
+    if (I.locked) e.preventDefault();
+  }
+  function onMouseUp(e) {
+    const b = e.button;
+    mouse.buttons &= ~(1 << b);
+    mbUpEdge[b] = frame;
+  }
+  function onWheel(e) {
+    mouse.wheel += Math.sign(e.deltaY);
+    if (I.locked) e.preventDefault();
+  }
+  function onLockChange() {
+    I.locked = (document.pointerLockElement === canvas);
+    if (!I.locked && I.onUnlock) I.onUnlock();
+  }
+
+  I.init = function (cv) {
+    canvas = cv;
+    window.addEventListener('keydown', onKeyDown, { passive: false });
+    window.addEventListener('keyup', onKeyUp);
+    window.addEventListener('blur', onBlur);
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mousedown', onMouseDown);
+    window.addEventListener('mouseup', onMouseUp);
+    window.addEventListener('wheel', onWheel, { passive: false });
+    document.addEventListener('pointerlockchange', onLockChange);
+    document.addEventListener('contextmenu', (e) => { if (I.locked) e.preventDefault(); });
+    return I;
+  };
+
+  I.lock = function () {
+    if (!canvas || I.locked) return;
+    const p = canvas.requestPointerLock && canvas.requestPointerLock({ unadjustedMovement: true });
+    if (p && p.catch) p.catch(() => { try { canvas.requestPointerLock(); } catch (e) { /* ignore */ } });
+  };
+  I.unlock = function () { if (document.exitPointerLock) document.exitPointerLock(); };
+
+  // --- per-frame ------------------------------------------------------------
+  I.update = function () {
+    frame++;
+    pollGamepad();
+  };
+  I.postUpdate = function () {
+    mouse.dx = 0; mouse.dy = 0; mouse.wheel = 0;
+    if (I.gamepad) { I.gamepad.prevButtons = I.gamepad.buttons.slice(); }
+  };
+
+  // --- queries --------------------------------------------------------------
+  I.down = (code) => !!keys[code];
+  I.pressed = (code) => keyEdge[code] === frame;
+  I.released = (code) => keyUpEdge[code] === frame;
+  I.mb = (n) => !!(mouse.buttons & (1 << n));
+  I.mbPressed = (n) => mbEdge[n] === frame;
+  I.mbReleased = (n) => mbUpEdge[n] === frame;
+  I.wheel = () => mouse.wheel;
+  I.mousePos = () => [mouse.x, mouse.y];
+
+  I.takeMouse = function (out) {
+    out = out || [0, 0];
+    out[0] = mouse.dx; out[1] = mouse.dy;
+    return out;
+  };
+
+  I.act = function (name) {
+    const b = I.binds[name];
+    if (!b) return false;
+    for (let i = 0; i < b.length; i++) if (keys[b[i]]) return true;
+    return false;
+  };
+  I.actPressed = function (name) {
+    const b = I.binds[name];
+    if (!b) return false;
+    for (let i = 0; i < b.length; i++) if (keyEdge[b[i]] === frame) return true;
+    return false;
+  };
+  I.actReleased = function (name) {
+    const b = I.binds[name];
+    if (!b) return false;
+    for (let i = 0; i < b.length; i++) if (keyUpEdge[b[i]] === frame) return true;
+    return false;
+  };
+
+  // Movement axes in local space: x = strafe right, y = forward.
+  I.moveAxis = function (out) {
+    out = out || [0, 0];
+    let x = 0, y = 0;
+    if (I.act('forward')) y += 1;
+    if (I.act('back')) y -= 1;
+    if (I.act('right')) x += 1;
+    if (I.act('left')) x -= 1;
+    const g = I.gamepad;
+    if (g) {
+      const gx = dz(g.axes[0]), gy = dz(g.axes[1]);
+      if (gx || gy) { x = gx; y = -gy; I.lastInputWasGamepad = true; }
+    }
+    // normalise so diagonals aren't faster
+    const l = Math.hypot(x, y);
+    if (l > 1) { x /= l; y /= l; }
+    out[0] = x; out[1] = y;
+    return out;
+  };
+
+  function dz(v) {
+    const d = I.gamepadDeadzone;
+    if (Math.abs(v) < d) return 0;
+    // rescale so the stick still reaches 1.0 and response stays smooth
+    const s = (Math.abs(v) - d) / (1 - d);
+    return Math.sign(v) * s * s;
+  }
+
+  function pollGamepad() {
+    if (!navigator.getGamepads) { I.gamepad = null; return; }
+    const pads = navigator.getGamepads();
+    let pad = null;
+    for (let i = 0; i < pads.length; i++) if (pads[i] && pads[i].connected) { pad = pads[i]; break; }
+    if (!pad) { I.gamepad = null; return; }
+    const prev = I.gamepad ? I.gamepad.prevButtons : null;
+    const buttons = [];
+    for (let i = 0; i < pad.buttons.length; i++) buttons.push(pad.buttons[i].value);
+    I.gamepad = {
+      axes: pad.axes.slice(),
+      buttons,
+      prevButtons: prev || buttons.slice(),
+      id: pad.id,
+    };
+  }
+
+  // Gamepad look, applied as an additional delta each frame (out is in "mouse
+  // pixels" so it flows through the same sensitivity path).
+  I.gamepadLook = function (out, dt) {
+    out = out || [0, 0];
+    out[0] = 0; out[1] = 0;
+    const g = I.gamepad;
+    if (!g) return out;
+    const lx = dz(g.axes[2] || 0), ly = dz(g.axes[3] || 0);
+    if (lx || ly) I.lastInputWasGamepad = true;
+    const rate = 1400 * dt; // deg-ish per second at full deflection
+    out[0] = lx * rate;
+    out[1] = ly * rate;
+    return out;
+  };
+  I.gpButton = function (i) { return I.gamepad ? I.gamepad.buttons[i] > 0.5 : false; };
+  I.gpPressed = function (i) {
+    if (!I.gamepad) return false;
+    return I.gamepad.buttons[i] > 0.5 && I.gamepad.prevButtons[i] <= 0.5;
+  };
+  I.gpAxis = function (i) { return I.gamepad ? dz(I.gamepad.axes[i] || 0) : 0; };
+
+  I.clearAll = onBlur;
+}());

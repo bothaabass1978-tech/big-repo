@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>NACHT DER UNTOTEN</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { width:100%; height:100%; overflow:hidden; background:#000; }
+  body { font-family: "Courier New", Courier, monospace; color:#c8c0a8; cursor:default;
+         -webkit-user-select:none; user-select:none; touch-action:none; }
+  #stage { position:fixed; inset:0; background:#000; }
+  canvas { position:absolute; inset:0; width:100%; height:100%; display:block; }
+  #view { z-index:1; image-rendering:auto; }
+  #hud  { z-index:2; pointer-events:none; }
+  #ui   { position:absolute; inset:0; z-index:3; display:none; }
+  #ui.on { display:block; }
+  #fatal { position:absolute; inset:0; z-index:9; display:none; padding:8vh 8vw;
+           background:#000; color:#b03a2a; font-size:14px; white-space:pre-wrap; overflow:auto; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="view"></canvas>
+  <canvas id="hud"></canvas>
+  <div id="ui"></div>
+  <pre id="fatal"></pre>
+</div>
+<script>
+"use strict";
+(function(){
+/*__GAME_BUNDLE__*/
+})();
+</script>
+</body>
+</html>
