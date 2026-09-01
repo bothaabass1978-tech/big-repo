@@ -136,19 +136,36 @@ await page.waitForTimeout(200);
 await page.screenshot({ path: join(OUT, 'ev-10-firing.png') });
 
 // --- damaged: blood overlay + low health -----------------------------------
+// God mode stays ON: we want the low-health screen, not a player who gets
+// finished off during the settle frames. Health is set after the sim so no
+// regen or hit can walk it back before the shot lands.
 await shot('ev-11-hurt.png', `
-  G.debug.godMode(false);
-  G.player.health = 32;
-  G.player.damageDirs.push({ ang: 1.2, t: 1.1 });
   G.debug.sim(0.4);
+  G.player.health = 32;
+  G.player.lastDamageTime = G.player.clock;
+  G.player.damageDirs.push({ ang: 1.2, t: 1.1 });
+`);
+
+// --- bleeding out: the downed screen ---------------------------------------
+// Drive the real down path so the post-pass desaturation and the bleedout
+// timer are both genuine, then restore before anything else is captured.
+await shot('ev-11b-downed.png', `
+  Z.Player.goDown(G.player);
+  G.player.bleedout = 21.4;
+  G.debug.sim(0.9);
 `);
 
 // --- high round, fast zombies ----------------------------------------------
 await shot('ev-12-round15.png', `
+  G.debug.heal();
   G.debug.godMode(true);
-  G.player.health = 100;
+  // goDown() strips solo players back to the starting pistol; a round-15 shot
+  // should show a round-15 loadout.
+  G.debug.giveWeapon('bar');
+  G.debug.givePerk('juggernog');
   G.debug.setRound(15);
   G.debug.sim(30);
+  G.debug.heal();
   let best = null, bestScore = -1;
   for (const z of Z.Zombies.list) {
     if (z.dying) continue;

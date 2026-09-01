@@ -515,6 +515,17 @@
       intensity: 0.80, flicker: 0, name: 'moon_shaft_s' });
     lights.push({ pos: [6.0, UP + 2.4, -5.2], color: [0.38, 0.50, 0.88], radius: 6.4,
       intensity: 0.62, flicker: 0, name: 'moon_shaft_n' });
+    // Four bulbs left the north-east ground room, the west wall and the
+    // catwalk outside every radius, so a third of the playable floor — and
+    // anything standing on it — resolved to flat black. One emitter per room.
+    lights.push({ pos: [6.2, 2.90, -5.0], color: [1.00, 0.66, 0.30], radius: 8.0,
+      intensity: 1.45, flicker: 0.32, sway: 0.06, name: 'ne_bulb' });
+    lights.push({ pos: [-7.6, 2.85, -4.2], color: [1.00, 0.72, 0.38], radius: 7.4,
+      intensity: 1.20, flicker: 0.24, sway: 0.05, name: 'west_bulb' });
+    lights.push({ pos: [-7.0, 0.80, 5.8], color: [1.00, 0.45, 0.14], radius: 6.0,
+      intensity: 1.15, flicker: 0.52, name: 'sw_embers' });
+    lights.push({ pos: [0.8, UP + 2.45, -2.2], color: [1.00, 0.70, 0.36], radius: 7.0,
+      intensity: 1.05, flicker: 0.40, sway: 0.05, name: 'catwalk_bulb' });
 
     // =====================================================================
     // Nav seeds + zombie spawn zones

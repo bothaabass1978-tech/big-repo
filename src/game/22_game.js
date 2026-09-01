@@ -26,7 +26,7 @@
   const look = [0, 0];
 
   // Screen-effect state the post pass and HUD both read.
-  const screen = { blood: 0, flash: 0, fade: 1, hurtPulse: 0 };
+  const screen = { blood: 0, flash: 0, fade: 1, hurtPulse: 0, downed: 0 };
   const hudPointsDelta = [];
   const hitmarker = { t: 99, crit: false };
 
@@ -178,7 +178,7 @@
 
     hudPointsDelta.length = 0;
     hitmarker.t = 99;
-    screen.blood = 0; screen.flash = 0; screen.fade = 1; screen.hurtPulse = 0;
+    screen.blood = 0; screen.flash = 0; screen.fade = 1; screen.hurtPulse = 0; screen.downed = 0;
 
     G.mode = 'playing';
     Z.Menu.hide();
@@ -422,6 +422,10 @@
     screen.blood = M.damp(screen.blood, M.clamp01(1 - hf), 6, dt);
     screen.hurtPulse = M.damp(screen.hurtPulse, p.downed ? 0.7 : M.clamp01((1 - hf) * 0.9), 5, dt);
     screen.fade = M.damp(screen.fade, G.mode === 'gameover' ? 1 : 0, 2.2, dt);
+    // Bleeding out drains the colour out of the world. This has to happen in
+    // the post pass: the HUD is a separate transparent canvas, so a blend-mode
+    // slab there only greys out the HUD's own (empty) pixels, not the scene.
+    screen.downed = M.damp(screen.downed, p.downed ? 1 : 0, 3.4, dt);
     screen.flash = Math.max(0, screen.flash - dt * 4);
 
     // hud timers
@@ -493,6 +497,15 @@
       cam.fov = 62;
     }
 
+    // A weak lamp riding the camera. Every shooter of this era carries one:
+    // without it anything pressed against the lens — a zombie on top of you,
+    // your own weapon, a chalk outline you are standing at — falls outside
+    // every world bulb and renders as an unlit black slab. Short radius and
+    // low intensity so it reads as eye adaptation, not a flashlight.
+    const vcam = Z.Render.camera;
+    Z.Render.addLight([vcam.pos[0], vcam.pos[1] - 0.10, vcam.pos[2]],
+      [0.62, 0.58, 0.52], 5.4, 0.62);
+
     Z.Render.beginScene();
     Z.Render.drawWorld();
     Z.Econ.render();
@@ -503,13 +516,13 @@
     renderViewmodel(dt);
 
     Z.Render.post({
-      vignette: 0.52 + screen.blood * 0.22,
-      grain: 0.55,
+      vignette: 0.52 + screen.blood * 0.22 + screen.downed * 0.30,
+      grain: 0.55 + screen.downed * 0.35,
       aberration: 0.45 + screen.blood * 0.7,
-      exposure: 1.0,
+      exposure: 1.0 - screen.downed * 0.22,
       fade: G.mode === 'gameover' ? M.clamp01(screen.fade) : 0,
       flash: screen.flash,
-      saturation: M.lerp(0.78, 0.32, screen.blood),
+      saturation: M.lerp(M.lerp(0.78, 0.32, screen.blood), 0.06, screen.downed),
       hurtPulse: screen.hurtPulse,
     });
 
@@ -669,6 +682,15 @@
       Z.Nav.build(Z.Level.level);
     },
     godMode(on) { G.player.godMode = on !== false; },
+    // Put the player back on their feet from any state — used by the evidence
+    // harness so one capture's damage cannot leak into the next one's setup.
+    heal() {
+      const p = G.player;
+      p.dead = false; p.downed = false; p.bleedout = 0; p.crouched = false;
+      p.health = Z.Player.effectiveMaxHealth(p);
+      p.lastDamageTime = -999; p.damageDirs.length = 0;
+      return p.health;
+    },
     killAll() { return Z.Zombies.killAll('debug'); },
     dropPowerup(id) { return Z.Econ.dropPowerup(G.player.pos, id); },
     // Advance the simulation without waiting for real frames.

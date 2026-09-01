@@ -7043,7 +7043,7 @@ Z.assert = function (cond, msg) {
 }());
 
 
-/* ============================ 08_mesh.js (300 lines) ============================ */
+/* ============================ 08_mesh.js (310 lines) ============================ */
 // ---------------------------------------------------------------------------
 // 08_mesh.js — CPU mesh construction. Everything in this game is generated
 // here: walls, stairs, rubble, zombie limbs, gun viewmodels.
@@ -7065,12 +7065,18 @@ Z.assert = function (cond, msg) {
     this.idx = [];
     this.joint = 0;          // current joint index applied to new verts
     this.col3 = [1, 1, 1];   // current vertex colour
+    // Per-vertex emissive strength. Lets one mesh carry self-lit detail —
+    // zombie eyes, the box's glow, a perk machine's sign — without either a
+    // second draw call or a whole-mesh emissive that lights everything.
+    this.emis = [];
+    this.emisV = 0;
     // optional transform stack applied to vert()/box()/cyl()
     this.xf = null;
   }
   Mesh.builder = () => new Builder();
 
   Builder.prototype.setColor = function (r, g, b) { this.col3[0] = r; this.col3[1] = g; this.col3[2] = b; return this; };
+  Builder.prototype.setEmissive = function (e) { this.emisV = e || 0; return this; };
   Builder.prototype.setJoint = function (j) { this.joint = j | 0; return this; };
   Builder.prototype.setTransform = function (m) { this.xf = m; return this; };
 
@@ -7092,6 +7098,7 @@ Z.assert = function (cond, msg) {
     this.nrm.push(nx, ny, nz);
     this.uv.push(u, v);
     this.col.push(this.col3[0], this.col3[1], this.col3[2]);
+    this.emis.push(this.emisV);
     this.jnt.push(this.joint);
     return this.pos.length / 3 - 1;
   };
@@ -7274,6 +7281,7 @@ Z.assert = function (cond, msg) {
       this.nrm.push(nx, ny, nz);
       this.uv.push(other.uv[i * 2], other.uv[i * 2 + 1]);
       this.col.push(other.col[i * 3], other.col[i * 3 + 1], other.col[i * 3 + 2]);
+      this.emis.push(other.emis ? other.emis[i] : 0);
       this.jnt.push(other.jnt[i]);
     }
     for (let i = 0; i < other.idx.length; i++) this.idx.push(other.idx[i] + base);
@@ -7299,6 +7307,7 @@ Z.assert = function (cond, msg) {
       norms: new Float32Array(this.nrm),
       uvs: new Float32Array(this.uv),
       cols: new Float32Array(this.col),
+      emis: new Float32Array(this.emis),
       joint: new Uint8Array(this.jnt),
       idx: new IdxType(this.idx),
       mat: mat || 'default',
@@ -7315,7 +7324,7 @@ Z.assert = function (cond, msg) {
     const out = {
       verts: new Float32Array(vc * 3), norms: new Float32Array(vc * 3),
       uvs: new Float32Array(vc * 2), cols: new Float32Array(vc * 3),
-      joint: new Uint8Array(vc), idx: new IdxType(ic),
+      emis: new Float32Array(vc), joint: new Uint8Array(vc), idx: new IdxType(ic),
       mat: mat || (meshes[0] && meshes[0].mat) || 'default', count: ic, vertCount: vc,
     };
     let vo = 0, io = 0;
@@ -7324,6 +7333,7 @@ Z.assert = function (cond, msg) {
       out.norms.set(m.norms, vo * 3);
       out.uvs.set(m.uvs, vo * 2);
       out.cols.set(m.cols, vo * 3);
+      if (m.emis) out.emis.set(m.emis, vo);
       out.joint.set(m.joint, vo);
       for (let i = 0; i < m.count; i++) out.idx[io + i] = m.idx[i] + vo;
       vo += m.vertCount; io += m.count;
@@ -7345,7 +7355,7 @@ Z.assert = function (cond, msg) {
 }());
 
 
-/* ============================ 09_level.js (636 lines) ============================ */
+/* ============================ 09_level.js (647 lines) ============================ */
 // ---------------------------------------------------------------------------
 // 09_level.js — Nacht der Untoten.
 //
@@ -7863,6 +7873,17 @@ Z.assert = function (cond, msg) {
       intensity: 0.80, flicker: 0, name: 'moon_shaft_s' });
     lights.push({ pos: [6.0, UP + 2.4, -5.2], color: [0.38, 0.50, 0.88], radius: 6.4,
       intensity: 0.62, flicker: 0, name: 'moon_shaft_n' });
+    // Four bulbs left the north-east ground room, the west wall and the
+    // catwalk outside every radius, so a third of the playable floor — and
+    // anything standing on it — resolved to flat black. One emitter per room.
+    lights.push({ pos: [6.2, 2.90, -5.0], color: [1.00, 0.66, 0.30], radius: 8.0,
+      intensity: 1.45, flicker: 0.32, sway: 0.06, name: 'ne_bulb' });
+    lights.push({ pos: [-7.6, 2.85, -4.2], color: [1.00, 0.72, 0.38], radius: 7.4,
+      intensity: 1.20, flicker: 0.24, sway: 0.05, name: 'west_bulb' });
+    lights.push({ pos: [-7.0, 0.80, 5.8], color: [1.00, 0.45, 0.14], radius: 6.0,
+      intensity: 1.15, flicker: 0.52, name: 'sw_embers' });
+    lights.push({ pos: [0.8, UP + 2.45, -2.2], color: [1.00, 0.70, 0.36], radius: 7.0,
+      intensity: 1.05, flicker: 0.40, sway: 0.05, name: 'catwalk_bulb' });
 
     // =====================================================================
     // Nav seeds + zombie spawn zones
@@ -8938,7 +8959,7 @@ Z.assert = function (cond, msg) {
 }());
 
 
-/* ============================ 12_render.js (814 lines) ============================ */
+/* ============================ 12_render.js (828 lines) ============================ */
 // ---------------------------------------------------------------------------
 // 12_render.js — forward renderer.
 //
@@ -8969,8 +8990,12 @@ Z.assert = function (cond, msg) {
   const tmpM = m4.create();
 
   R.env = {
-    ambTop: [0.072, 0.074, 0.094],   // cold moonlight from above
-    ambBot: [0.018, 0.017, 0.021],   // near-black bounce off the floorboards
+    ambTop: [0.082, 0.084, 0.104],   // cold moonlight from above
+    // Not literally black. At 0.018 every vertical face outside a bulb's
+    // radius crushed to 0,0,0 in the tonemap, so crates, walls and zombies
+    // alike became flat silhouettes. This is the floor that keeps a shape
+    // readable without lifting the room out of darkness.
+    ambBot: [0.034, 0.034, 0.042],
     sunDir: [0.35, -0.82, 0.45],
     sunCol: [0.055, 0.062, 0.090],
     fogCol: Z.C.FOG_COLOR.slice(),
@@ -8997,6 +9022,7 @@ Z.assert = function (cond, msg) {
     'ATTR vec3 aNrm;',
     'ATTR vec2 aUv;',
     'ATTR vec3 aCol;',
+    'ATTR float aEmis;',
     '#ifdef SKINNED',
     'ATTR float aJoint;',
     'uniform vec4 uJoints[66];',   // 22 joints as mat3x4 rows
@@ -9009,6 +9035,7 @@ Z.assert = function (cond, msg) {
     'VARYING vec3 vNrm;',
     'VARYING vec2 vUv;',
     'VARYING vec3 vCol;',
+    'VARYING float vEmis;',
     'void main() {',
     '  vec3 p = aPos;',
     '  vec3 n = aNrm;',
@@ -9026,6 +9053,7 @@ Z.assert = function (cond, msg) {
     '  vNrm = uNormalMat * n;',
     '  vUv = aUv + uUvScroll;',
     '  vCol = aCol;',
+    '  vEmis = aEmis;',
     '  gl_Position = uViewProj * wp;',
     '}',
   ].join('\n');
@@ -9035,6 +9063,7 @@ Z.assert = function (cond, msg) {
     'VARYING vec3 vNrm;',
     'VARYING vec2 vUv;',
     'VARYING vec3 vCol;',
+    'VARYING float vEmis;',
     'uniform sampler2D uTex;',
     'uniform sampler2D uNrmTex;',
     'uniform float uHasNormal;',
@@ -9108,6 +9137,9 @@ Z.assert = function (cond, msg) {
     '    }',
     '  }',
     '  vec3 col = albedo * light + spec + albedo * uEmissive;',
+    // Per-vertex self-lit detail (zombie eyes, box glow). vCol carries the
+    // glow colour so one mesh can hold several differently-tinted emitters.
+    '  if (vEmis > 0.0) col += vCol * (vEmis * 1.8);',
     '  float fogT = clamp((dist - uFogRange.x) / max(uFogRange.y - uFogRange.x, 0.001), 0.0, 1.0);',
     '  fogT = 1.0 - exp(-fogT * fogT * 3.2);',
     '  col = mix(col, uFogCol, fogT);',
@@ -9281,9 +9313,9 @@ Z.assert = function (cond, msg) {
   // GPU meshes
   // =========================================================================
   R.uploadMesh = function (mesh) {
-    const interleave = new Float32Array(mesh.vertCount * 12);
+    const interleave = new Float32Array(mesh.vertCount * 13);
     for (let i = 0; i < mesh.vertCount; i++) {
-      const o = i * 12;
+      const o = i * 13;
       interleave[o] = mesh.verts[i * 3];
       interleave[o + 1] = mesh.verts[i * 3 + 1];
       interleave[o + 2] = mesh.verts[i * 3 + 2];
@@ -9296,6 +9328,7 @@ Z.assert = function (cond, msg) {
       interleave[o + 9] = mesh.cols ? mesh.cols[i * 3 + 1] : 1;
       interleave[o + 10] = mesh.cols ? mesh.cols[i * 3 + 2] : 1;
       interleave[o + 11] = mesh.joint ? mesh.joint[i] : 0;
+      interleave[o + 12] = mesh.emis ? mesh.emis[i] : 0;
     }
     const vb = Z.GL.buf(interleave);
     const ib = Z.GL.buf(mesh.idx, gl.ELEMENT_ARRAY_BUFFER);
@@ -9314,12 +9347,13 @@ Z.assert = function (cond, msg) {
     return Z.GL.vao(function () {
       gl.bindBuffer(gl.ARRAY_BUFFER, g.vb);
       gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, g.ib);
-      const S = 12 * 4;
+      const S = 13 * 4;
       bindAttr(prog, 'aPos', 3, S, 0);
       bindAttr(prog, 'aNrm', 3, S, 12);
       bindAttr(prog, 'aUv', 2, S, 24);
       bindAttr(prog, 'aCol', 3, S, 32);
       bindAttr(prog, 'aJoint', 1, S, 44);
+      bindAttr(prog, 'aEmis', 1, S, 48);
     });
   }
   function bindAttr(prog, name, size, stride, offset) {
@@ -9387,6 +9421,7 @@ Z.assert = function (cond, msg) {
       b.nrm.push(m.norms ? m.norms[i * 3] : 0, m.norms ? m.norms[i * 3 + 1] : 1, m.norms ? m.norms[i * 3 + 2] : 0);
       b.uv.push(m.uvs ? m.uvs[i * 2] : 0, m.uvs ? m.uvs[i * 2 + 1] : 0);
       b.col.push(m.cols ? m.cols[i * 3] : 1, m.cols ? m.cols[i * 3 + 1] : 1, m.cols ? m.cols[i * 3 + 2] : 1);
+      b.emis.push(m.emis ? m.emis[i] : 0);
       b.jnt.push(m.joint ? m.joint[i] : 0);
     }
     for (let i = 0; i < m.idx.length; i++) b.idx.push(m.idx[i]);
@@ -9754,7 +9789,7 @@ Z.assert = function (cond, msg) {
 }());
 
 
-/* ============================ 13_models.js (1432 lines) ============================ */
+/* ============================ 13_models.js (1440 lines) ============================ */
 // ---------------------------------------------------------------------------
 // 13_models.js — Z.Models: every piece of geometry in the game that is not a
 // level brush. Zombies (skinned + variants), procedural animation, first
@@ -9843,6 +9878,9 @@ Z.assert = function (cond, msg) {
     bone: [0.700, 0.685, 0.575],
     teeth: [0.760, 0.730, 0.610],
     eye: [0.03, 0.03, 0.03],
+    // The signature read: two amber points that stay legible across a black
+    // room. Emissive, so they survive the lighting falloff entirely.
+    eyeGlow: [1.00, 0.62, 0.13],
     helmet: [0.176, 0.192, 0.176],     // stahlhelm, worn field grey
     helmetDark: [0.110, 0.122, 0.112],
     // --- weapons ---
@@ -10141,9 +10179,14 @@ Z.assert = function (cond, msg) {
       box(b, hx - 0.062 * rk, hy - 0.075, hz - 0.086 * rk, hx + 0.062 * rk, hy - 0.005, hz + 0.028 * rk, COL.skinDark);
       // exposed teeth strip where the jaw hangs open
       box(b, hx - 0.05 * rk, hy - 0.028, hz - 0.09 * rk, hx + 0.05 * rk, hy - 0.010, hz - 0.06 * rk, COL.teeth, { shade: false });
-      // sunken eye sockets (dark recessed dabs)
+      // sunken eye sockets — dark recess, then a smaller glowing pupil set
+      // just proud of it so the amber reads as coming from inside the skull.
       box(b, hx - 0.058 * rk, hy + 0.10, hz - 0.093 * rk, hx - 0.018 * rk, hy + 0.128, hz - 0.07 * rk, COL.eye, { shade: false });
       box(b, hx + 0.018 * rk, hy + 0.10, hz - 0.093 * rk, hx + 0.058 * rk, hy + 0.128, hz - 0.07 * rk, COL.eye, { shade: false });
+      b.setEmissive(1);
+      box(b, hx - 0.050 * rk, hy + 0.106, hz - 0.098 * rk, hx - 0.026 * rk, hy + 0.124, hz - 0.086 * rk, COL.eyeGlow, { shade: false });
+      box(b, hx + 0.026 * rk, hy + 0.106, hz - 0.098 * rk, hx + 0.050 * rk, hy + 0.124, hz - 0.086 * rk, COL.eyeGlow, { shade: false });
+      b.setEmissive(0);
       // torn cheek patch
       box(b, hx + 0.055 * rk, hy + 0.02, hz - 0.05 * rk, hx + 0.086 * rk, hy + 0.06, hz + 0.01 * rk, COL.fleshDark, { shade: false });
 
@@ -15131,8 +15174,13 @@ Z.assert = function (cond, msg) {
     drawPerks(state, dt);
     drawRound(state, dt);
     drawPoints(state, dt);
+    // Bleeding out, the loadout is not the read — round, points and the
+    // timer are. Sink the weapon block rather than cutting it, so a
+    // self-revive drops you back into a HUD that never went away.
+    if (mode === 'downed') { ctx.save(); ctx.globalAlpha *= 0.28; }
     drawAmmo(state, dt);
     drawGrenades(state, dt);
+    if (mode === 'downed') ctx.restore();
     drawPowerups(state, dt);
     drawPrompt(state, dt);
 
@@ -15653,13 +15701,8 @@ Z.assert = function (cond, msg) {
   // Downed state
   // ---------------------------------------------------------------------------
   function drawDowned(state, dt) {
-    if (supportsBlend()) {
-      ctx.save();
-      ctx.globalCompositeOperation = 'saturation';
-      ctx.fillStyle = 'rgba(120,120,120,0.9)';
-      ctx.fillRect(0, 0, W, Hh);
-      ctx.restore();
-    }
+    // The world desaturation lives in the renderer's post pass — this canvas is
+    // transparent, so blending here would paint a flat slab over everything.
     const cx = W / 2, cy = Hh / 2;
     const g = ctx.createRadialGradient(cx, cy, Math.min(W, Hh) * 0.35, cx, cy, Math.max(W, Hh) * 0.75);
     g.addColorStop(0, 'rgba(90,0,0,0)');
@@ -16820,7 +16863,7 @@ Z.assert = function (cond, msg) {
 }());
 
 
-/* ============================ 22_game.js (684 lines) ============================ */
+/* ============================ 22_game.js (706 lines) ============================ */
 // ---------------------------------------------------------------------------
 // 22_game.js — state machine, fixed-timestep loop, render order, HUD feed.
 // ---------------------------------------------------------------------------
@@ -16849,7 +16892,7 @@ Z.assert = function (cond, msg) {
   const look = [0, 0];
 
   // Screen-effect state the post pass and HUD both read.
-  const screen = { blood: 0, flash: 0, fade: 1, hurtPulse: 0 };
+  const screen = { blood: 0, flash: 0, fade: 1, hurtPulse: 0, downed: 0 };
   const hudPointsDelta = [];
   const hitmarker = { t: 99, crit: false };
 
@@ -17001,7 +17044,7 @@ Z.assert = function (cond, msg) {
 
     hudPointsDelta.length = 0;
     hitmarker.t = 99;
-    screen.blood = 0; screen.flash = 0; screen.fade = 1; screen.hurtPulse = 0;
+    screen.blood = 0; screen.flash = 0; screen.fade = 1; screen.hurtPulse = 0; screen.downed = 0;
 
     G.mode = 'playing';
     Z.Menu.hide();
@@ -17245,6 +17288,10 @@ Z.assert = function (cond, msg) {
     screen.blood = M.damp(screen.blood, M.clamp01(1 - hf), 6, dt);
     screen.hurtPulse = M.damp(screen.hurtPulse, p.downed ? 0.7 : M.clamp01((1 - hf) * 0.9), 5, dt);
     screen.fade = M.damp(screen.fade, G.mode === 'gameover' ? 1 : 0, 2.2, dt);
+    // Bleeding out drains the colour out of the world. This has to happen in
+    // the post pass: the HUD is a separate transparent canvas, so a blend-mode
+    // slab there only greys out the HUD's own (empty) pixels, not the scene.
+    screen.downed = M.damp(screen.downed, p.downed ? 1 : 0, 3.4, dt);
     screen.flash = Math.max(0, screen.flash - dt * 4);
 
     // hud timers
@@ -17316,6 +17363,15 @@ Z.assert = function (cond, msg) {
       cam.fov = 62;
     }
 
+    // A weak lamp riding the camera. Every shooter of this era carries one:
+    // without it anything pressed against the lens — a zombie on top of you,
+    // your own weapon, a chalk outline you are standing at — falls outside
+    // every world bulb and renders as an unlit black slab. Short radius and
+    // low intensity so it reads as eye adaptation, not a flashlight.
+    const vcam = Z.Render.camera;
+    Z.Render.addLight([vcam.pos[0], vcam.pos[1] - 0.10, vcam.pos[2]],
+      [0.62, 0.58, 0.52], 5.4, 0.62);
+
     Z.Render.beginScene();
     Z.Render.drawWorld();
     Z.Econ.render();
@@ -17326,13 +17382,13 @@ Z.assert = function (cond, msg) {
     renderViewmodel(dt);
 
     Z.Render.post({
-      vignette: 0.52 + screen.blood * 0.22,
-      grain: 0.55,
+      vignette: 0.52 + screen.blood * 0.22 + screen.downed * 0.30,
+      grain: 0.55 + screen.downed * 0.35,
       aberration: 0.45 + screen.blood * 0.7,
-      exposure: 1.0,
+      exposure: 1.0 - screen.downed * 0.22,
       fade: G.mode === 'gameover' ? M.clamp01(screen.fade) : 0,
       flash: screen.flash,
-      saturation: M.lerp(0.78, 0.32, screen.blood),
+      saturation: M.lerp(M.lerp(0.78, 0.32, screen.blood), 0.06, screen.downed),
       hurtPulse: screen.hurtPulse,
     });
 
@@ -17492,6 +17548,15 @@ Z.assert = function (cond, msg) {
       Z.Nav.build(Z.Level.level);
     },
     godMode(on) { G.player.godMode = on !== false; },
+    // Put the player back on their feet from any state — used by the evidence
+    // harness so one capture's damage cannot leak into the next one's setup.
+    heal() {
+      const p = G.player;
+      p.dead = false; p.downed = false; p.bleedout = 0; p.crouched = false;
+      p.health = Z.Player.effectiveMaxHealth(p);
+      p.lastDamageTime = -999; p.damageDirs.length = 0;
+      return p.health;
+    },
     killAll() { return Z.Zombies.killAll('debug'); },
     dropPowerup(id) { return Z.Econ.dropPowerup(G.player.pos, id); },
     // Advance the simulation without waiting for real frames.

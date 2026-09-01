@@ -86,6 +86,9 @@
     bone: [0.700, 0.685, 0.575],
     teeth: [0.760, 0.730, 0.610],
     eye: [0.03, 0.03, 0.03],
+    // The signature read: two amber points that stay legible across a black
+    // room. Emissive, so they survive the lighting falloff entirely.
+    eyeGlow: [1.00, 0.62, 0.13],
     helmet: [0.176, 0.192, 0.176],     // stahlhelm, worn field grey
     helmetDark: [0.110, 0.122, 0.112],
     // --- weapons ---
@@ -384,9 +387,14 @@
       box(b, hx - 0.062 * rk, hy - 0.075, hz - 0.086 * rk, hx + 0.062 * rk, hy - 0.005, hz + 0.028 * rk, COL.skinDark);
       // exposed teeth strip where the jaw hangs open
       box(b, hx - 0.05 * rk, hy - 0.028, hz - 0.09 * rk, hx + 0.05 * rk, hy - 0.010, hz - 0.06 * rk, COL.teeth, { shade: false });
-      // sunken eye sockets (dark recessed dabs)
+      // sunken eye sockets — dark recess, then a smaller glowing pupil set
+      // just proud of it so the amber reads as coming from inside the skull.
       box(b, hx - 0.058 * rk, hy + 0.10, hz - 0.093 * rk, hx - 0.018 * rk, hy + 0.128, hz - 0.07 * rk, COL.eye, { shade: false });
       box(b, hx + 0.018 * rk, hy + 0.10, hz - 0.093 * rk, hx + 0.058 * rk, hy + 0.128, hz - 0.07 * rk, COL.eye, { shade: false });
+      b.setEmissive(1);
+      box(b, hx - 0.050 * rk, hy + 0.106, hz - 0.098 * rk, hx - 0.026 * rk, hy + 0.124, hz - 0.086 * rk, COL.eyeGlow, { shade: false });
+      box(b, hx + 0.026 * rk, hy + 0.106, hz - 0.098 * rk, hx + 0.050 * rk, hy + 0.124, hz - 0.086 * rk, COL.eyeGlow, { shade: false });
+      b.setEmissive(0);
       // torn cheek patch
       box(b, hx + 0.055 * rk, hy + 0.02, hz - 0.05 * rk, hx + 0.086 * rk, hy + 0.06, hz + 0.01 * rk, COL.fleshDark, { shade: false });
 

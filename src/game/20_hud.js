@@ -564,8 +564,13 @@
     drawPerks(state, dt);
     drawRound(state, dt);
     drawPoints(state, dt);
+    // Bleeding out, the loadout is not the read — round, points and the
+    // timer are. Sink the weapon block rather than cutting it, so a
+    // self-revive drops you back into a HUD that never went away.
+    if (mode === 'downed') { ctx.save(); ctx.globalAlpha *= 0.28; }
     drawAmmo(state, dt);
     drawGrenades(state, dt);
+    if (mode === 'downed') ctx.restore();
     drawPowerups(state, dt);
     drawPrompt(state, dt);
 
@@ -1086,13 +1091,8 @@
   // Downed state
   // ---------------------------------------------------------------------------
   function drawDowned(state, dt) {
-    if (supportsBlend()) {
-      ctx.save();
-      ctx.globalCompositeOperation = 'saturation';
-      ctx.fillStyle = 'rgba(120,120,120,0.9)';
-      ctx.fillRect(0, 0, W, Hh);
-      ctx.restore();
-    }
+    // The world desaturation lives in the renderer's post pass — this canvas is
+    // transparent, so blending here would paint a flat slab over everything.
     const cx = W / 2, cy = Hh / 2;
     const g = ctx.createRadialGradient(cx, cy, Math.min(W, Hh) * 0.35, cx, cy, Math.max(W, Hh) * 0.75);
     g.addColorStop(0, 'rgba(90,0,0,0)');

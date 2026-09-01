@@ -19,12 +19,18 @@
     this.idx = [];
     this.joint = 0;          // current joint index applied to new verts
     this.col3 = [1, 1, 1];   // current vertex colour
+    // Per-vertex emissive strength. Lets one mesh carry self-lit detail —
+    // zombie eyes, the box's glow, a perk machine's sign — without either a
+    // second draw call or a whole-mesh emissive that lights everything.
+    this.emis = [];
+    this.emisV = 0;
     // optional transform stack applied to vert()/box()/cyl()
     this.xf = null;
   }
   Mesh.builder = () => new Builder();
 
   Builder.prototype.setColor = function (r, g, b) { this.col3[0] = r; this.col3[1] = g; this.col3[2] = b; return this; };
+  Builder.prototype.setEmissive = function (e) { this.emisV = e || 0; return this; };
   Builder.prototype.setJoint = function (j) { this.joint = j | 0; return this; };
   Builder.prototype.setTransform = function (m) { this.xf = m; return this; };
 
@@ -46,6 +52,7 @@
     this.nrm.push(nx, ny, nz);
     this.uv.push(u, v);
     this.col.push(this.col3[0], this.col3[1], this.col3[2]);
+    this.emis.push(this.emisV);
     this.jnt.push(this.joint);
     return this.pos.length / 3 - 1;
   };
@@ -228,6 +235,7 @@
       this.nrm.push(nx, ny, nz);
       this.uv.push(other.uv[i * 2], other.uv[i * 2 + 1]);
       this.col.push(other.col[i * 3], other.col[i * 3 + 1], other.col[i * 3 + 2]);
+      this.emis.push(other.emis ? other.emis[i] : 0);
       this.jnt.push(other.jnt[i]);
     }
     for (let i = 0; i < other.idx.length; i++) this.idx.push(other.idx[i] + base);
@@ -253,6 +261,7 @@
       norms: new Float32Array(this.nrm),
       uvs: new Float32Array(this.uv),
       cols: new Float32Array(this.col),
+      emis: new Float32Array(this.emis),
       joint: new Uint8Array(this.jnt),
       idx: new IdxType(this.idx),
       mat: mat || 'default',
@@ -269,7 +278,7 @@
     const out = {
       verts: new Float32Array(vc * 3), norms: new Float32Array(vc * 3),
       uvs: new Float32Array(vc * 2), cols: new Float32Array(vc * 3),
-      joint: new Uint8Array(vc), idx: new IdxType(ic),
+      emis: new Float32Array(vc), joint: new Uint8Array(vc), idx: new IdxType(ic),
       mat: mat || (meshes[0] && meshes[0].mat) || 'default', count: ic, vertCount: vc,
     };
     let vo = 0, io = 0;
@@ -278,6 +287,7 @@
       out.norms.set(m.norms, vo * 3);
       out.uvs.set(m.uvs, vo * 2);
       out.cols.set(m.cols, vo * 3);
+      if (m.emis) out.emis.set(m.emis, vo);
       out.joint.set(m.joint, vo);
       for (let i = 0; i < m.count; i++) out.idx[io + i] = m.idx[i] + vo;
       vo += m.vertCount; io += m.count;

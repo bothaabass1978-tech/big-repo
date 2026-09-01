@@ -28,8 +28,12 @@
   const tmpM = m4.create();
 
   R.env = {
-    ambTop: [0.072, 0.074, 0.094],   // cold moonlight from above
-    ambBot: [0.018, 0.017, 0.021],   // near-black bounce off the floorboards
+    ambTop: [0.082, 0.084, 0.104],   // cold moonlight from above
+    // Not literally black. At 0.018 every vertical face outside a bulb's
+    // radius crushed to 0,0,0 in the tonemap, so crates, walls and zombies
+    // alike became flat silhouettes. This is the floor that keeps a shape
+    // readable without lifting the room out of darkness.
+    ambBot: [0.034, 0.034, 0.042],
     sunDir: [0.35, -0.82, 0.45],
     sunCol: [0.055, 0.062, 0.090],
     fogCol: Z.C.FOG_COLOR.slice(),
@@ -56,6 +60,7 @@
     'ATTR vec3 aNrm;',
     'ATTR vec2 aUv;',
     'ATTR vec3 aCol;',
+    'ATTR float aEmis;',
     '#ifdef SKINNED',
     'ATTR float aJoint;',
     'uniform vec4 uJoints[66];',   // 22 joints as mat3x4 rows
@@ -68,6 +73,7 @@
     'VARYING vec3 vNrm;',
     'VARYING vec2 vUv;',
     'VARYING vec3 vCol;',
+    'VARYING float vEmis;',
     'void main() {',
     '  vec3 p = aPos;',
     '  vec3 n = aNrm;',
@@ -85,6 +91,7 @@
     '  vNrm = uNormalMat * n;',
     '  vUv = aUv + uUvScroll;',
     '  vCol = aCol;',
+    '  vEmis = aEmis;',
     '  gl_Position = uViewProj * wp;',
     '}',
   ].join('\n');
@@ -94,6 +101,7 @@
     'VARYING vec3 vNrm;',
     'VARYING vec2 vUv;',
     'VARYING vec3 vCol;',
+    'VARYING float vEmis;',
     'uniform sampler2D uTex;',
     'uniform sampler2D uNrmTex;',
     'uniform float uHasNormal;',
@@ -167,6 +175,9 @@
     '    }',
     '  }',
     '  vec3 col = albedo * light + spec + albedo * uEmissive;',
+    // Per-vertex self-lit detail (zombie eyes, box glow). vCol carries the
+    // glow colour so one mesh can hold several differently-tinted emitters.
+    '  if (vEmis > 0.0) col += vCol * (vEmis * 1.8);',
     '  float fogT = clamp((dist - uFogRange.x) / max(uFogRange.y - uFogRange.x, 0.001), 0.0, 1.0);',
     '  fogT = 1.0 - exp(-fogT * fogT * 3.2);',
     '  col = mix(col, uFogCol, fogT);',
@@ -340,9 +351,9 @@
   // GPU meshes
   // =========================================================================
   R.uploadMesh = function (mesh) {
-    const interleave = new Float32Array(mesh.vertCount * 12);
+    const interleave = new Float32Array(mesh.vertCount * 13);
     for (let i = 0; i < mesh.vertCount; i++) {
-      const o = i * 12;
+      const o = i * 13;
       interleave[o] = mesh.verts[i * 3];
       interleave[o + 1] = mesh.verts[i * 3 + 1];
       interleave[o + 2] = mesh.verts[i * 3 + 2];
@@ -355,6 +366,7 @@
       interleave[o + 9] = mesh.cols ? mesh.cols[i * 3 + 1] : 1;
       interleave[o + 10] = mesh.cols ? mesh.cols[i * 3 + 2] : 1;
       interleave[o + 11] = mesh.joint ? mesh.joint[i] : 0;
+      interleave[o + 12] = mesh.emis ? mesh.emis[i] : 0;
     }
     const vb = Z.GL.buf(interleave);
     const ib = Z.GL.buf(mesh.idx, gl.ELEMENT_ARRAY_BUFFER);
@@ -373,12 +385,13 @@
     return Z.GL.vao(function () {
       gl.bindBuffer(gl.ARRAY_BUFFER, g.vb);
       gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, g.ib);
-      const S = 12 * 4;
+      const S = 13 * 4;
       bindAttr(prog, 'aPos', 3, S, 0);
       bindAttr(prog, 'aNrm', 3, S, 12);
       bindAttr(prog, 'aUv', 2, S, 24);
       bindAttr(prog, 'aCol', 3, S, 32);
       bindAttr(prog, 'aJoint', 1, S, 44);
+      bindAttr(prog, 'aEmis', 1, S, 48);
     });
   }
   function bindAttr(prog, name, size, stride, offset) {
@@ -446,6 +459,7 @@
       b.nrm.push(m.norms ? m.norms[i * 3] : 0, m.norms ? m.norms[i * 3 + 1] : 1, m.norms ? m.norms[i * 3 + 2] : 0);
       b.uv.push(m.uvs ? m.uvs[i * 2] : 0, m.uvs ? m.uvs[i * 2 + 1] : 0);
       b.col.push(m.cols ? m.cols[i * 3] : 1, m.cols ? m.cols[i * 3 + 1] : 1, m.cols ? m.cols[i * 3 + 2] : 1);
+      b.emis.push(m.emis ? m.emis[i] : 0);
       b.jnt.push(m.joint ? m.joint[i] : 0);
     }
     for (let i = 0; i < m.idx.length; i++) b.idx.push(m.idx[i]);
