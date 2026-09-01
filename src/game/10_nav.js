@@ -351,6 +351,90 @@
     return null;
   };
 
+  // -------------------------------------------------------------------------
+  // Flow field
+  //
+  // Every zombie in the map is chasing the same target, so running a separate
+  // A* per zombie is 24 searches computing almost the same answer. One
+  // Dijkstra outward from the player gives every node a next-hop toward them;
+  // each zombie then just reads its own node. That is a single O(N log N)
+  // sweep a few times a second instead of two dozen, and — unlike rationing
+  // searches — it makes pursuit MORE responsive, not less, because every
+  // zombie gets a fresh answer on every rebuild.
+  // -------------------------------------------------------------------------
+  let flowNext = null, flowDist = null, flowStamp = null, flowGen = 0;
+  let flowGoalNode = -1;
+  const flowGoalPos = [0, 0, 0];
+  N.flowRebuilds = 0;
+
+  N.buildFlow = function (goalPos) {
+    const goal = N.nearest(goalPos, 3.5);
+    if (!goal) return false;
+    if (!flowNext || flowNext.length < nodes.length) {
+      flowNext = new Int32Array(nodes.length);
+      flowDist = new Float32Array(nodes.length);
+      flowStamp = new Int32Array(nodes.length);
+    }
+    flowGen++;
+    N.flowRebuilds++;
+    flowGoalNode = goal.i;
+    flowGoalPos[0] = goalPos[0]; flowGoalPos[1] = goalPos[1]; flowGoalPos[2] = goalPos[2];
+
+    // Dijkstra outward from the goal. Reuses the A* heap by scoring on
+    // fScore, which here holds the accumulated distance.
+    ensureScratch();
+    heap.length = 0;
+    flowStamp[goal.i] = flowGen;
+    flowDist[goal.i] = 0;
+    flowNext[goal.i] = -1;
+    fScore[goal.i] = 0;
+    heapPush(goal.i, 0);
+
+    let guard = 0;
+    while (heap.length && guard++ < 60000) {
+      const cur = heapPop();
+      const d = flowDist[cur];
+      if (fScore[cur] > d + 1e-4) continue;      // stale heap entry
+      const node = nodes[cur];
+      for (let e = 0; e < node.edges.length; e++) {
+        const nb = node.edges[e];
+        const nd = d + node.edgeCost[e];
+        if (flowStamp[nb] !== flowGen || nd < flowDist[nb]) {
+          flowStamp[nb] = flowGen;
+          flowDist[nb] = nd;
+          flowNext[nb] = cur;                     // step toward the goal
+          fScore[nb] = nd;
+          heapPush(nb, nd);
+        }
+      }
+    }
+    return true;
+  };
+
+  N.hasFlow = function () { return flowGoalNode >= 0 && !!flowNext; };
+  N.flowGoalMoved = function (p) {
+    return M.dist3sq(flowGoalPos, p) > 4.0;
+  };
+
+  // Next node toward the player from a world position, or null.
+  N.flowStep = function (from) {
+    if (!N.hasFlow()) return null;
+    const n = N.nearest(from, 2.5);
+    if (!n) return null;
+    if (flowStamp[n.i] !== flowGen) return null;   // unreachable from the goal
+    if (n.i === flowGoalNode) return nodes[flowGoalNode];
+    const nx = flowNext[n.i];
+    return nx >= 0 ? nodes[nx] : null;
+  };
+
+  // How far a position is from the player along the graph (-1 if cut off).
+  N.flowDistance = function (from) {
+    if (!N.hasFlow()) return -1;
+    const n = N.nearest(from, 2.5);
+    if (!n || flowStamp[n.i] !== flowGen) return -1;
+    return flowDist[n.i];
+  };
+
   // Convenience: world position -> world position.
   N.pathBetween = function (from, to, maxExpand) {
     const a = N.nearest(from, 3.0);

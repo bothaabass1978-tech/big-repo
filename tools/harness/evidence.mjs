@@ -81,8 +81,10 @@ await shot('ev-06-perk.png', `
 
 // --- the debris that gates the stairs --------------------------------------
 await shot('ev-07-debris.png', `
-  G.debug.teleport(-7.4, 0, 6.4);
-  G.player.yaw = Math.PI * 1.15; G.player.pitch = -0.12;
+  const d = Z.Level.level.buys.find(function (b) { return b.id === 'stairs_west'; });
+  G.debug.teleport(d.use[0], 0, d.use[2]);
+  const dx = d.pos[0] - G.player.pos[0], dz = d.pos[2] - G.player.pos[2];
+  G.player.yaw = Math.atan2(-dx, -dz); G.player.pitch = -0.10;
 `);
 
 // --- upstairs: the HELP room ----------------------------------------------

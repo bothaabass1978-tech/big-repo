@@ -276,10 +276,18 @@
   const tmpA = [0, 0, 0], tmpB = [0, 0, 0];
 
   S.lastDt = 1 / 120;
+  S.flowT = 0;
 
   S.update = function (dt, ctx) {
     S.lastDt = dt;
     S.pathBudget = PATHS_PER_TICK;
+
+    // One shared search toward the player, reused by every hunter this tick.
+    S.flowT -= dt;
+    if (player && !player.dead && (S.flowT <= 0 || Z.Nav.flowGoalMoved(player.pos))) {
+      Z.Nav.buildFlow(player.pos);
+      S.flowT = 0.35;
+    }
     const B = Z.B.PLAYER;
     const playerPos = player ? player.pos : [0, 0, 0];
     const paused = ctx && ctx.paused;
@@ -466,21 +474,18 @@
     return d;
   }
 
-  // A full horde all repathing on the same tick is what pushed simulation cost
-  // over an entire 60 Hz frame. Searches are rationed: a zombie that cannot get
-  // a token keeps walking its existing path and tries again next tick, which is
-  // invisible in play because paths stay valid for a second or more.
+  // Only zombies walking to a specific window need their own search; hunters
+  // all share the flow field, so this stays cheap without rationing.
   S.pathBudget = 0;
-  const PATHS_PER_TICK = 3;
+  const PATHS_PER_TICK = 6;
 
   function repath(z, goal) {
     if (S.pathBudget <= 0) {
-      // no token this tick — keep the old path, retry very soon
-      z.repathT = Math.min(z.repathT, 0.05);
+      z.repathT = Math.min(z.repathT, 0.12);
       return false;
     }
     S.pathBudget--;
-    const path = Z.Nav.pathBetween(z.pos, goal, 2200);
+    const path = Z.Nav.pathBetween(z.pos, goal, 2400);
     if (path) {
       z.path = Z.Nav.smooth(path, []);
       z.pathI = 0;
@@ -493,10 +498,46 @@
     return true;
   }
 
+  // Walk downhill on the shared flow field toward the player. Falls back to a
+  // direct steer when the field has no answer for this node (just spawned, or
+  // standing somewhere the sweep did not reach).
+  function followFlow(z, goal, dt) {
+    const straight = M.distXZ(z.pos, goal);
+    // Close enough to see them: go straight, it looks far more deliberate than
+    // stepping between grid nodes.
+    if (straight < 3.0 && Math.abs(z.pos[1] - goal[1]) < 1.2
+        && Z.Phys.losClear([z.pos[0], z.pos[1] + 1.0, z.pos[2]], [goal[0], goal[1] + 1.0, goal[2]])) {
+      steerTo(z, goal, dt, 1);
+      trackProgress(z, dt);
+      return straight;
+    }
+    const next = Z.Nav.flowStep(z.pos);
+    if (!next) { steerTo(z, goal, dt, 1); trackProgress(z, dt); return straight; }
+    tmpA[0] = next.x; tmpA[1] = next.y; tmpA[2] = next.z;
+    steerTo(z, tmpA, dt, 1);
+    trackProgress(z, dt);
+    return straight;
+  }
+
+  function trackProgress(z, dt) {
+    const moved = M.distXZ(z.pos, z.lastPos);
+    if (moved < 0.02) {
+      z.stuckT += dt;
+      if (z.stuckT > 0.75) {
+        z.stuckT = 0;
+        z.vel[0] += rng.sym(1.6);
+        z.vel[2] += rng.sym(1.6);
+      }
+    } else {
+      z.stuckT = 0;
+    }
+    z.lastPos[0] = z.pos[0]; z.lastPos[1] = z.pos[1]; z.lastPos[2] = z.pos[2];
+  }
+
   // Follow the current path; returns distance remaining to the final goal.
   function followPath(z, goal, dt, speedScale) {
     z.repathT -= dt;
-    const goalMoved = !z.goal || M.dist3sq(z.goal, goal) > 9.0;
+    const goalMoved = !z.goal || M.dist3sq(z.goal, goal) > 2.5;
     if (z.repathT <= 0 || goalMoved || !z.path) {
       repath(z, goal);
       z.repathT = rng.range(0.55, 1.05);
@@ -705,7 +746,7 @@
 
   function updateHunt(z, dt, playerPos) {
     z.anim = z.crawler ? 'crawler' : animForSpeed(z);
-    const dist = followPath(z, playerPos, dt, 1);
+    const dist = followFlow(z, playerPos, dt);
 
     // progress watchdog
     const reachNow = Z.B.PLAYER.meleeRange * 0.8;

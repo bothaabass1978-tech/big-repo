@@ -5783,7 +5783,7 @@ Z.assert = function (cond, msg) {
       const streakBoost = 0.15; // subtle extra weighting handled by warp already
       const rgb = ramp(M.clamp01(t), stopsRust);
       rOut.data[p] = rgb[0]; rOut.data[p + 1] = rgb[1]; rOut.data[p + 2] = rgb[2];
-      rOut.data[p + 3] = M.clamp01((t - 0.35) * 1.6) * 235;
+      rOut.data[p + 3] = M.clamp01((t - 0.12) * 2.4) * 235;
     }
     rctx.putImageData(rOut, 0, 0);
     ctx.globalAlpha = 1; ctx.drawImage(rustC, 0, 0);
@@ -5971,7 +5971,7 @@ Z.assert = function (cond, msg) {
       const t = rd[p] / 255;
       if (t > 0.55) {
         const rgb = ramp(t, stopsRust);
-        const a = M.clamp01((t - 0.55) * 2);
+        const a = M.clamp01((t - 0.22) * 2.6);
         d[p] = M.lerp(d[p], rgb[0], a); d[p + 1] = M.lerp(d[p + 1], rgb[1], a); d[p + 2] = M.lerp(d[p + 2], rgb[2], a);
       }
     }
@@ -6381,11 +6381,11 @@ Z.assert = function (cond, msg) {
     edgeWear(ctx, size, seedN, { count: 6, color: [150, 148, 140], amount: 1.2 });
     grime(ctx, size, seedN, 0.8);
     forceSeamEdges(c);
-    return { canvas: c, size, tile: [true, true], spec: 0.14, gloss: 0.6, emissive: 0, normal: null, tint: [1, 1, 1] };
+    return { canvas: c, size, tile: [true, true], spec: 0.14, gloss: 0.6, emissive: 0, normal: null, tint: [2.30, 2.30, 2.42] };
   }
   function makeGunWood() {
     const c = tileWood(38, PROP, { axis: 'v', count: 3, freq: 1.2, stops: stopsWoodNew, knots: false, rot: false, nails: false, gapColor: 'rgba(10,7,5,0.3)', gapWidth: 0.5, stainAmt: 0, scratchCount: 8, wear: 1.2, grime: 0.4, ao: false });
-    return { canvas: c, size: PROP, tile: [true, true], spec: 0.18, gloss: 0.4, emissive: 0, normal: null, tint: [1, 1, 1] };
+    return { canvas: c, size: PROP, tile: [true, true], spec: 0.18, gloss: 0.4, emissive: 0, normal: null, tint: [1.35, 1.30, 1.22] };
   }
   function makeHands() {
     const size = PROP, seedN = 39;
@@ -6403,7 +6403,7 @@ Z.assert = function (cond, msg) {
     stains(ctx, size, seedN, { count: 3, color: [50, 10, 10], alpha: 0.25 });
     grime(ctx, size, seedN, 1);
     forceSeamEdges(c);
-    return { canvas: c, size, tile: [true, true], spec: 0.06, gloss: 0.12, emissive: 0, normal: null, tint: [1, 1, 1] };
+    return { canvas: c, size, tile: [true, true], spec: 0.06, gloss: 0.12, emissive: 0, normal: null, tint: [1.30, 1.05, 0.88] };
   }
 
   // ===========================================================================
@@ -7791,18 +7791,18 @@ Z.assert = function (cond, msg) {
     boxSpots.push({ pos: [6.2, UP, -0.6], yaw: 1.2, room: 'east_up' });
     boxSpots.push({ pos: [5.4, 0, 5.4], yaw: -1.1, room: 'se' });
 
-    lights.push({ pos: [-3.2, 2.95, 0.4], color: [1.00, 0.72, 0.38], radius: 9.5,
-      intensity: 1.25, flicker: 0.28, sway: 0.07, name: 'main_bulb' });
-    lights.push({ pos: [8.4, 1.05, 5.9], color: [1.00, 0.52, 0.20], radius: 7.0,
-      intensity: 1.15, flicker: 0.45, name: 'fire_barrel' });
-    lights.push({ pos: [6.4, UP + 2.55, -4.2], color: [1.00, 0.76, 0.44], radius: 7.5,
-      intensity: 0.85, flicker: 0.35, sway: 0.04, name: 'east_bulb' });
-    lights.push({ pos: [-5.6, UP + 2.6, -5.0], color: [1.00, 0.70, 0.36], radius: 6.5,
-      intensity: 0.55, flicker: 0.62, name: 'help_bulb' });
-    lights.push({ pos: [-2.8, 4.4, 5.2], color: [0.42, 0.55, 0.86], radius: 8.0,
-      intensity: 0.55, flicker: 0, name: 'moon_shaft_s' });
-    lights.push({ pos: [6.0, UP + 2.4, -5.2], color: [0.40, 0.52, 0.84], radius: 6.0,
-      intensity: 0.40, flicker: 0, name: 'moon_shaft_n' });
+    lights.push({ pos: [-3.2, 2.95, 0.4], color: [1.00, 0.70, 0.34], radius: 8.6,
+      intensity: 2.60, flicker: 0.28, sway: 0.07, name: 'main_bulb' });
+    lights.push({ pos: [8.4, 1.05, 5.9], color: [1.00, 0.48, 0.16], radius: 6.6,
+      intensity: 2.40, flicker: 0.45, name: 'fire_barrel' });
+    lights.push({ pos: [6.4, UP + 2.55, -4.2], color: [1.00, 0.74, 0.40], radius: 7.2,
+      intensity: 1.90, flicker: 0.35, sway: 0.04, name: 'east_bulb' });
+    lights.push({ pos: [-5.6, UP + 2.6, -5.0], color: [1.00, 0.68, 0.32], radius: 6.2,
+      intensity: 1.35, flicker: 0.62, name: 'help_bulb' });
+    lights.push({ pos: [-2.8, 4.4, 5.2], color: [0.40, 0.54, 0.90], radius: 8.4,
+      intensity: 0.95, flicker: 0, name: 'moon_shaft_s' });
+    lights.push({ pos: [6.0, UP + 2.4, -5.2], color: [0.38, 0.50, 0.88], radius: 6.4,
+      intensity: 0.75, flicker: 0, name: 'moon_shaft_n' });
 
     // =====================================================================
     // Nav seeds + zombie spawn zones
@@ -7923,7 +7923,7 @@ Z.assert = function (cond, msg) {
 }());
 
 
-/* ============================ 10_nav.js (423 lines) ============================ */
+/* ============================ 10_nav.js (507 lines) ============================ */
 // ---------------------------------------------------------------------------
 // 10_nav.js — layered navigation grid + A*.
 //
@@ -8275,6 +8275,90 @@ Z.assert = function (cond, msg) {
     N.searchStats.failures++;
     N.searchStats.expanded += expanded;
     return null;
+  };
+
+  // -------------------------------------------------------------------------
+  // Flow field
+  //
+  // Every zombie in the map is chasing the same target, so running a separate
+  // A* per zombie is 24 searches computing almost the same answer. One
+  // Dijkstra outward from the player gives every node a next-hop toward them;
+  // each zombie then just reads its own node. That is a single O(N log N)
+  // sweep a few times a second instead of two dozen, and — unlike rationing
+  // searches — it makes pursuit MORE responsive, not less, because every
+  // zombie gets a fresh answer on every rebuild.
+  // -------------------------------------------------------------------------
+  let flowNext = null, flowDist = null, flowStamp = null, flowGen = 0;
+  let flowGoalNode = -1;
+  const flowGoalPos = [0, 0, 0];
+  N.flowRebuilds = 0;
+
+  N.buildFlow = function (goalPos) {
+    const goal = N.nearest(goalPos, 3.5);
+    if (!goal) return false;
+    if (!flowNext || flowNext.length < nodes.length) {
+      flowNext = new Int32Array(nodes.length);
+      flowDist = new Float32Array(nodes.length);
+      flowStamp = new Int32Array(nodes.length);
+    }
+    flowGen++;
+    N.flowRebuilds++;
+    flowGoalNode = goal.i;
+    flowGoalPos[0] = goalPos[0]; flowGoalPos[1] = goalPos[1]; flowGoalPos[2] = goalPos[2];
+
+    // Dijkstra outward from the goal. Reuses the A* heap by scoring on
+    // fScore, which here holds the accumulated distance.
+    ensureScratch();
+    heap.length = 0;
+    flowStamp[goal.i] = flowGen;
+    flowDist[goal.i] = 0;
+    flowNext[goal.i] = -1;
+    fScore[goal.i] = 0;
+    heapPush(goal.i, 0);
+
+    let guard = 0;
+    while (heap.length && guard++ < 60000) {
+      const cur = heapPop();
+      const d = flowDist[cur];
+      if (fScore[cur] > d + 1e-4) continue;      // stale heap entry
+      const node = nodes[cur];
+      for (let e = 0; e < node.edges.length; e++) {
+        const nb = node.edges[e];
+        const nd = d + node.edgeCost[e];
+        if (flowStamp[nb] !== flowGen || nd < flowDist[nb]) {
+          flowStamp[nb] = flowGen;
+          flowDist[nb] = nd;
+          flowNext[nb] = cur;                     // step toward the goal
+          fScore[nb] = nd;
+          heapPush(nb, nd);
+        }
+      }
+    }
+    return true;
+  };
+
+  N.hasFlow = function () { return flowGoalNode >= 0 && !!flowNext; };
+  N.flowGoalMoved = function (p) {
+    return M.dist3sq(flowGoalPos, p) > 4.0;
+  };
+
+  // Next node toward the player from a world position, or null.
+  N.flowStep = function (from) {
+    if (!N.hasFlow()) return null;
+    const n = N.nearest(from, 2.5);
+    if (!n) return null;
+    if (flowStamp[n.i] !== flowGen) return null;   // unreachable from the goal
+    if (n.i === flowGoalNode) return nodes[flowGoalNode];
+    const nx = flowNext[n.i];
+    return nx >= 0 ? nodes[nx] : null;
+  };
+
+  // How far a position is from the player along the graph (-1 if cut off).
+  N.flowDistance = function (from) {
+    if (!N.hasFlow()) return -1;
+    const n = N.nearest(from, 2.5);
+    if (!n || flowStamp[n.i] !== flowGen) return -1;
+    return flowDist[n.i];
   };
 
   // Convenience: world position -> world position.
@@ -8825,10 +8909,10 @@ Z.assert = function (cond, msg) {
   const tmpM = m4.create();
 
   R.env = {
-    ambTop: [0.112, 0.112, 0.136],   // cold moonlight from above
-    ambBot: [0.030, 0.028, 0.033],   // near-black bounce off the floorboards
+    ambTop: [0.072, 0.074, 0.094],   // cold moonlight from above
+    ambBot: [0.018, 0.017, 0.021],   // near-black bounce off the floorboards
     sunDir: [0.35, -0.82, 0.45],
-    sunCol: [0.085, 0.095, 0.130],
+    sunCol: [0.055, 0.062, 0.090],
     fogCol: Z.C.FOG_COLOR.slice(),
     fogNear: Z.C.FOG_NEAR,
     fogFar: Z.C.FOG_FAR,
@@ -12669,7 +12753,7 @@ Z.assert = function (cond, msg) {
 }());
 
 
-/* ============================ 17_zombie.js (882 lines) ============================ */
+/* ============================ 17_zombie.js (923 lines) ============================ */
 // ---------------------------------------------------------------------------
 // 17_zombie.js — zombie entities, state machine, damage model, rendering.
 //
@@ -12948,10 +13032,18 @@ Z.assert = function (cond, msg) {
   const tmpA = [0, 0, 0], tmpB = [0, 0, 0];
 
   S.lastDt = 1 / 120;
+  S.flowT = 0;
 
   S.update = function (dt, ctx) {
     S.lastDt = dt;
     S.pathBudget = PATHS_PER_TICK;
+
+    // One shared search toward the player, reused by every hunter this tick.
+    S.flowT -= dt;
+    if (player && !player.dead && (S.flowT <= 0 || Z.Nav.flowGoalMoved(player.pos))) {
+      Z.Nav.buildFlow(player.pos);
+      S.flowT = 0.35;
+    }
     const B = Z.B.PLAYER;
     const playerPos = player ? player.pos : [0, 0, 0];
     const paused = ctx && ctx.paused;
@@ -13138,21 +13230,18 @@ Z.assert = function (cond, msg) {
     return d;
   }
 
-  // A full horde all repathing on the same tick is what pushed simulation cost
-  // over an entire 60 Hz frame. Searches are rationed: a zombie that cannot get
-  // a token keeps walking its existing path and tries again next tick, which is
-  // invisible in play because paths stay valid for a second or more.
+  // Only zombies walking to a specific window need their own search; hunters
+  // all share the flow field, so this stays cheap without rationing.
   S.pathBudget = 0;
-  const PATHS_PER_TICK = 3;
+  const PATHS_PER_TICK = 6;
 
   function repath(z, goal) {
     if (S.pathBudget <= 0) {
-      // no token this tick — keep the old path, retry very soon
-      z.repathT = Math.min(z.repathT, 0.05);
+      z.repathT = Math.min(z.repathT, 0.12);
       return false;
     }
     S.pathBudget--;
-    const path = Z.Nav.pathBetween(z.pos, goal, 2200);
+    const path = Z.Nav.pathBetween(z.pos, goal, 2400);
     if (path) {
       z.path = Z.Nav.smooth(path, []);
       z.pathI = 0;
@@ -13165,10 +13254,46 @@ Z.assert = function (cond, msg) {
     return true;
   }
 
+  // Walk downhill on the shared flow field toward the player. Falls back to a
+  // direct steer when the field has no answer for this node (just spawned, or
+  // standing somewhere the sweep did not reach).
+  function followFlow(z, goal, dt) {
+    const straight = M.distXZ(z.pos, goal);
+    // Close enough to see them: go straight, it looks far more deliberate than
+    // stepping between grid nodes.
+    if (straight < 3.0 && Math.abs(z.pos[1] - goal[1]) < 1.2
+        && Z.Phys.losClear([z.pos[0], z.pos[1] + 1.0, z.pos[2]], [goal[0], goal[1] + 1.0, goal[2]])) {
+      steerTo(z, goal, dt, 1);
+      trackProgress(z, dt);
+      return straight;
+    }
+    const next = Z.Nav.flowStep(z.pos);
+    if (!next) { steerTo(z, goal, dt, 1); trackProgress(z, dt); return straight; }
+    tmpA[0] = next.x; tmpA[1] = next.y; tmpA[2] = next.z;
+    steerTo(z, tmpA, dt, 1);
+    trackProgress(z, dt);
+    return straight;
+  }
+
+  function trackProgress(z, dt) {
+    const moved = M.distXZ(z.pos, z.lastPos);
+    if (moved < 0.02) {
+      z.stuckT += dt;
+      if (z.stuckT > 0.75) {
+        z.stuckT = 0;
+        z.vel[0] += rng.sym(1.6);
+        z.vel[2] += rng.sym(1.6);
+      }
+    } else {
+      z.stuckT = 0;
+    }
+    z.lastPos[0] = z.pos[0]; z.lastPos[1] = z.pos[1]; z.lastPos[2] = z.pos[2];
+  }
+
   // Follow the current path; returns distance remaining to the final goal.
   function followPath(z, goal, dt, speedScale) {
     z.repathT -= dt;
-    const goalMoved = !z.goal || M.dist3sq(z.goal, goal) > 9.0;
+    const goalMoved = !z.goal || M.dist3sq(z.goal, goal) > 2.5;
     if (z.repathT <= 0 || goalMoved || !z.path) {
       repath(z, goal);
       z.repathT = rng.range(0.55, 1.05);
@@ -13377,7 +13502,7 @@ Z.assert = function (cond, msg) {
 
   function updateHunt(z, dt, playerPos) {
     z.anim = z.crawler ? 'crawler' : animForSpeed(z);
-    const dist = followPath(z, playerPos, dt, 1);
+    const dist = followFlow(z, playerPos, dt);
 
     // progress watchdog
     const reachNow = Z.B.PLAYER.meleeRange * 0.8;

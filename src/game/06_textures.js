@@ -932,7 +932,7 @@
       const streakBoost = 0.15; // subtle extra weighting handled by warp already
       const rgb = ramp(M.clamp01(t), stopsRust);
       rOut.data[p] = rgb[0]; rOut.data[p + 1] = rgb[1]; rOut.data[p + 2] = rgb[2];
-      rOut.data[p + 3] = M.clamp01((t - 0.35) * 1.6) * 235;
+      rOut.data[p + 3] = M.clamp01((t - 0.12) * 2.4) * 235;
     }
     rctx.putImageData(rOut, 0, 0);
     ctx.globalAlpha = 1; ctx.drawImage(rustC, 0, 0);
@@ -1120,7 +1120,7 @@
       const t = rd[p] / 255;
       if (t > 0.55) {
         const rgb = ramp(t, stopsRust);
-        const a = M.clamp01((t - 0.55) * 2);
+        const a = M.clamp01((t - 0.22) * 2.6);
         d[p] = M.lerp(d[p], rgb[0], a); d[p + 1] = M.lerp(d[p + 1], rgb[1], a); d[p + 2] = M.lerp(d[p + 2], rgb[2], a);
       }
     }
@@ -1530,11 +1530,11 @@
     edgeWear(ctx, size, seedN, { count: 6, color: [150, 148, 140], amount: 1.2 });
     grime(ctx, size, seedN, 0.8);
     forceSeamEdges(c);
-    return { canvas: c, size, tile: [true, true], spec: 0.14, gloss: 0.6, emissive: 0, normal: null, tint: [1, 1, 1] };
+    return { canvas: c, size, tile: [true, true], spec: 0.14, gloss: 0.6, emissive: 0, normal: null, tint: [2.30, 2.30, 2.42] };
   }
   function makeGunWood() {
     const c = tileWood(38, PROP, { axis: 'v', count: 3, freq: 1.2, stops: stopsWoodNew, knots: false, rot: false, nails: false, gapColor: 'rgba(10,7,5,0.3)', gapWidth: 0.5, stainAmt: 0, scratchCount: 8, wear: 1.2, grime: 0.4, ao: false });
-    return { canvas: c, size: PROP, tile: [true, true], spec: 0.18, gloss: 0.4, emissive: 0, normal: null, tint: [1, 1, 1] };
+    return { canvas: c, size: PROP, tile: [true, true], spec: 0.18, gloss: 0.4, emissive: 0, normal: null, tint: [1.35, 1.30, 1.22] };
   }
   function makeHands() {
     const size = PROP, seedN = 39;
@@ -1552,7 +1552,7 @@
     stains(ctx, size, seedN, { count: 3, color: [50, 10, 10], alpha: 0.25 });
     grime(ctx, size, seedN, 1);
     forceSeamEdges(c);
-    return { canvas: c, size, tile: [true, true], spec: 0.06, gloss: 0.12, emissive: 0, normal: null, tint: [1, 1, 1] };
+    return { canvas: c, size, tile: [true, true], spec: 0.06, gloss: 0.12, emissive: 0, normal: null, tint: [1.30, 1.05, 0.88] };
   }
 
   // ===========================================================================

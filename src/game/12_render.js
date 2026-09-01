@@ -28,10 +28,10 @@
   const tmpM = m4.create();
 
   R.env = {
-    ambTop: [0.112, 0.112, 0.136],   // cold moonlight from above
-    ambBot: [0.030, 0.028, 0.033],   // near-black bounce off the floorboards
+    ambTop: [0.072, 0.074, 0.094],   // cold moonlight from above
+    ambBot: [0.018, 0.017, 0.021],   // near-black bounce off the floorboards
     sunDir: [0.35, -0.82, 0.45],
-    sunCol: [0.085, 0.095, 0.130],
+    sunCol: [0.055, 0.062, 0.090],
     fogCol: Z.C.FOG_COLOR.slice(),
     fogNear: Z.C.FOG_NEAR,
     fogFar: Z.C.FOG_FAR,
