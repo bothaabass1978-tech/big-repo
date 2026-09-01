@@ -12669,7 +12669,7 @@ Z.assert = function (cond, msg) {
 }());
 
 
-/* ============================ 17_zombie.js (867 lines) ============================ */
+/* ============================ 17_zombie.js (882 lines) ============================ */
 // ---------------------------------------------------------------------------
 // 17_zombie.js — zombie entities, state machine, damage model, rendering.
 //
@@ -12951,6 +12951,7 @@ Z.assert = function (cond, msg) {
 
   S.update = function (dt, ctx) {
     S.lastDt = dt;
+    S.pathBudget = PATHS_PER_TICK;
     const B = Z.B.PLAYER;
     const playerPos = player ? player.pos : [0, 0, 0];
     const paused = ctx && ctx.paused;
@@ -13137,8 +13138,21 @@ Z.assert = function (cond, msg) {
     return d;
   }
 
+  // A full horde all repathing on the same tick is what pushed simulation cost
+  // over an entire 60 Hz frame. Searches are rationed: a zombie that cannot get
+  // a token keeps walking its existing path and tries again next tick, which is
+  // invisible in play because paths stay valid for a second or more.
+  S.pathBudget = 0;
+  const PATHS_PER_TICK = 3;
+
   function repath(z, goal) {
-    const path = Z.Nav.pathBetween(z.pos, goal, 2600);
+    if (S.pathBudget <= 0) {
+      // no token this tick — keep the old path, retry very soon
+      z.repathT = Math.min(z.repathT, 0.05);
+      return false;
+    }
+    S.pathBudget--;
+    const path = Z.Nav.pathBetween(z.pos, goal, 2200);
     if (path) {
       z.path = Z.Nav.smooth(path, []);
       z.pathI = 0;
@@ -13148,12 +13162,13 @@ Z.assert = function (cond, msg) {
       z.path = null;
     }
     z.goal = [goal[0], goal[1], goal[2]];
+    return true;
   }
 
   // Follow the current path; returns distance remaining to the final goal.
   function followPath(z, goal, dt, speedScale) {
     z.repathT -= dt;
-    const goalMoved = !z.goal || M.dist3sq(z.goal, goal) > 2.2;
+    const goalMoved = !z.goal || M.dist3sq(z.goal, goal) > 9.0;
     if (z.repathT <= 0 || goalMoved || !z.path) {
       repath(z, goal);
       z.repathT = rng.range(0.55, 1.05);
