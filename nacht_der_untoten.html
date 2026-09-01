@@ -12330,7 +12330,7 @@ Z.assert = function (cond, msg) {
 }());
 
 
-/* ============================ 16_player.js (532 lines) ============================ */
+/* ============================ 16_player.js (561 lines) ============================ */
 // ---------------------------------------------------------------------------
 // 16_player.js — the player: movement, camera, health, inventory, interaction.
 //
@@ -12609,20 +12609,49 @@ Z.assert = function (cond, msg) {
     return Z.B.PLAYER.health;
   };
 
+  // How many zombies are close enough to be swinging at the player right now.
+  // Counted from the live list rather than passed in, so the caller stays a
+  // single call and every damage source gets the same crowding rule.
+  function attackersNear(p) {
+    const list = Z.Zombies && Z.Zombies.list;
+    if (!list) return 1;
+    const reach = Z.B.PLAYER.zombieAttackRange || 1.72;
+    const r2 = (reach + 0.5) * (reach + 0.5);
+    let n = 0;
+    for (let i = 0; i < list.length; i++) {
+      const z = list[i];
+      if (z.dying) continue;
+      const dx = z.pos[0] - p.pos[0], dy = z.pos[1] - p.pos[1], dz = z.pos[2] - p.pos[2];
+      if (dx * dx + dy * dy + dz * dz <= r2) n++;
+    }
+    return n < 1 ? 1 : n;
+  }
+
   P.damage = function (p, amount, fromPos, source) {
     if (p.dead || amount <= 0) return false;
     if (p.godMode) return false;
     // Two zombies striking on the same tick would take a full-health player
-    // straight to downed with nothing they could have done. A short spacing
-    // keeps 'two hits and you are down' true without making it unreactable.
+    // straight to downed with nothing they could have done, so hits are spaced
+    // out. A flat global cooldown does that but flattens the horde: being
+    // boxed in by eight is then exactly as dangerous as being caught by two,
+    // which removes the reason to fear a corner. Instead the spacing tightens
+    // with the size of the group actually on you, down to a floor that keeps
+    // every hit individually reactable.
     const now = p.clock || 0;
-    if (source === 'zombie' && (now - (p.lastHitTime || -99)) < Z.B.PLAYER.damageCooldown) {
-      return false;
+    if (source === 'zombie') {
+      const B = Z.B.PLAYER;
+      const crowd = attackersNear(p);
+      const floor = B.damageCooldownMin || B.damageCooldown * 0.55;
+      const gap = Math.max(floor, B.damageCooldown - (crowd - 1) * 0.035);
+      if ((now - (p.lastHitTime || -99)) < gap) return false;
+      p.lastHitTime = now;
     }
-    if (source === 'zombie') p.lastHitTime = now;
     if (p.downed) {
-      // Already down: further hits just accelerate the bleedout slightly.
-      p.bleedout = Math.max(0, p.bleedout - 2.5);
+      // Already down: further hits accelerate the bleedout. This shares the
+      // spacing above, so a swarm does drain the clock faster than a straggler
+      // — but the drain per hit is small enough that the 45 s window is a
+      // window, not a formality.
+      p.bleedout = Math.max(0, p.bleedout - 1.1);
       return true;
     }
     p.health -= amount;
