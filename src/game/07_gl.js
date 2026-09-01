@@ -122,7 +122,7 @@
     let s = isFrag
       ? 'precision highp float;\n#define VARYING varying\n#define TEX texture2D\n#define FRAGCOLOR gl_FragColor\n'
       : 'precision highp float;\n#define ATTR attribute\n#define VARYING varying\n';
-    if (isFrag && G.extDeriv) s = '#extension GL_OES_standard_derivatives : enable\n' + s;
+    if (isFrag) s = '#extension GL_OES_standard_derivatives : enable\n' + s;
     return s;
   };
 

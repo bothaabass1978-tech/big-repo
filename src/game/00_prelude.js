@@ -36,6 +36,9 @@ Z.C = {
 
   // --- sim ---
   FIXED_DT: 1 / 120,        // physics tick
+  MAX_STEPS: 10,            // fixed steps allowed per rendered frame
+  MAX_CATCHUP_DT: 1 / 30,   // biggest single catch-up step (5.6 m/s -> 0.19 m,
+                            // well under the 0.34 m player radius)
   MAX_FRAME_DT: 0.25,
 
   // --- debug ---

@@ -248,12 +248,20 @@
     if (G.mode === 'playing' || G.mode === 'gameover') {
       accumulator += dt;
       let steps = 0;
-      while (accumulator >= C.FIXED_DT && steps < 8) {
+      while (accumulator >= C.FIXED_DT && steps < C.MAX_STEPS) {
         fixedStep(C.FIXED_DT);
         accumulator -= C.FIXED_DT;
         steps++;
       }
-      if (steps >= 8) accumulator = 0;   // don't spiral
+      // If we ran out of steps there is still real time unaccounted for.
+      // Dropping it makes the whole game run in slow motion on slow hardware,
+      // so spend the remainder in one larger step instead, clamped so a
+      // sprinting body still moves less than its own radius per tick and
+      // cannot tunnel through a wall.
+      if (steps >= C.MAX_STEPS && accumulator > C.FIXED_DT) {
+        fixedStep(Math.min(accumulator, C.MAX_CATCHUP_DT));
+        accumulator = 0;
+      }
     }
 
     G.time += dt;

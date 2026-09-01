@@ -30,7 +30,7 @@
 "use strict";
 (function(){
 
-/* ============================ 00_prelude.js (64 lines) ============================ */
+/* ============================ 00_prelude.js (67 lines) ============================ */
 // ---------------------------------------------------------------------------
 // 00_prelude.js — namespace, global config, fatal error trap
 // ---------------------------------------------------------------------------
@@ -69,6 +69,9 @@ Z.C = {
 
   // --- sim ---
   FIXED_DT: 1 / 120,        // physics tick
+  MAX_STEPS: 10,            // fixed steps allowed per rendered frame
+  MAX_CATCHUP_DT: 1 / 30,   // biggest single catch-up step (5.6 m/s -> 0.19 m,
+                            // well under the 0.34 m player radius)
   MAX_FRAME_DT: 0.25,
 
   // --- debug ---
@@ -1400,7 +1403,7 @@ Z.assert = function (cond, msg) {
 }());
 
 
-/* ============================ 04_input.js (230 lines) ============================ */
+/* ============================ 04_input.js (241 lines) ============================ */
 // ---------------------------------------------------------------------------
 // 04_input.js — keyboard / mouse / gamepad. Raw mouse deltas, pointer lock,
 // edge-triggered state, rebindable actions.
@@ -1410,13 +1413,19 @@ Z.assert = function (cond, msg) {
   Z.Input = I;
 
   const keys = Object.create(null);      // code -> true while held
-  const keyEdge = Object.create(null);   // code -> frame index of press
-  const keyUpEdge = Object.create(null);
+  // Edges are collected into sets by the DOM handlers and cleared at the end
+  // of the frame that consumed them. Tagging them with a frame counter instead
+  // is off by one — a key pressed between frames is stamped with the OLD frame
+  // number, and by the time anything asks, the counter has already advanced,
+  // so every single press edge is missed. That silently kills reload, buy,
+  // swap, melee, grenade and pause while held-key movement still works.
+  let edgeDown = Object.create(null);
+  let edgeUp = Object.create(null);
   let frame = 0;
 
   const mouse = { buttons: 0, dx: 0, dy: 0, wheel: 0, x: 0, y: 0 };
-  const mbEdge = [0, 0, 0, 0, 0];
-  const mbUpEdge = [0, 0, 0, 0, 0];
+  const mbDownEdge = [false, false, false, false, false];
+  const mbUpEdge = [false, false, false, false, false];
 
   I.locked = false;
   I.enabled = true;
@@ -1451,18 +1460,20 @@ Z.assert = function (cond, msg) {
     if (!I.enabled) return;
     // Never swallow devtools / reload
     if (e.code === 'F5' || e.code === 'F12' || (e.ctrlKey && e.code === 'KeyR')) return;
-    if (!keys[e.code]) keyEdge[e.code] = frame;
+    if (!keys[e.code]) edgeDown[e.code] = true;
     keys[e.code] = true;
     I.lastInputWasGamepad = false;
     if (e.code === 'Tab' || e.code === 'Space' || e.code.startsWith('Arrow')) e.preventDefault();
   }
   function onKeyUp(e) {
     keys[e.code] = false;
-    keyUpEdge[e.code] = frame;
+    edgeUp[e.code] = true;
   }
   function onBlur() {
     for (const k in keys) keys[k] = false;
     mouse.buttons = 0;
+    edgeDown = Object.create(null);
+    edgeUp = Object.create(null);
   }
 
   function onMouseMove(e) {
@@ -1477,7 +1488,7 @@ Z.assert = function (cond, msg) {
   function onMouseDown(e) {
     if (!I.enabled) return;
     const b = e.button;
-    if (!(mouse.buttons & (1 << b))) mbEdge[b] = frame;
+    if (!(mouse.buttons & (1 << b))) mbDownEdge[b] = true;
     mouse.buttons |= (1 << b);
     I.lastInputWasGamepad = false;
     if (I.locked) e.preventDefault();
@@ -1485,7 +1496,7 @@ Z.assert = function (cond, msg) {
   function onMouseUp(e) {
     const b = e.button;
     mouse.buttons &= ~(1 << b);
-    mbUpEdge[b] = frame;
+    mbUpEdge[b] = true;
   }
   function onWheel(e) {
     mouse.wheel += Math.sign(e.deltaY);
@@ -1524,16 +1535,19 @@ Z.assert = function (cond, msg) {
   };
   I.postUpdate = function () {
     mouse.dx = 0; mouse.dy = 0; mouse.wheel = 0;
+    edgeDown = Object.create(null);
+    edgeUp = Object.create(null);
+    for (let i = 0; i < mbDownEdge.length; i++) { mbDownEdge[i] = false; mbUpEdge[i] = false; }
     if (I.gamepad) { I.gamepad.prevButtons = I.gamepad.buttons.slice(); }
   };
 
   // --- queries --------------------------------------------------------------
   I.down = (code) => !!keys[code];
-  I.pressed = (code) => keyEdge[code] === frame;
-  I.released = (code) => keyUpEdge[code] === frame;
+  I.pressed = (code) => !!edgeDown[code];
+  I.released = (code) => !!edgeUp[code];
   I.mb = (n) => !!(mouse.buttons & (1 << n));
-  I.mbPressed = (n) => mbEdge[n] === frame;
-  I.mbReleased = (n) => mbUpEdge[n] === frame;
+  I.mbPressed = (n) => !!mbDownEdge[n];
+  I.mbReleased = (n) => !!mbUpEdge[n];
   I.wheel = () => mouse.wheel;
   I.mousePos = () => [mouse.x, mouse.y];
 
@@ -1552,13 +1566,13 @@ Z.assert = function (cond, msg) {
   I.actPressed = function (name) {
     const b = I.binds[name];
     if (!b) return false;
-    for (let i = 0; i < b.length; i++) if (keyEdge[b[i]] === frame) return true;
+    for (let i = 0; i < b.length; i++) if (edgeDown[b[i]]) return true;
     return false;
   };
   I.actReleased = function (name) {
     const b = I.binds[name];
     if (!b) return false;
-    for (let i = 0; i < b.length; i++) if (keyUpEdge[b[i]] === frame) return true;
+    for (let i = 0; i < b.length; i++) if (edgeUp[b[i]]) return true;
     return false;
   };
 
@@ -5534,7 +5548,7 @@ Z.assert = function (cond, msg) {
     stains(ctx, size, 14, { count: 3, color: [10, 9, 9], alpha: 0.3 });
     scratches(ctx, size, 14, 8, { maxLen: 0.2 });
     grime(ctx, size, 14, 1.1);
-    return { canvas: c, size, tile: [false, false], spec: 0.1, gloss: 0.25, emissive: 0, normal: null, tint: [1, 1, 1] };
+    return { canvas: c, size, tile: [false, false], spec: 0.1, gloss: 0.25, emissive: 0, normal: null, tint: [0.52, 0.50, 0.46] };
   }
 
   function makePlasterWall() {
@@ -5895,7 +5909,7 @@ Z.assert = function (cond, msg) {
       }
     }
     grime(ctx, size, seedN, 0.3);
-    return { canvas: c, size, tile: [false, false], spec: 0.4, gloss: 0.55, emissive: 0, normal: null, tint: [1, 1, 1] };
+    return { canvas: c, size, tile: [false, false], spec: 0.4, gloss: 0.55, emissive: 0, normal: null, tint: [0.55, 0.50, 0.48] };
   }
 
   function makeCrateWood() {
@@ -6009,7 +6023,7 @@ Z.assert = function (cond, msg) {
     ctx.restore();
     grime(ctx, size, seedN, 0.9);
     dirtAO(ctx, size, { strength: 0.1 });
-    return { canvas: c, size, tile: [false, false], spec: 0.06, gloss: 0.12, emissive: 0, normal: null, tint: [1, 1, 1] };
+    return { canvas: c, size, tile: [false, false], spec: 0.06, gloss: 0.12, emissive: 0, normal: null, tint: [0.42, 0.40, 0.37] };
   }
   // Crude blocky letter stroke paths for HELP (H,E,L,P), origin top-left of cell.
   function strokesForLetter(ch, x0, y0, w, h) {
@@ -6076,7 +6090,7 @@ Z.assert = function (cond, msg) {
     crackNetwork(ctx, size, seedN, { count: 2, depth: 2, width: 0.8, maxLen: 0.2, color: 'rgba(20,18,14,0.3)' });
     stains(ctx, size, seedN, { count: 3, color: [20, 18, 14], alpha: 0.3 });
     grime(ctx, size, seedN, 0.8);
-    return { canvas: c, size, tile: [false, false], spec: 0.03, gloss: 0.06, emissive: 0, normal: null, tint: [1, 1, 1] };
+    return { canvas: c, size, tile: [false, false], spec: 0.03, gloss: 0.06, emissive: 0, normal: null, tint: [0.44, 0.42, 0.38] };
   }
 
   // Perk-a-Cola label panels. Each: coloured glass bottle silhouette + cartoon
@@ -6777,7 +6791,7 @@ Z.assert = function (cond, msg) {
     let s = isFrag
       ? 'precision highp float;\n#define VARYING varying\n#define TEX texture2D\n#define FRAGCOLOR gl_FragColor\n'
       : 'precision highp float;\n#define ATTR attribute\n#define VARYING varying\n';
-    if (isFrag && G.extDeriv) s = '#extension GL_OES_standard_derivatives : enable\n' + s;
+    if (isFrag) s = '#extension GL_OES_standard_derivatives : enable\n' + s;
     return s;
   };
 
@@ -8780,7 +8794,7 @@ Z.assert = function (cond, msg) {
 }());
 
 
-/* ============================ 12_render.js (782 lines) ============================ */
+/* ============================ 12_render.js (814 lines) ============================ */
 // ---------------------------------------------------------------------------
 // 12_render.js — forward renderer.
 //
@@ -8811,7 +8825,7 @@ Z.assert = function (cond, msg) {
   const tmpM = m4.create();
 
   R.env = {
-    ambTop: [0.100, 0.100, 0.122],   // cold moonlight from above
+    ambTop: [0.112, 0.112, 0.136],   // cold moonlight from above
     ambBot: [0.030, 0.028, 0.033],   // near-black bounce off the floorboards
     sunDir: [0.35, -0.82, 0.45],
     sunCol: [0.085, 0.095, 0.130],
@@ -8878,6 +8892,8 @@ Z.assert = function (cond, msg) {
     'VARYING vec2 vUv;',
     'VARYING vec3 vCol;',
     'uniform sampler2D uTex;',
+    'uniform sampler2D uNrmTex;',
+    'uniform float uHasNormal;',
     'uniform vec3 uTint;',
     'uniform float uEmissive;',
     'uniform vec2 uSpec;',
@@ -8894,6 +8910,24 @@ Z.assert = function (cond, msg) {
     'uniform vec4 uLightPosR[8];',
     'uniform vec4 uLightColI[8];',
     'uniform float uHurt;',
+    // Build a tangent frame from screen-space derivatives. The world meshes
+    // carry no tangents (they are generated brush geometry), and this costs
+    // nothing to author while giving every surface real relief under the
+    // moving lamps — which is most of what stops a tiled wall reading flat.
+    'vec3 perturbNormal(vec3 N, vec3 V, vec2 uv) {',
+    '  vec3 dp1 = dFdx(-V);',
+    '  vec3 dp2 = dFdy(-V);',
+    '  vec2 duv1 = dFdx(uv);',
+    '  vec2 duv2 = dFdy(uv);',
+    '  vec3 dp2perp = cross(dp2, N);',
+    '  vec3 dp1perp = cross(N, dp1);',
+    '  vec3 T = dp2perp * duv1.x + dp1perp * duv2.x;',
+    '  vec3 B = dp2perp * duv1.y + dp1perp * duv2.y;',
+    '  float invmax = inversesqrt(max(dot(T, T), dot(B, B)) + 1e-8);',
+    '  vec3 m = TEX(uNrmTex, uv).xyz * 2.0 - 1.0;',
+    '  m.xy *= 1.35;',
+    '  return normalize(mat3(T * invmax, B * invmax, N) * m);',
+    '}',
     'void main() {',
     '  vec4 texel = TEX(uTex, vUv);',
     '  if (texel.a < uAlphaTest) discard;',
@@ -8901,6 +8935,11 @@ Z.assert = function (cond, msg) {
     '  vec3 N = normalize(vNrm);',
     '  vec3 V = normalize(uCamPos - vWorld);',
     '  float dist = length(uCamPos - vWorld);',
+    '  if (uHasNormal > 0.5 && dist < 26.0) {',
+    '    vec3 Np = perturbNormal(N, V, vUv);',
+    // fade the detail out with distance so it never aliases into noise
+    '    N = normalize(mix(Np, N, clamp((dist - 9.0) / 17.0, 0.0, 1.0)));',
+    '  }',
     '  float up = N.y * 0.5 + 0.5;',
     '  vec3 light = mix(uAmbBot, uAmbTop, up);',
     '  float nd = dot(N, -normalize(uSunDir));',
@@ -9073,6 +9112,9 @@ Z.assert = function (cond, msg) {
       const mat = Z.Tex.materials[k];
       if (!mat || !mat.canvas || gpuTex[k]) continue;
       gpuTex[k] = Z.GL.tex2D(mat.canvas, { clamp: mat.clamp === true });
+      if (mat.normal) {
+        gpuTex['n:' + k] = Z.GL.tex2D(mat.normal, { clamp: mat.clamp === true });
+      }
     }
     if (Z.Tex.SPRITES) {
       for (const k in Z.Tex.SPRITES) {
@@ -9300,6 +9342,10 @@ Z.assert = function (cond, msg) {
     const mat = (Z.Tex && Z.Tex.materials && Z.Tex.materials[key]) || null;
     Z.GL.bindTex(0, R.texFor(key));
     gl.uniform1i(prog.u.uTex, 0);
+    const nrm = gpuTex['n:' + key];
+    Z.GL.bindTex(2, nrm || Z.GL.flatNormal);
+    gl.uniform1i(prog.u.uNrmTex, 2);
+    gl.uniform1f(prog.u.uHasNormal, nrm ? 1 : 0);
     const tint = (over && over.tint) || (mat && mat.tint) || WHITE3;
     gl.uniform3fv(prog.u.uTint, tint);
     const emis = (over && over.emissive !== undefined) ? over.emissive : (mat ? (mat.emissive || 0) : 0);
@@ -16562,7 +16608,7 @@ Z.assert = function (cond, msg) {
 }());
 
 
-/* ============================ 22_game.js (669 lines) ============================ */
+/* ============================ 22_game.js (677 lines) ============================ */
 // ---------------------------------------------------------------------------
 // 22_game.js — state machine, fixed-timestep loop, render order, HUD feed.
 // ---------------------------------------------------------------------------
@@ -16813,12 +16859,20 @@ Z.assert = function (cond, msg) {
     if (G.mode === 'playing' || G.mode === 'gameover') {
       accumulator += dt;
       let steps = 0;
-      while (accumulator >= C.FIXED_DT && steps < 8) {
+      while (accumulator >= C.FIXED_DT && steps < C.MAX_STEPS) {
         fixedStep(C.FIXED_DT);
         accumulator -= C.FIXED_DT;
         steps++;
       }
-      if (steps >= 8) accumulator = 0;   // don't spiral
+      // If we ran out of steps there is still real time unaccounted for.
+      // Dropping it makes the whole game run in slow motion on slow hardware,
+      // so spend the remainder in one larger step instead, clamped so a
+      // sprinting body still moves less than its own radius per tick and
+      // cannot tunnel through a wall.
+      if (steps >= C.MAX_STEPS && accumulator > C.FIXED_DT) {
+        fixedStep(Math.min(accumulator, C.MAX_CATCHUP_DT));
+        accumulator = 0;
+      }
     }
 
     G.time += dt;

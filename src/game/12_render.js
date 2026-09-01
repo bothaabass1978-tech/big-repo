@@ -28,7 +28,7 @@
   const tmpM = m4.create();
 
   R.env = {
-    ambTop: [0.100, 0.100, 0.122],   // cold moonlight from above
+    ambTop: [0.112, 0.112, 0.136],   // cold moonlight from above
     ambBot: [0.030, 0.028, 0.033],   // near-black bounce off the floorboards
     sunDir: [0.35, -0.82, 0.45],
     sunCol: [0.085, 0.095, 0.130],
@@ -95,6 +95,8 @@
     'VARYING vec2 vUv;',
     'VARYING vec3 vCol;',
     'uniform sampler2D uTex;',
+    'uniform sampler2D uNrmTex;',
+    'uniform float uHasNormal;',
     'uniform vec3 uTint;',
     'uniform float uEmissive;',
     'uniform vec2 uSpec;',
@@ -111,6 +113,24 @@
     'uniform vec4 uLightPosR[8];',
     'uniform vec4 uLightColI[8];',
     'uniform float uHurt;',
+    // Build a tangent frame from screen-space derivatives. The world meshes
+    // carry no tangents (they are generated brush geometry), and this costs
+    // nothing to author while giving every surface real relief under the
+    // moving lamps — which is most of what stops a tiled wall reading flat.
+    'vec3 perturbNormal(vec3 N, vec3 V, vec2 uv) {',
+    '  vec3 dp1 = dFdx(-V);',
+    '  vec3 dp2 = dFdy(-V);',
+    '  vec2 duv1 = dFdx(uv);',
+    '  vec2 duv2 = dFdy(uv);',
+    '  vec3 dp2perp = cross(dp2, N);',
+    '  vec3 dp1perp = cross(N, dp1);',
+    '  vec3 T = dp2perp * duv1.x + dp1perp * duv2.x;',
+    '  vec3 B = dp2perp * duv1.y + dp1perp * duv2.y;',
+    '  float invmax = inversesqrt(max(dot(T, T), dot(B, B)) + 1e-8);',
+    '  vec3 m = TEX(uNrmTex, uv).xyz * 2.0 - 1.0;',
+    '  m.xy *= 1.35;',
+    '  return normalize(mat3(T * invmax, B * invmax, N) * m);',
+    '}',
     'void main() {',
     '  vec4 texel = TEX(uTex, vUv);',
     '  if (texel.a < uAlphaTest) discard;',
@@ -118,6 +138,11 @@
     '  vec3 N = normalize(vNrm);',
     '  vec3 V = normalize(uCamPos - vWorld);',
     '  float dist = length(uCamPos - vWorld);',
+    '  if (uHasNormal > 0.5 && dist < 26.0) {',
+    '    vec3 Np = perturbNormal(N, V, vUv);',
+    // fade the detail out with distance so it never aliases into noise
+    '    N = normalize(mix(Np, N, clamp((dist - 9.0) / 17.0, 0.0, 1.0)));',
+    '  }',
     '  float up = N.y * 0.5 + 0.5;',
     '  vec3 light = mix(uAmbBot, uAmbTop, up);',
     '  float nd = dot(N, -normalize(uSunDir));',
@@ -290,6 +315,9 @@
       const mat = Z.Tex.materials[k];
       if (!mat || !mat.canvas || gpuTex[k]) continue;
       gpuTex[k] = Z.GL.tex2D(mat.canvas, { clamp: mat.clamp === true });
+      if (mat.normal) {
+        gpuTex['n:' + k] = Z.GL.tex2D(mat.normal, { clamp: mat.clamp === true });
+      }
     }
     if (Z.Tex.SPRITES) {
       for (const k in Z.Tex.SPRITES) {
@@ -517,6 +545,10 @@
     const mat = (Z.Tex && Z.Tex.materials && Z.Tex.materials[key]) || null;
     Z.GL.bindTex(0, R.texFor(key));
     gl.uniform1i(prog.u.uTex, 0);
+    const nrm = gpuTex['n:' + key];
+    Z.GL.bindTex(2, nrm || Z.GL.flatNormal);
+    gl.uniform1i(prog.u.uNrmTex, 2);
+    gl.uniform1f(prog.u.uHasNormal, nrm ? 1 : 0);
     const tint = (over && over.tint) || (mat && mat.tint) || WHITE3;
     gl.uniform3fv(prog.u.uTint, tint);
     const emis = (over && over.emissive !== undefined) ? over.emissive : (mat ? (mat.emissive || 0) : 0);

@@ -7,13 +7,19 @@
   Z.Input = I;
 
   const keys = Object.create(null);      // code -> true while held
-  const keyEdge = Object.create(null);   // code -> frame index of press
-  const keyUpEdge = Object.create(null);
+  // Edges are collected into sets by the DOM handlers and cleared at the end
+  // of the frame that consumed them. Tagging them with a frame counter instead
+  // is off by one — a key pressed between frames is stamped with the OLD frame
+  // number, and by the time anything asks, the counter has already advanced,
+  // so every single press edge is missed. That silently kills reload, buy,
+  // swap, melee, grenade and pause while held-key movement still works.
+  let edgeDown = Object.create(null);
+  let edgeUp = Object.create(null);
   let frame = 0;
 
   const mouse = { buttons: 0, dx: 0, dy: 0, wheel: 0, x: 0, y: 0 };
-  const mbEdge = [0, 0, 0, 0, 0];
-  const mbUpEdge = [0, 0, 0, 0, 0];
+  const mbDownEdge = [false, false, false, false, false];
+  const mbUpEdge = [false, false, false, false, false];
 
   I.locked = false;
   I.enabled = true;
@@ -48,18 +54,20 @@
     if (!I.enabled) return;
     // Never swallow devtools / reload
     if (e.code === 'F5' || e.code === 'F12' || (e.ctrlKey && e.code === 'KeyR')) return;
-    if (!keys[e.code]) keyEdge[e.code] = frame;
+    if (!keys[e.code]) edgeDown[e.code] = true;
     keys[e.code] = true;
     I.lastInputWasGamepad = false;
     if (e.code === 'Tab' || e.code === 'Space' || e.code.startsWith('Arrow')) e.preventDefault();
   }
   function onKeyUp(e) {
     keys[e.code] = false;
-    keyUpEdge[e.code] = frame;
+    edgeUp[e.code] = true;
   }
   function onBlur() {
     for (const k in keys) keys[k] = false;
     mouse.buttons = 0;
+    edgeDown = Object.create(null);
+    edgeUp = Object.create(null);
   }
 
   function onMouseMove(e) {
@@ -74,7 +82,7 @@
   function onMouseDown(e) {
     if (!I.enabled) return;
     const b = e.button;
-    if (!(mouse.buttons & (1 << b))) mbEdge[b] = frame;
+    if (!(mouse.buttons & (1 << b))) mbDownEdge[b] = true;
     mouse.buttons |= (1 << b);
     I.lastInputWasGamepad = false;
     if (I.locked) e.preventDefault();
@@ -82,7 +90,7 @@
   function onMouseUp(e) {
     const b = e.button;
     mouse.buttons &= ~(1 << b);
-    mbUpEdge[b] = frame;
+    mbUpEdge[b] = true;
   }
   function onWheel(e) {
     mouse.wheel += Math.sign(e.deltaY);
@@ -121,16 +129,19 @@
   };
   I.postUpdate = function () {
     mouse.dx = 0; mouse.dy = 0; mouse.wheel = 0;
+    edgeDown = Object.create(null);
+    edgeUp = Object.create(null);
+    for (let i = 0; i < mbDownEdge.length; i++) { mbDownEdge[i] = false; mbUpEdge[i] = false; }
     if (I.gamepad) { I.gamepad.prevButtons = I.gamepad.buttons.slice(); }
   };
 
   // --- queries --------------------------------------------------------------
   I.down = (code) => !!keys[code];
-  I.pressed = (code) => keyEdge[code] === frame;
-  I.released = (code) => keyUpEdge[code] === frame;
+  I.pressed = (code) => !!edgeDown[code];
+  I.released = (code) => !!edgeUp[code];
   I.mb = (n) => !!(mouse.buttons & (1 << n));
-  I.mbPressed = (n) => mbEdge[n] === frame;
-  I.mbReleased = (n) => mbUpEdge[n] === frame;
+  I.mbPressed = (n) => !!mbDownEdge[n];
+  I.mbReleased = (n) => !!mbUpEdge[n];
   I.wheel = () => mouse.wheel;
   I.mousePos = () => [mouse.x, mouse.y];
 
@@ -149,13 +160,13 @@
   I.actPressed = function (name) {
     const b = I.binds[name];
     if (!b) return false;
-    for (let i = 0; i < b.length; i++) if (keyEdge[b[i]] === frame) return true;
+    for (let i = 0; i < b.length; i++) if (edgeDown[b[i]]) return true;
     return false;
   };
   I.actReleased = function (name) {
     const b = I.binds[name];
     if (!b) return false;
-    for (let i = 0; i < b.length; i++) if (keyUpEdge[b[i]] === frame) return true;
+    for (let i = 0; i < b.length; i++) if (edgeUp[b[i]]) return true;
     return false;
   };
 

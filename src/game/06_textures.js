@@ -697,7 +697,7 @@
     stains(ctx, size, 14, { count: 3, color: [10, 9, 9], alpha: 0.3 });
     scratches(ctx, size, 14, 8, { maxLen: 0.2 });
     grime(ctx, size, 14, 1.1);
-    return { canvas: c, size, tile: [false, false], spec: 0.1, gloss: 0.25, emissive: 0, normal: null, tint: [1, 1, 1] };
+    return { canvas: c, size, tile: [false, false], spec: 0.1, gloss: 0.25, emissive: 0, normal: null, tint: [0.52, 0.50, 0.46] };
   }
 
   function makePlasterWall() {
@@ -1058,7 +1058,7 @@
       }
     }
     grime(ctx, size, seedN, 0.3);
-    return { canvas: c, size, tile: [false, false], spec: 0.4, gloss: 0.55, emissive: 0, normal: null, tint: [1, 1, 1] };
+    return { canvas: c, size, tile: [false, false], spec: 0.4, gloss: 0.55, emissive: 0, normal: null, tint: [0.55, 0.50, 0.48] };
   }
 
   function makeCrateWood() {
@@ -1172,7 +1172,7 @@
     ctx.restore();
     grime(ctx, size, seedN, 0.9);
     dirtAO(ctx, size, { strength: 0.1 });
-    return { canvas: c, size, tile: [false, false], spec: 0.06, gloss: 0.12, emissive: 0, normal: null, tint: [1, 1, 1] };
+    return { canvas: c, size, tile: [false, false], spec: 0.06, gloss: 0.12, emissive: 0, normal: null, tint: [0.42, 0.40, 0.37] };
   }
   // Crude blocky letter stroke paths for HELP (H,E,L,P), origin top-left of cell.
   function strokesForLetter(ch, x0, y0, w, h) {
@@ -1239,7 +1239,7 @@
     crackNetwork(ctx, size, seedN, { count: 2, depth: 2, width: 0.8, maxLen: 0.2, color: 'rgba(20,18,14,0.3)' });
     stains(ctx, size, seedN, { count: 3, color: [20, 18, 14], alpha: 0.3 });
     grime(ctx, size, seedN, 0.8);
-    return { canvas: c, size, tile: [false, false], spec: 0.03, gloss: 0.06, emissive: 0, normal: null, tint: [1, 1, 1] };
+    return { canvas: c, size, tile: [false, false], spec: 0.03, gloss: 0.06, emissive: 0, normal: null, tint: [0.44, 0.42, 0.38] };
   }
 
   // Perk-a-Cola label panels. Each: coloured glass bottle silhouette + cartoon
