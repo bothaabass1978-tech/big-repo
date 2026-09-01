@@ -275,7 +275,10 @@
   // -------------------------------------------------------------------------
   const tmpA = [0, 0, 0], tmpB = [0, 0, 0];
 
+  S.lastDt = 1 / 120;
+
   S.update = function (dt, ctx) {
+    S.lastDt = dt;
     const B = Z.B.PLAYER;
     const playerPos = player ? player.pos : [0, 0, 0];
     const paused = ctx && ctx.paused;
@@ -340,9 +343,27 @@
       z.yaw = M.angDamp(z.yaw, z.targetYaw, 9, dt);
     }
 
-    // Keep the horde from collapsing into a single point.
+    // Keep the horde from collapsing into a single point, and keep it out of
+    // the player's own space.
     separate(dt);
+    separateFromPlayer();
   };
+
+  // Separation moves bodies by direct assignment, which bypasses collision —
+  // next to a wall that will happily push a zombie clean through it, and a
+  // zombie outside the building has no navigation path back in and is stuck
+  // for the rest of the round. So every shove is checked and reverted if it
+  // would end up inside geometry.
+  const sepSave = [0, 0, 0];
+  function shoveSafe(z, dx, dz) {
+    sepSave[0] = z.pos[0]; sepSave[2] = z.pos[2];
+    z.pos[0] += dx; z.pos[2] += dz;
+    if (Z.Phys.boxSolid(z.pos, z.radius * 0.92, z.height * 0.9)) {
+      z.pos[0] = sepSave[0]; z.pos[2] = sepSave[2];
+      return false;
+    }
+    return true;
+  }
 
   function separate() {
     const n = S.list.length;
@@ -353,9 +374,71 @@
         const b = S.list[j];
         if (b.dying) continue;
         if (Math.abs(a.pos[1] - b.pos[1]) > 1.4) continue;
-        Z.Phys.separate(a, b, 0.55);
+        const dx = b.pos[0] - a.pos[0], dz = b.pos[2] - a.pos[2];
+        const d2 = dx * dx + dz * dz;
+        const rr = a.radius + b.radius;
+        if (d2 > rr * rr || d2 < 1e-8) continue;
+        const d = Math.sqrt(d2);
+        const push = (rr - d) * 0.5 * 0.55;
+        const nx = dx / d, nz = dz / d;
+        shoveSafe(a, -nx * push, -nz * push);
+        shoveSafe(b, nx * push, nz * push);
       }
     }
+  }
+
+  // Zombies are solid to the player. Without this they walk straight into
+  // your chest, sit at 0.2 m from your centre and beat you to death while you
+  // shove uselessly through them — being crowded has to *feel* like being
+  // crowded. The player is much heavier than a zombie so a crowd slows and
+  // corners you (which is the horror) without ever teleporting you into
+  // geometry (which is a bug).
+  const PLAYER_PUSH = 0.20;
+  const MAX_PUSH_PER_TICK = 0.020;   // metres; ~2.4 m/s of crowd shove at 120 Hz
+  const pushAcc = [0, 0];
+
+  function separateFromPlayer() {
+    if (!player || player.dead) return;
+    const pr = player.radius;
+    pushAcc[0] = 0; pushAcc[1] = 0;
+
+    for (const z of S.list) {
+      if (z.dying) continue;
+      if (z.state === 'climb') continue;                 // mid-window, not solid yet
+      if (Math.abs(z.pos[1] - player.pos[1]) > 1.5) continue;
+      const dx = z.pos[0] - player.pos[0];
+      const dz = z.pos[2] - player.pos[2];
+      const rr = z.radius + pr;
+      const d2 = dx * dx + dz * dz;
+      if (d2 > rr * rr) continue;
+      let nx, nz, d;
+      if (d2 < 1e-6) {
+        // exactly coincident: shove along the zombie's facing so it resolves
+        nx = Math.sin(z.yaw); nz = Math.cos(z.yaw); d = 0;
+      } else {
+        d = Math.sqrt(d2); nx = dx / d; nz = dz / d;
+      }
+      const overlap = rr - d;
+      // The zombie takes almost all of the correction, but never through a wall.
+      shoveSafe(z, nx * overlap * (1 - PLAYER_PUSH), nz * overlap * (1 - PLAYER_PUSH));
+      pushAcc[0] -= nx * overlap * PLAYER_PUSH;
+      pushAcc[1] -= nz * overlap * PLAYER_PUSH;
+    }
+
+    // One clamped shove per tick. Without the clamp, ten zombies each pushing
+    // a little sums to more than the player's own top speed and the crowd
+    // simply freezes you in place — being mobbed should be lethal because you
+    // cannot escape the *damage*, not because the physics pins you.
+    const mag = Math.hypot(pushAcc[0], pushAcc[1]);
+    if (mag < 1e-6) return;
+    const k = Math.min(1, MAX_PUSH_PER_TICK / mag);
+    const dt = Math.max(1e-4, S.lastDt);
+    const ent = {
+      pos: player.pos,
+      vel: [pushAcc[0] * k / dt, 0, pushAcc[1] * k / dt],
+      radius: pr, height: player.height, onGround: player.onGround, stepUp: 0,
+    };
+    Z.Phys.move(ent, dt);
   }
 
   // --- movement helper -------------------------------------------------------
@@ -439,6 +522,20 @@
     if (!w) { z.state = 'hunt'; return; }
     z.anim = animForSpeed(z);
     const d = followPath(z, w.out, dt, 1);
+    // Same watchdog as hunting: no headway toward the window for long enough
+    // means this one can't get there and needs a different way in.
+    if (z.approachBest === undefined || d < z.approachBest - 0.25) {
+      z.approachBest = d;
+      z.approachStuckT = 0;
+    } else {
+      z.approachStuckT = (z.approachStuckT || 0) + dt;
+      if (z.approachStuckT > 9.0) {
+        z.approachBest = undefined;
+        z.approachStuckT = 0;
+        recoverStuckHunter(z, player ? player.pos : z.pos);
+        return;
+      }
+    }
     if (d < 1.0) {
       z.state = w.boards > 0 ? 'queue' : 'climb';
       z.stateT = 0;
@@ -538,9 +635,81 @@
     }
   }
 
+  // A hunter that makes no headway for long enough has gone wrong somehow —
+  // shoved outside the building, wedged on geometry, or cut off by a door
+  // that closed. Rather than leave it to hang the round forever, send it back
+  // to a barricade and let it come in again.
+  const NO_PROGRESS_REPATH = 4.0;
+  const NO_PROGRESS_RESET = 11.0;
+
+  function recoverStuckHunter(z, playerPos) {
+    const lv = Z.Level.level;
+    const D = Z.Level.DIMS;
+    const inside = z.pos[0] > D.X0 && z.pos[0] < D.X1
+      && z.pos[2] > D.Z0 && z.pos[2] < D.Z1;
+
+    if (inside) {
+      // Already in the building but cut off. Sending it back out to a window
+      // is impossible (windows are not walkable nav edges), so relocate it to
+      // a barricade's inside drop point that CAN reach the player.
+      for (const w of lv.windows) {
+        if (!Z.Level.isRoomOpen(w.room)) continue;
+        const to = [w.inPos[0], w.floorY + 0.02, w.inPos[2]];
+        if (!Z.Nav.pathBetween(to, playerPos, 3000)) continue;
+        z.pos[0] = to[0]; z.pos[1] = to[1]; z.pos[2] = to[2];
+        z.state = 'hunt';
+        z.window = null;
+        z.path = null; z.goal = null; z.repathT = 0;
+        z.noProgressT = 0; z.bestDist = undefined;
+        return;
+      }
+      // Nothing reachable at all — let it die rather than hang the round.
+      S.kill(z, { source: 'stuck', dir: [0, 0, 1] });
+      return;
+    }
+
+    // Outside: pick a window it can actually walk to and start over.
+    let best = null, bestD = 1e9;
+    for (const w of lv.windows) {
+      if (!Z.Level.isRoomOpen(w.room)) continue;
+      const d = M.dist3(w.out, z.pos);
+      if (d >= bestD) continue;
+      if (!Z.Nav.pathBetween(z.pos, w.out, 3000)) continue;
+      bestD = d; best = w;
+    }
+    if (!best) { S.kill(z, { source: 'stuck', dir: [0, 0, 1] }); return; }
+    z.window = best;
+    z.state = 'approach';
+    z.stateT = 0;
+    z.path = null; z.goal = null; z.repathT = 0;
+    z.noProgressT = 0; z.bestDist = undefined;
+    if (Z.Phys.boxSolid(z.pos, z.radius, z.height)) {
+      z.pos[0] = best.out[0]; z.pos[1] = best.out[1] + 0.02; z.pos[2] = best.out[2];
+    }
+  }
+
   function updateHunt(z, dt, playerPos) {
     z.anim = z.crawler ? 'crawler' : animForSpeed(z);
     const dist = followPath(z, playerPos, dt, 1);
+
+    // progress watchdog
+    const reachNow = Z.B.PLAYER.meleeRange * 0.8;
+    if (z.bestDist === undefined || dist < z.bestDist - 0.25) {
+      z.bestDist = dist;
+      z.noProgressT = 0;
+    } else if (dist > reachNow) {
+      z.noProgressT = (z.noProgressT || 0) + dt;
+      if (z.noProgressT > NO_PROGRESS_RESET) {
+        recoverStuckHunter(z, playerPos);
+        z.bestDist = undefined;
+        return;
+      }
+      if (z.noProgressT > NO_PROGRESS_REPATH) {
+        z.repathT = 0;
+        z.bestDist = dist;      // give the new path a fresh baseline
+      }
+    }
+
     const reach = Z.B.PLAYER.meleeRange * 0.8;
     if (dist < reach && Math.abs(z.pos[1] - playerPos[1]) < 1.6 && z.attackCooldown <= 0) {
       z.state = 'attack';

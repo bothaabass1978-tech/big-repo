@@ -293,12 +293,24 @@
 
     // --- input snapshot -----------------------------------------------------
     const alive = !p.dead;
+    // A bot brain, when installed, replaces every human input for this tick.
+    // Used by the headless playtest harness to actually play the game.
+    const bot = G.botBrain ? G.botBrain(p, dt) : null;
+
     const canAct = alive && G.mode === 'playing' && !p.downed;
     const input = {
       move: [0, 0],
       jump: false, crouch: false, sprint: false,
     };
-    if (alive && G.mode === 'playing') {
+    if (bot) {
+      input.move[0] = bot.move ? bot.move[0] : 0;
+      input.move[1] = bot.move ? bot.move[1] : 0;
+      input.jump = !!bot.jump;
+      input.crouch = !!bot.crouch;
+      input.sprint = !!bot.sprint;
+      if (bot.aimYaw !== undefined) p.yaw = bot.aimYaw;
+      if (bot.aimPitch !== undefined) p.pitch = M.clamp(bot.aimPitch, -C.PITCH_LIMIT, C.PITCH_LIMIT);
+    } else if (alive && G.mode === 'playing') {
       Z.Input.moveAxis(input.move);
       input.jump = Z.Input.act('jump') || Z.Input.gpButton(0);
       input.crouch = (Z.Menu.settings.toggleCrouch ? p.wantCrouch : Z.Input.act('crouch'))
@@ -328,11 +340,11 @@
     Z.Player.eye(p, eye);
     Z.Player.forward(p, dir);
 
-    const wantFire = canAct && p.swapT <= 0
-      && (Z.Input.mb(0) || Z.Input.gpAxis(7) > 0.4 || Z.Input.gpButton(7));
-    const wantAds = canAct && (Z.Menu.settings.toggleAds ? p.wantAds
-      : (Z.Input.mb(2) || Z.Input.gpButton(6)));
-    if (Z.Menu.settings.toggleAds && canAct && Z.Input.mbPressed(2)) p.wantAds = !p.wantAds;
+    const wantFire = canAct && p.swapT <= 0 && (bot ? !!bot.fire
+      : (Z.Input.mb(0) || Z.Input.gpAxis(7) > 0.4 || Z.Input.gpButton(7)));
+    const wantAds = canAct && (bot ? !!bot.ads
+      : (Z.Menu.settings.toggleAds ? p.wantAds : (Z.Input.mb(2) || Z.Input.gpButton(6))));
+    if (!bot && Z.Menu.settings.toggleAds && canAct && Z.Input.mbPressed(2)) p.wantAds = !p.wantAds;
 
     const speed = Math.hypot(p.vel[0], p.vel[2]);
     const wctx = {
@@ -340,7 +352,7 @@
       speed, crouched: p.crouched, onGround: p.onGround, sprinting: p.sprinting,
       mods: Z.Player.mods(p),
       wantFire, wantAds,
-      wantReload: canAct && (Z.Input.actPressed('reload') || Z.Input.gpPressed(2)),
+      wantReload: canAct && (bot ? !!bot.reload : (Z.Input.actPressed('reload') || Z.Input.gpPressed(2))),
       dt, time: G.time, player: p,
       lookDX: lookRad[0], lookDY: lookRad[1],
       onShot: onShot,
@@ -351,7 +363,7 @@
     Z.W.updateMelee(dt, wctx);
     Z.W.updateView(w, wctx);
 
-    if (canAct && (Z.Input.actPressed('melee') || Z.Input.gpPressed(9))) Z.W.tryMelee(wctx);
+    if (canAct && (bot ? !!bot.melee : (Z.Input.actPressed('melee') || Z.Input.gpPressed(9)))) Z.W.tryMelee(wctx);
     if (canAct && (Z.Input.actPressed('swap') || Z.Input.gpPressed(3))) Z.Player.swapSlot(p);
     if (canAct && (Z.Input.actPressed('grenade') || Z.Input.gpButton(5))
       && !p.grenadeThrown) {
@@ -363,12 +375,13 @@
     // --- interaction --------------------------------------------------------
     const act = canAct ? Z.Econ.findInteraction(p, eye, dir) : null;
     G.interaction = act;
-    const useHeld = canAct && (Z.Input.act('use') || Z.Input.gpButton(2));
+    const useHeld = canAct && (bot ? !!bot.use : (Z.Input.act('use') || Z.Input.gpButton(2)));
     if (act && act.hold) {
       Z.Econ.updateRepair(p, act, useHeld, dt);
     } else {
       Z.Econ.updateRepair(p, null, false, dt);
-      if (act && (Z.Input.actPressed('use') || Z.Input.gpPressed(2))) Z.Econ.use(p, act);
+      const usePressed = bot ? !!bot.usePress : (Z.Input.actPressed('use') || Z.Input.gpPressed(2));
+      if (act && usePressed) Z.Econ.use(p, act);
     }
     // Downed players can still self-revive by holding use if they own the perk.
     if (p.downed && p.reviveUses > 0 && useHeld) p.selfReviveT += dt * 1.5;
@@ -605,6 +618,9 @@
   // -------------------------------------------------------------------------
   // Debug API used by the headless harness
   // -------------------------------------------------------------------------
+  // Install/remove a bot brain: fn(player, dt) -> input object, or null.
+  G.setBot = function (fn) { G.botBrain = fn; };
+
   G.debug = {
     stats() {
       return {

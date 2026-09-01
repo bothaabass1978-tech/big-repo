@@ -550,30 +550,22 @@
   // Power-ups are billboards so they read from any angle, like the real ones.
   E.renderPowerups = function () {
     if (!E.powerups.length) return;
-    Z.Render.beginQuads();
     const t = Z.Render.time;
+    // Group by icon so each type is one additive draw call.
+    const byIcon = Object.create(null);
     for (const pu of E.powerups) {
-      const remain = pu.life - pu.t;
-      let alpha = 1;
-      if (remain < BLINK_AT) alpha = (Math.sin(remain * 18) > 0) ? 1 : 0.15;
-      const y = pu.pos[1] + Math.sin(t * 2.4 + pu.bob) * 0.07;
-      const size = 0.42 + Math.sin(t * 3.1 + pu.bob) * 0.02;
-      Z.Render.billboard([pu.pos[0], y, pu.pos[2]], [size, size], [1, 1, 1, alpha]);
-      Z.Render.addLight([pu.pos[0], y, pu.pos[2]], powerupLight(pu.id), 4.5, 0.9 * alpha);
+      (byIcon[pu.id] = byIcon[pu.id] || []).push(pu);
     }
-    // one flush per icon type
-    const byIcon = {};
-    for (const pu of E.powerups) (byIcon[pu.id] = byIcon[pu.id] || []).push(pu);
-    Z.Render.beginQuads();
     for (const id in byIcon) {
       Z.Render.beginQuads();
       for (const pu of byIcon[id]) {
         const remain = pu.life - pu.t;
-        let alpha = 1;
-        if (remain < BLINK_AT) alpha = (Math.sin(remain * 18) > 0) ? 1 : 0.15;
+        // blink out over the last few seconds, exactly like the real drops
+        const alpha = remain < BLINK_AT ? ((Math.sin(remain * 18) > 0) ? 1 : 0.15) : 1;
         const y = pu.pos[1] + Math.sin(t * 2.4 + pu.bob) * 0.07;
         const size = 0.42 + Math.sin(t * 3.1 + pu.bob) * 0.02;
         Z.Render.billboard([pu.pos[0], y, pu.pos[2]], [size, size], [1, 1, 1, alpha]);
+        Z.Render.addLight([pu.pos[0], y, pu.pos[2]], powerupLight(id), 4.5, 0.9 * alpha);
       }
       Z.Render.flushQuads('powerup_icon_' + id, true, 0.4);
     }

@@ -206,12 +206,23 @@
   N.nodeCount = () => nodes.length;
   N.allNodes = () => nodes;
 
+  // Nearest walkable node to a world point.
+  //
+  // Straight-line distance alone is not good enough: an agent standing 0.4 m
+  // from an exterior wall is *closest* to a node on the far side of it, and
+  // pathing from that node to anything indoors fails instantly. So candidates
+  // that aren't actually visible from the query point are only used as a last
+  // resort.
   N.nearest = function (p, maxDist) {
     const md = maxDist === undefined ? 3.0 : maxDist;
     const rad = Math.ceil(md / CELL);
     const cx = Math.floor((p[0] - minX) / CELL);
     const cz = Math.floor((p[2] - minZ) / CELL);
     let best = null, bestD = md * md;
+    let fallback = null, fallbackD = md * md;
+    const eyeA = [p[0], p[1] + 0.9, p[2]];
+    const eyeB = [0, 0, 0];
+
     for (let r = 0; r <= rad; r++) {
       let found = false;
       for (let dz = -r; dz <= r; dz++) {
@@ -222,13 +233,19 @@
           for (const n of list) {
             const ddx = n.x - p[0], ddz = n.z - p[2], ddy = (n.y - p[1]) * 1.6;
             const d = ddx * ddx + ddz * ddz + ddy * ddy;
-            if (d < bestD) { bestD = d; best = n; found = true; }
+            if (d < fallbackD) { fallbackD = d; fallback = n; }
+            if (d >= bestD) continue;
+            if (d > 0.36) {                 // >0.6 m away: make sure we can see it
+              eyeB[0] = n.x; eyeB[1] = n.y + 0.9; eyeB[2] = n.z;
+              if (!Z.Phys.losClear(eyeA, eyeB)) continue;
+            }
+            bestD = d; best = n; found = true;
           }
         }
       }
       if (found && r > 1) break;
     }
-    return best;
+    return best || fallback;
   };
 
   // -------------------------------------------------------------------------

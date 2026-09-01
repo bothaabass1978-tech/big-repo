@@ -864,7 +864,7 @@
       h1.appendChild(sp);
     }
     const sub = el('div', 'wa-menu__subtitle', hero);
-    text(sub, '— DIE MASCHINE —');
+    text(sub, '\u2014 GERMANY, 1945 \u2014');
     return hero;
   }
 

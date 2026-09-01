@@ -27,9 +27,12 @@
   };
   let pHead = 0, pAlive = 0;
 
+  // These must be keys that Z.Tex actually generates — an unknown key silently
+  // falls back to a 1x1 white texture, which renders brass casings and tracers
+  // as solid white squares.
   const SPRITE_KEYS = [
     'smoke_puff', 'spark', 'blood_drop', 'dust_mote', 'gib_chunk',
-    'muzzle_flash_1', 'muzzle_flash_2', 'muzzle_flash_3', 'shell', 'glow',
+    'muzzle_flash_1', 'muzzle_flash_2', 'muzzle_flash_3', 'gib_chunk', 'spark',
   ];
   const K_SMOKE = 0, K_SPARK = 1, K_BLOOD = 2, K_DUST = 3, K_GIB = 4,
     K_FLASH1 = 5, K_FLASH2 = 6, K_FLASH3 = 7, K_SHELL = 8, K_GLOW = 9;
@@ -413,7 +416,7 @@
         TMP_COL[3] = tr.col[3] * k;
         R.worldQuad(TMP_POS, TMP_R, TMP_U, TMP_COL);
       }
-      R.flushQuads('glow', true, 0.4);
+      R.flushQuads('spark', true, 0.4);
     }
   };
   const TMP_POS = [0, 0, 0], TMP_SIZE = [0, 0], TMP_COL = [0, 0, 0, 0];
