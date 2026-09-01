@@ -48,7 +48,11 @@
     const win = opts.window;
     const zone = opts.zone;
 
-    const spread = M.lerp(Z.B.zombieSpeedSpread.min, Z.B.zombieSpeedSpread.max, rng.f());
+    // At the capped sprint tier the spread is downward-only, so no individual
+    // zombie can exceed the cap the kiting invariant is built on.
+    const band = Z.B.zombieSpeedTier(round).name === 'sprint'
+      ? Z.B.zombieSpeedSpreadTop : Z.B.zombieSpeedSpread;
+    const spread = M.lerp(band.min, band.max, rng.f());
     const hp = Z.B.roundHealth(round);
     const z = {
       id: ++idCounter,
@@ -749,7 +753,7 @@
     const dist = followFlow(z, playerPos, dt);
 
     // progress watchdog
-    const reachNow = Z.B.PLAYER.meleeRange * 0.8;
+    const reachNow = Z.B.PLAYER.zombieAttackRange * 0.85;
     if (z.bestDist === undefined || dist < z.bestDist - 0.25) {
       z.bestDist = dist;
       z.noProgressT = 0;
@@ -766,7 +770,7 @@
       }
     }
 
-    const reach = Z.B.PLAYER.meleeRange * 0.8;
+    const reach = Z.B.PLAYER.zombieAttackRange * 0.85;
     if (dist < reach && Math.abs(z.pos[1] - playerPos[1]) < 1.6 && z.attackCooldown <= 0) {
       z.state = 'attack';
       z.stateT = 0;
@@ -791,7 +795,7 @@
     if (!z.hasHitThisSwing && z.stateT >= ATTACK_WINDUP) {
       z.hasHitThisSwing = true;
       const d = M.distXZ(z.pos, playerPos);
-      if (d < Z.B.PLAYER.meleeRange && Math.abs(z.pos[1] - playerPos[1]) < 1.8) {
+      if (d < Z.B.PLAYER.zombieAttackRange && Math.abs(z.pos[1] - playerPos[1]) < 1.8) {
         if (Z.Audio && Z.Audio.ready) {
           Z.Audio.play('zom_attack_swipe', { pos: z.pos, vol: 0.85 });
           Z.Audio.play('zom_hit_player', { vol: 0.9 });

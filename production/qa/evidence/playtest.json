@@ -2,283 +2,406 @@
   "rounds": [
     {
       "round": 1,
-      "points": 710,
+      "points": 1240,
       "health": 100,
       "maxHealth": 100,
       "kills": 6,
-      "headshots": 5,
-      "shots": 30,
-      "hits": 22,
-      "accuracy": 0.733,
+      "headshots": 6,
+      "shots": 28,
+      "hits": 20,
+      "accuracy": 0.714,
       "downs": 0,
       "weapon": "m1911",
       "reserve": 8,
-      "perks": [
-        "quickrevive"
-      ],
-      "boards": 57,
+      "perks": [],
+      "boards": 70,
       "maxBoards": 78,
-      "timeAlive": 30.5,
-      "roundSecs": 30.5,
+      "timeAlive": 24,
+      "roundSecs": 24,
       "zHealth": 150,
       "zSpeed": 1,
       "zCount": 6
     },
     {
       "round": 2,
-      "points": 1060,
+      "points": 1140,
       "health": 100,
       "maxHealth": 100,
       "kills": 14,
-      "headshots": 8,
-      "shots": 48,
-      "hits": 39,
-      "accuracy": 0.813,
+      "headshots": 10,
+      "shots": 71,
+      "hits": 44,
+      "accuracy": 0.62,
       "downs": 0,
-      "weapon": "kar98k",
-      "reserve": 85,
-      "perks": [
-        "quickrevive"
-      ],
-      "boards": 43,
+      "weapon": "m1a1_carbine",
+      "reserve": 93,
+      "perks": [],
+      "boards": 38,
       "maxBoards": 78,
-      "timeAlive": 76.6,
-      "roundSecs": 46.1,
+      "timeAlive": 70,
+      "roundSecs": 46,
       "zHealth": 250,
       "zSpeed": 1.13,
       "zCount": 8
     },
     {
       "round": 3,
-      "points": 1560,
+      "points": 2550,
       "health": 100,
       "maxHealth": 100,
       "kills": 27,
-      "headshots": 17,
-      "shots": 110,
-      "hits": 81,
-      "accuracy": 0.736,
+      "headshots": 19,
+      "shots": 141,
+      "hits": 84,
+      "accuracy": 0.596,
       "downs": 0,
       "weapon": "m1a1_carbine",
-      "reserve": 65,
-      "perks": [
-        "quickrevive"
-      ],
-      "boards": 36,
+      "reserve": 34,
+      "perks": [],
+      "boards": 27,
       "maxBoards": 78,
-      "timeAlive": 115.2,
-      "roundSecs": 38.6,
+      "timeAlive": 110.6,
+      "roundSecs": 40.5,
       "zHealth": 350,
       "zSpeed": 1.27,
       "zCount": 13
-    },
-    {
-      "round": 4,
-      "points": 3240,
-      "health": 100,
-      "maxHealth": 100,
-      "kills": 45,
-      "headshots": 28,
-      "shots": 204,
-      "hits": 152,
-      "accuracy": 0.745,
-      "downs": 0,
-      "weapon": "m1a1_carbine",
-      "reserve": 36,
-      "perks": [
-        "quickrevive"
-      ],
-      "boards": 30,
-      "maxBoards": 78,
-      "timeAlive": 160.2,
-      "roundSecs": 45.1,
-      "zHealth": 450,
-      "zSpeed": 1.4,
-      "zCount": 18
-    },
-    {
-      "round": 5,
-      "points": 6280,
-      "health": 100,
-      "maxHealth": 100,
-      "kills": 69,
-      "headshots": 49,
-      "shots": 321,
-      "hits": 248,
-      "accuracy": 0.773,
-      "downs": 0,
-      "weapon": "m1a1_carbine",
-      "reserve": 50,
-      "perks": [
-        "quickrevive"
-      ],
-      "boards": 62,
-      "maxBoards": 78,
-      "timeAlive": 209.9,
-      "roundSecs": 49.7,
-      "zHealth": 550,
-      "zSpeed": 1.9,
-      "zCount": 24
-    },
-    {
-      "round": 6,
-      "points": 9630,
-      "health": 100,
-      "maxHealth": 100,
-      "kills": 96,
-      "headshots": 67,
-      "shots": 472,
-      "hits": 379,
-      "accuracy": 0.803,
-      "downs": 0,
-      "weapon": "m1a1_carbine",
-      "reserve": 79,
-      "perks": [
-        "quickrevive"
-      ],
-      "boards": 30,
-      "maxBoards": 78,
-      "timeAlive": 270.2,
-      "roundSecs": 60.3,
-      "zHealth": 650,
-      "zSpeed": 2.13,
-      "zCount": 27
-    },
-    {
-      "round": 7,
-      "points": 12710,
-      "health": 100,
-      "maxHealth": 100,
-      "kills": 124,
-      "headshots": 80,
-      "shots": 680,
-      "hits": 560,
-      "accuracy": 0.824,
-      "downs": 0,
-      "weapon": "m1a1_carbine",
-      "reserve": 15,
-      "perks": [
-        "quickrevive"
-      ],
-      "boards": 78,
-      "maxBoards": 78,
-      "timeAlive": 345.8,
-      "roundSecs": 75.6,
-      "zHealth": 750,
-      "zSpeed": 2.37,
-      "zCount": 28
-    },
-    {
-      "round": 8,
-      "points": 15930,
-      "health": 100,
-      "maxHealth": 100,
-      "kills": 152,
-      "headshots": 96,
-      "shots": 894,
-      "hits": 750,
-      "accuracy": 0.839,
-      "downs": 0,
-      "weapon": "m1a1_carbine",
-      "reserve": 15,
-      "perks": [
-        "quickrevive"
-      ],
-      "boards": 24,
-      "maxBoards": 78,
-      "timeAlive": 419.2,
-      "roundSecs": 73.4,
-      "zHealth": 850,
-      "zSpeed": 2.6,
-      "zCount": 28
-    },
-    {
-      "round": 9,
-      "points": 14830,
-      "health": 100,
-      "maxHealth": 100,
-      "kills": 181,
-      "headshots": 116,
-      "shots": 1053,
-      "hits": 897,
-      "accuracy": 0.852,
-      "downs": 0,
-      "weapon": "m1a1_carbine",
-      "reserve": 120,
-      "perks": [
-        "quickrevive"
-      ],
-      "boards": 42,
-      "maxBoards": 78,
-      "timeAlive": 507.2,
-      "roundSecs": 88,
-      "zHealth": 950,
-      "zSpeed": 3.2,
-      "zCount": 29
     }
   ],
-  "events": [],
+  "events": [
+    {
+      "t": 144.4,
+      "round": 4,
+      "source": "zombie",
+      "amount": 50,
+      "hpBefore": 100,
+      "hpAfter": 50,
+      "pos": [
+        1.9,
+        0,
+        -2.08
+      ],
+      "vel": 3.22,
+      "nearWithin3m": 1,
+      "nearest": 1.54,
+      "room": "main"
+    },
+    {
+      "t": 155.6,
+      "round": 4,
+      "source": "zombie",
+      "amount": 50,
+      "hpBefore": 100,
+      "hpAfter": 50,
+      "pos": [
+        8.77,
+        0,
+        7.17
+      ],
+      "vel": 1.86,
+      "nearWithin3m": 1,
+      "nearest": 1.01,
+      "room": "se"
+    },
+    {
+      "t": 157.2,
+      "round": 4,
+      "source": "zombie",
+      "amount": 50,
+      "hpBefore": 50,
+      "hpAfter": 0,
+      "pos": [
+        9.25,
+        0,
+        3.41
+      ],
+      "vel": 3.2,
+      "nearWithin3m": 2,
+      "nearest": 0.73,
+      "room": "se"
+    },
+    {
+      "t": 158.7,
+      "round": 4,
+      "source": "zombie",
+      "amount": 50,
+      "hpBefore": 0,
+      "hpAfter": 0,
+      "pos": [
+        9.23,
+        0,
+        1.99
+      ],
+      "vel": 0.93,
+      "nearWithin3m": 2,
+      "nearest": 0.88,
+      "room": "se"
+    },
+    {
+      "t": 160.2,
+      "round": 4,
+      "source": "zombie",
+      "amount": 50,
+      "hpBefore": 0,
+      "hpAfter": 0,
+      "pos": [
+        8.61,
+        0,
+        0.72
+      ],
+      "vel": 0.93,
+      "nearWithin3m": 5,
+      "nearest": 0.92,
+      "room": "se"
+    },
+    {
+      "t": 161.3,
+      "round": 4,
+      "source": "zombie",
+      "amount": 50,
+      "hpBefore": 0,
+      "hpAfter": 0,
+      "pos": [
+        8.23,
+        0,
+        -0.15
+      ],
+      "vel": 0.93,
+      "nearWithin3m": 5,
+      "nearest": 0.72,
+      "room": "ne"
+    },
+    {
+      "t": 161.7,
+      "round": 4,
+      "source": "zombie",
+      "amount": 50,
+      "hpBefore": 0,
+      "hpAfter": 0,
+      "pos": [
+        8.08,
+        0,
+        -0.51
+      ],
+      "vel": 0.93,
+      "nearWithin3m": 5,
+      "nearest": 0.84,
+      "room": "ne"
+    },
+    {
+      "t": 162,
+      "round": 4,
+      "source": "zombie",
+      "amount": 50,
+      "hpBefore": 0,
+      "hpAfter": 0,
+      "pos": [
+        7.96,
+        0,
+        -0.8
+      ],
+      "vel": 0.93,
+      "nearWithin3m": 5,
+      "nearest": 0.99,
+      "room": "ne"
+    },
+    {
+      "t": 163.2,
+      "round": 4,
+      "source": "zombie",
+      "amount": 50,
+      "hpBefore": 0,
+      "hpAfter": 0,
+      "pos": [
+        7.61,
+        0,
+        -1.79
+      ],
+      "vel": 0.93,
+      "nearWithin3m": 6,
+      "nearest": 0.93,
+      "room": "ne"
+    },
+    {
+      "t": 164.3,
+      "round": 4,
+      "source": "zombie",
+      "amount": 50,
+      "hpBefore": 0,
+      "hpAfter": 0,
+      "pos": [
+        7.61,
+        0,
+        -2.79
+      ],
+      "vel": 0.93,
+      "nearWithin3m": 6,
+      "nearest": 1.41,
+      "room": "ne"
+    },
+    {
+      "t": 165.5,
+      "round": 4,
+      "source": "zombie",
+      "amount": 50,
+      "hpBefore": 0,
+      "hpAfter": 0,
+      "pos": [
+        7.61,
+        0,
+        -3.95
+      ],
+      "vel": 0.93,
+      "nearWithin3m": 4,
+      "nearest": 1.32,
+      "room": "ne"
+    },
+    {
+      "t": 167,
+      "round": 4,
+      "source": "zombie",
+      "amount": 50,
+      "hpBefore": 0,
+      "hpAfter": 0,
+      "pos": [
+        7.35,
+        0,
+        -5.31
+      ],
+      "vel": 0.94,
+      "nearWithin3m": 5,
+      "nearest": 0.95,
+      "room": "ne"
+    },
+    {
+      "t": 167.5,
+      "round": 4,
+      "source": "zombie",
+      "amount": 50,
+      "hpBefore": 0,
+      "hpAfter": 0,
+      "pos": [
+        7.32,
+        0,
+        -5.7
+      ],
+      "vel": 0.93,
+      "nearWithin3m": 5,
+      "nearest": 1.15,
+      "room": "ne"
+    },
+    {
+      "t": 168.3,
+      "round": 4,
+      "source": "zombie",
+      "amount": 50,
+      "hpBefore": 0,
+      "hpAfter": 0,
+      "pos": [
+        6.69,
+        0,
+        -6.1
+      ],
+      "vel": 0.93,
+      "nearWithin3m": 6,
+      "nearest": 0.76,
+      "room": "ne"
+    },
+    {
+      "t": 169,
+      "round": 4,
+      "source": "zombie",
+      "amount": 50,
+      "hpBefore": 0,
+      "hpAfter": 0,
+      "pos": [
+        6.11,
+        0,
+        -6.37
+      ],
+      "vel": 0.93,
+      "nearWithin3m": 6,
+      "nearest": 0.77,
+      "room": "ne"
+    },
+    {
+      "t": 169.8,
+      "round": 4,
+      "source": "zombie",
+      "amount": 50,
+      "hpBefore": 0,
+      "hpAfter": 0,
+      "pos": [
+        5.46,
+        0,
+        -6.76
+      ],
+      "vel": 0.93,
+      "nearWithin3m": 6,
+      "nearest": 0.68,
+      "room": "ne"
+    }
+  ],
   "final": {
-    "round": 10,
-    "kills": 181,
-    "headshots": 116,
-    "accuracy": 0.852,
-    "downs": 0,
-    "dead": false,
-    "points": 14830,
-    "timeAlive": 517.8,
-    "roundSecs": 10.5
+    "round": 4,
+    "kills": 34,
+    "headshots": 24,
+    "accuracy": 0.617,
+    "downs": 1,
+    "dead": true,
+    "points": 1340,
+    "timeAlive": 171.9,
+    "roundSecs": 61.3
   },
   "stats": {
-    "mode": "playing",
-    "fps": 8.155515168813965,
+    "mode": "gameover",
+    "fps": 16.225609188275577,
     "round": {
-      "round": 10,
-      "phase": "intro",
-      "phaseT": 3.54999999999999,
-      "spawned": 0,
-      "total": 33,
-      "alive": 0,
-      "remaining": 33,
-      "health": 1045,
-      "speed": 3.4333333333333336
+      "round": 4,
+      "phase": "active",
+      "phaseT": 48.02499999999792,
+      "spawned": 18,
+      "total": 18,
+      "alive": 11,
+      "remaining": 11,
+      "health": 450,
+      "speed": 1.4
     },
     "zombies": {
-      "total": 0,
-      "alive": 0,
+      "total": 11,
+      "alive": 11,
       "tearing": 0,
-      "hunting": 0,
+      "hunting": 11,
       "climbing": 0,
       "approaching": 0,
       "dying": 0
     },
     "player": {
       "pos": [
-        -7.678802548382663,
+        5.437453008863442,
         0.001,
-        1.659
+        -6.764811669267332
       ],
-      "health": 100,
-      "points": 14830,
+      "health": 0,
+      "points": 1340,
       "weapon": "m1a1_carbine",
-      "mag": 10,
-      "reserve": 120,
+      "mag": 0,
+      "reserve": 0,
       "downed": false,
-      "dead": false,
-      "kills": 181,
-      "headshots": 116
+      "dead": true,
+      "kills": 34,
+      "headshots": 24
     },
     "render": {
-      "draws": 97,
-      "tris": 16000,
+      "draws": 79,
+      "tris": 18002,
       "lights": 8,
-      "worldTris": 5976,
+      "worldTris": 6036,
       "quads": 0
     },
     "fx": {
-      "particles": 1400,
+      "particles": 145,
       "decals": 220,
-      "tracers": 35
+      "tracers": 0
     },
     "econ": {
       "box": {
@@ -292,12 +415,12 @@
       "doublePoints": 0
     },
     "nav": {
-      "nodes": 7238,
+      "nodes": 7235,
       "cols": 80,
       "rows": 72,
       "cell": 0.5,
-      "edges": 62104,
-      "buildMs": 141.60000000009313,
+      "edges": 62095,
+      "buildMs": 139,
       "windowLinks": 13
     }
   }

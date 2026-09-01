@@ -110,7 +110,10 @@ await page.evaluate((god) => {
     // into a corner. The bot follows a circuit through the main hall and lets
     // the horde string out behind it, which is what the balance is tuned for.
     if (!window.__LOOP) {
-      const cand = [[-7.4, -6.4], [-7.4, 6.2], [1.2, 6.2], [1.2, -5.4]];
+      // Keep the circuit well clear of every wall. Waypoints tucked into
+      // corners are how the bot walks itself into a dead end and dies to
+      // round-2 shamblers, which tells us nothing about the game.
+      const cand = [[-6.6, -4.8], [-6.6, 4.8], [-0.4, 4.8], [-0.4, -4.8]];
       window.__LOOP = cand.filter(function (c) {
         return !Z.Phys.boxSolid([c[0], 0.05, c[1]], 0.4, 1.7);
       });
@@ -152,22 +155,47 @@ await page.evaluate((god) => {
         wx /= bl; wz /= bl;
       }
 
-      // Never commit to a heading that walks into geometry: rotate away
-      // until something is walkable. Stops the bot pinning itself on a wall.
-      const clearAhead = function (dx2, dz2) {
-        const q = [p.pos[0] + dx2 * 1.1, p.pos[1] + 0.15, p.pos[2] + dz2 * 1.1];
-        if (Z.Phys.boxSolid(q, 0.36, 1.7)) return false;
-        return Z.Phys.floorAt([q[0], q[1] + 0.4, q[2]], 1.0, 0.3) !== null;
-      };
-      if (!clearAhead(wx, wz)) {
-        for (let k = 1; k <= 7; k++) {
-          const a1 = k * 0.45, ca = Math.cos(a1), sa = Math.sin(a1);
-          const rx = wx * ca - wz * sa, rz = wx * sa + wz * ca;
-          if (clearAhead(rx, rz)) { wx = rx; wz = rz; break; }
-          const lx = wx * ca + wz * sa, lz = -wx * sa + wz * ca;
-          if (clearAhead(lx, lz)) { wx = lx; wz = lz; break; }
+      // Choose a heading by scoring candidates rather than taking the first
+      // one that isn't a wall. Backing into a corner is how a bot dies to
+      // round-2 shamblers, and a corner death tells us nothing about balance.
+      const clearance = function (dx2, dz2) {
+        let open = 0;
+        for (let s2 = 0.5; s2 <= 3.5; s2 += 0.5) {
+          const q = [p.pos[0] + dx2 * s2, p.pos[1] + 0.15, p.pos[2] + dz2 * s2];
+          if (Z.Phys.boxSolid(q, 0.38, 1.7)) break;
+          if (Z.Phys.floorAt([q[0], q[1] + 0.4, q[2]], 1.0, 0.3) === null) break;
+          open = s2;
         }
+        return open;
+      };
+      const wantX = wx, wantZ = wz;
+      let bestH = null, bestScore = -1e9;
+      for (let a = 0; a < 16; a++) {
+        const ang = (a / 16) * Math.PI * 2;
+        const cx2 = Math.sin(ang), cz2 = Math.cos(ang);
+        const open = clearance(cx2, cz2);
+        if (open < 1.0) continue;                 // no room that way
+        // how well it matches where we wanted to go
+        const align = cx2 * wantX + cz2 * wantZ;
+        // how much it takes us away from the nearest threats
+        let threatPen = 0;
+        for (const z of Z.Zombies.list) {
+          if (z.dying) continue;
+          const zx = z.pos[0] - p.pos[0], zz = z.pos[2] - p.pos[2];
+          const zd = Math.hypot(zx, zz);
+          if (zd > 8) continue;
+          const toward = (zx * cx2 + zz * cz2) / Math.max(zd, 0.01);
+          threatPen += Math.max(0, toward) * (8 - zd) * 0.55;
+        }
+        // When something is close, getting out matters far more than staying
+        // on the circuit — otherwise the bot politely walks into a corner.
+        const pressed = threatD < 4.0 ? 1 : 0;
+        const score = open * (pressed ? 3.4 : 1.15)
+          + align * (pressed ? 0.8 : 2.6)
+          - threatPen * (pressed ? 1.5 : 1.0);
+        if (score > bestScore) { bestScore = score; bestH = [cx2, cz2]; }
       }
+      if (bestH) { wx = bestH[0]; wz = bestH[1]; }
 
       const cy = Math.cos(p.yaw), sy = Math.sin(p.yaw);
       inp.move[1] = -(wx * sy + wz * cy);

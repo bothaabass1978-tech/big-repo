@@ -598,7 +598,7 @@
   gunDef('gun_m1911', 0.55, 0.80, 0.30, {
     lvl: 0.62, dist: 2.2, preDist: 1.15, clickF: 6100, clickHp: 2900, clickAmt: 0.9,
     body: [{ f: 860, q: 4.0, dec: 0.075, amt: 0.85 }, { f: 1950, q: 3.2, dec: 0.042, amt: 0.48 }],
-    thump: { f0: 215, f1: 68, dec: 0.095, amt: 0.55 },
+    thump: { f0: 262, f1: 92, dec: 0.062, amt: 0.34 },
     tail: { lp: 2500, dec: 0.22, amt: 0.24, pre: 0.013 },
     mech: { t: 0.045, f: 3100, dec: 0.02, amt: 0.16 },
   });
@@ -708,7 +708,7 @@
     build: function (c, out, t0, r) {
       gunshot(c, out, t0, {
         lvl: 0.68, dist: 3.0, clickF: 5200, clickHp: 2200, clickAmt: 0.9,
-        body: [{ f: 470, q: 2.8, dec: 0.13, amt: 0.92 }, { f: 1150, q: 2.4, dec: 0.07, amt: 0.5 }],
+        body: [{ f: 585, q: 2.4, dec: 0.13, amt: 0.92 }, { f: 1310, q: 2.4, dec: 0.07, amt: 0.5 }],
         thump: { f0: 134, f1: 40, dec: 0.30, amt: 0.85 },
         tail: { lp: 1600, dec: 0.55, amt: 0.40, pre: 0.017 },
       }, r);
@@ -748,7 +748,7 @@
   // M1919 Browning — deep chattering LMG.
   gunDef('gun_browning', 0.85, 0.90, 0.42, {
     lvl: 0.66, dist: 2.8, preDist: 1.15, clickF: 5100, clickHp: 2300, clickAmt: 0.88,
-    body: [{ f: 420, q: 4.6, dec: 0.105, amt: 0.98 }, { f: 1055, q: 3.4, dec: 0.055, amt: 0.5 },
+    body: [{ f: 368, q: 4.6, dec: 0.105, amt: 0.98 }, { f: 1055, q: 3.4, dec: 0.055, amt: 0.5 },
            { f: 2450, q: 2.6, dec: 0.026, amt: 0.22 }],
     thump: { f0: 142, f1: 48, dec: 0.20, amt: 0.86 },
     tail: { lp: 1500, dec: 0.38, amt: 0.34, pre: 0.016 },
@@ -2279,6 +2279,20 @@
       const rog = gain(c, 0);
       ro.connect(rlp); rlp.connect(rog); rog.connect(mst);
       swell(rog.gain, t0 + 0.1, 1.85, 0.30, 0.06);
+
+      // The arrival. Both reversed swells peak at t0+1.95 and then simply cut
+      // out — a backwards swell with nothing at the end of it reads as a
+      // generic horror riser, not as the round-change alarm. This is the hit
+      // they were building toward: a struck-metal toll plus a sub drop.
+      const tHit = t0 + 1.95;
+      fmBell(c, mst, tHit, 148, 2.6, 0.42, 2.74, 8.5, r);
+      impact(c, mst, tHit, { f: 96, dec: 0.42, amt: 0.75, lp: 900, noise: 0.35 }, r);
+      const arrSub = osc(c, 'sine', 84);
+      sweep(arrSub.frequency, tHit, 92, 26, 1.1);
+      const arrSubG = gain(c, 0);
+      ad(arrSubG.gain, tHit, 0.004, 1.05, 0.60);
+      arrSub.connect(arrSubG); arrSubG.connect(mst);
+      go(arrSub, tHit, tHit + 1.3);
       go(ro, t0, t0 + 2.1);
 
       // 4. sub drop under everything, then a long dark tail
@@ -2769,9 +2783,11 @@
     master = gain(ctx, 1.0);
     duckGain = gain(ctx, 1.0);
     limiter = ctx.createDynamicsCompressor();
-    limiter.threshold.value = -8;
-    limiter.knee.value = 8;
-    limiter.ratio.value = 14;
+    // Gentle bus glue. At -8 dB / 14:1 this was a near-brickwall that pulled
+    // gunfire down to ambience level while never touching the ambience itself.
+    limiter.threshold.value = -14;
+    limiter.knee.value = 6;
+    limiter.ratio.value = 3.5;
     limiter.attack.value = 0.003;
     limiter.release.value = 0.18;
     master.connect(duckGain); duckGain.connect(limiter); limiter.connect(ctx.destination);
@@ -2847,7 +2863,11 @@
   // shaper of the in-range signal — a hard, silent ceiling under ~0.97
   // rather than a wall of decimation-clipping noise. Linear (transparent)
   // below LIMITER_T, soft-knee tanh above it.
-  const LIMITER_T = 0.80;
+  // A true safety net for overs, not a tone shaper. At 0.80 this per-voice
+  // stage was squashing every loud layered sound toward the same ceiling,
+  // which — stacked with the master compressor — collapsed the dynamic range
+  // the mix depends on (quiet ambience, deafening Kar98k).
+  const LIMITER_T = 0.93;
   let limiterCurveCache = null;
   function limiterCurve() {
     if (limiterCurveCache) return limiterCurveCache;

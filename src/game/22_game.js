@@ -122,11 +122,15 @@
     Z.Zombies.onKill = function (z, info) {
       const p = G.player;
       const mult = Z.Econ.pointsMultiplier();
+      // A body-shot kill pays 60: the 10 for the hit plus the 50 kill bonus.
+      // The killing shot never runs the hit-award path (that only fires for
+      // non-lethal hits), so the bonus has to include it here or every body
+      // kill in the game is short-paid by 10 — which it was.
       let pts;
       if (info.source === 'melee') pts = Z.B.POINTS.meleeKill;
       else if (info.source === 'explosive' || info.source === 'nuke') pts = Z.B.POINTS.explosiveKill;
       else if (info.headshot) pts = Z.B.POINTS.headshotKill;
-      else pts = Z.B.POINTS.kill;
+      else pts = Z.B.POINTS.hit + Z.B.POINTS.kill;
       if (info.source !== 'nuke') Z.Player.award(p, pts * mult, 'kill');
       p.kills++;
       if (info.headshot) p.headshots++;
@@ -306,6 +310,9 @@
     const bot = G.botBrain ? G.botBrain(p, dt) : null;
 
     const canAct = alive && G.mode === 'playing' && !p.downed;
+    // Downed players keep their trigger: crawling and still shooting is the
+    // whole texture of the last-stand moment.
+    const canShoot = alive && G.mode === 'playing';
     const input = {
       move: [0, 0],
       jump: false, crouch: false, sprint: false,
@@ -348,7 +355,7 @@
     Z.Player.eye(p, eye);
     Z.Player.forward(p, dir);
 
-    const wantFire = canAct && p.swapT <= 0 && (bot ? !!bot.fire
+    const wantFire = canShoot && p.swapT <= 0 && (bot ? !!bot.fire
       : (Z.Input.mb(0) || Z.Input.gpAxis(7) > 0.4 || Z.Input.gpButton(7)));
     const wantAds = canAct && (bot ? !!bot.ads
       : (Z.Menu.settings.toggleAds ? p.wantAds : (Z.Input.mb(2) || Z.Input.gpButton(6))));

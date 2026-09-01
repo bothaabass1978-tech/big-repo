@@ -504,17 +504,17 @@
     boxSpots.push({ pos: [5.4, 0, 5.4], yaw: -1.1, room: 'se' });
 
     lights.push({ pos: [-3.2, 2.95, 0.4], color: [1.00, 0.70, 0.34], radius: 8.6,
-      intensity: 2.60, flicker: 0.28, sway: 0.07, name: 'main_bulb' });
+      intensity: 1.70, flicker: 0.28, sway: 0.07, name: 'main_bulb' });
     lights.push({ pos: [8.4, 1.05, 5.9], color: [1.00, 0.48, 0.16], radius: 6.6,
-      intensity: 2.40, flicker: 0.45, name: 'fire_barrel' });
+      intensity: 1.55, flicker: 0.45, name: 'fire_barrel' });
     lights.push({ pos: [6.4, UP + 2.55, -4.2], color: [1.00, 0.74, 0.40], radius: 7.2,
-      intensity: 1.90, flicker: 0.35, sway: 0.04, name: 'east_bulb' });
+      intensity: 1.30, flicker: 0.35, sway: 0.04, name: 'east_bulb' });
     lights.push({ pos: [-5.6, UP + 2.6, -5.0], color: [1.00, 0.68, 0.32], radius: 6.2,
-      intensity: 1.35, flicker: 0.62, name: 'help_bulb' });
+      intensity: 0.95, flicker: 0.62, name: 'help_bulb' });
     lights.push({ pos: [-2.8, 4.4, 5.2], color: [0.40, 0.54, 0.90], radius: 8.4,
-      intensity: 0.95, flicker: 0, name: 'moon_shaft_s' });
+      intensity: 0.80, flicker: 0, name: 'moon_shaft_s' });
     lights.push({ pos: [6.0, UP + 2.4, -5.2], color: [0.38, 0.50, 0.88], radius: 6.4,
-      intensity: 0.75, flicker: 0, name: 'moon_shaft_n' });
+      intensity: 0.62, flicker: 0, name: 'moon_shaft_n' });
 
     // =====================================================================
     // Nav seeds + zombie spawn zones

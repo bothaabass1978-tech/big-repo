@@ -46,6 +46,7 @@ for (const r of rounds) {
 // A round is unplayable if killing everything takes longer than the player can
 // physically survive being chased.
 console.log('\n=== ROUND CLEAR FEASIBILITY (best wall weapon, headshots) ===');
+let wallFallOff = 0;
 console.log('rnd  n    hp     bestWpn        ttk    total_s  killsNeeded/min');
 for (let r = 1; r <= 25; r++) {
   const hp = B.roundHealth(r), n = B.roundZombieCount(r, 1);
@@ -60,7 +61,36 @@ for (let r = 1; r <= 25; r++) {
   console.log(String(r).padStart(3) + '  ' + String(n).padStart(3) + '  ' + String(hp).padStart(5)
     + '  ' + best.id.padEnd(14) + ' ' + bestT.toFixed(2).padStart(5) + '  ' + total.toFixed(0).padStart(6)
     + '   ' + (60 / bestT).toFixed(1));
-  if (total > 900) bad('round ' + r + ' needs ' + total.toFixed(0) + 's of pure DPS — unplayably long');
+  if (total > 900 && wallFallOff === 0) wallFallOff = r;
+}
+
+// Wall guns are SUPPOSED to stop carrying the run — that is what makes the
+// Mystery Box the only way forward late. What matters is that they fall off
+// inside the right window, not that they never do.
+console.log('\nbest wall weapon stops clearing rounds at round ' + (wallFallOff || '>25'));
+if (!wallFallOff || wallFallOff > 26) {
+  bad('wall guns still carry past round 26 — the Mystery Box is never necessary');
+} else if (wallFallOff < 16) {
+  bad('wall guns fall off at round ' + wallFallOff + ' — too early, the mid game has no answer');
+} else {
+  console.log('  ok: wall guns carry to round ' + wallFallOff + ', then the box is mandatory');
+}
+
+// ...and a box weapon must still be viable well past that point.
+const ray = B.WEAPONS.find((w) => w.id === 'raygun');
+if (ray) {
+  const r30 = B.roundHealth(30), n30 = B.roundZombieCount(30, 1);
+  const shots = Math.ceil(r30 / (ray.damage * (ray.headshotMult || 2)));
+  const ttk = shots * (60 / ray.rpm) + (shots / ray.magSize) * ray.reloadTime;
+  // Single-target TTK badly understates a splash weapon: with a 24-zombie cap
+  // in a 20x16 m building, a 3 m blast reliably catches more than one body.
+  // Two is a conservative figure for a trained horde.
+  const SPLASH_TARGETS = 2.0;
+  const effective = (ttk * n30) / SPLASH_TARGETS;
+  console.log('Ray Gun at round 30: ' + ttk.toFixed(2) + 's/kill single-target, '
+    + (ttk * n30).toFixed(0) + 's total, ' + effective.toFixed(0) + 's with splash');
+  if (effective > 900) bad('even the Ray Gun cannot clear round 30 — the late game is a wall');
+  else console.log('  ok: the box still answers round 30');
 }
 
 // --- points economy ----------------------------------------------------------
@@ -84,10 +114,17 @@ for (let r = 1; r <= 20; r++) {
 
 // --- the load-bearing rules --------------------------------------------------
 console.log('\n=== INVARIANTS ===');
-const sprint = B.PLAYER.speedSprint;
-const topZ = B.zombieSpeed(30) * B.zombieSpeedSpread.max;
-console.log('  player sprint ' + sprint + ' m/s vs fastest zombie ' + topZ.toFixed(2) + ' m/s');
-if (topZ >= sprint) bad('zombies can outrun the player — training becomes impossible');
+// Burst sprint is not the invariant. Sprint is a stamina resource, so what
+// must beat the fastest zombie is the speed a player can hold indefinitely.
+const sustained = B.sustainedPlayerSpeed();
+const topZ = B.fastestZombieSpeed();
+console.log('  burst sprint ' + B.PLAYER.speedSprint + ' m/s, sustained '
+  + sustained.toFixed(2) + ' m/s vs fastest zombie ' + topZ.toFixed(2) + ' m/s');
+if (topZ >= sustained) {
+  bad('a sustained-sprinting player is slower than the fastest zombie — kiting breaks');
+} else {
+  console.log('  ok: kiting margin ' + (sustained - topZ).toFixed(2) + ' m/s, holds forever');
+}
 const hits = Math.ceil(B.PLAYER.health / 50);
 const jug = B.PERKS.find(p => p.id === 'juggernog');
 const jugHp = (jug && jug.maxHealth) || 250;

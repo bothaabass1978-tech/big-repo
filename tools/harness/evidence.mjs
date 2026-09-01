@@ -98,9 +98,20 @@ await shot('ev-08-helproom.png', `
 await shot('ev-09-horde.png', `
   G.debug.setRound(8);
   G.debug.sim(26);
-  const z = Z.Zombies.nearestTo(G.player.pos, 40);
-  if (z) {
-    G.player.yaw = Math.atan2(-(z.pos[0] - G.player.pos[0]), -(z.pos[2] - G.player.pos[2]));
+  // Look at the densest group 5-14 m out, not whatever is closest — a zombie
+  // pressed against the lens tells you nothing about how a horde reads.
+  let best = null, bestScore = -1;
+  for (const z of Z.Zombies.list) {
+    if (z.dying) continue;
+    const d = Z.M.dist3(z.pos, G.player.pos);
+    if (d < 5 || d > 14) continue;
+    let n = 0;
+    for (const o of Z.Zombies.list) { if (!o.dying && Z.M.dist3(o.pos, z.pos) < 5) n++; }
+    const score = n - d * 0.1;
+    if (score > bestScore) { bestScore = score; best = z; }
+  }
+  if (best) {
+    G.player.yaw = Math.atan2(-(best.pos[0] - G.player.pos[0]), -(best.pos[2] - G.player.pos[2]));
     G.player.pitch = -0.02;
   }
 `);
@@ -138,8 +149,17 @@ await shot('ev-12-round15.png', `
   G.player.health = 100;
   G.debug.setRound(15);
   G.debug.sim(30);
-  const z = Z.Zombies.nearestTo(G.player.pos, 40);
-  if (z) G.player.yaw = Math.atan2(-(z.pos[0] - G.player.pos[0]), -(z.pos[2] - G.player.pos[2]));
+  let best = null, bestScore = -1;
+  for (const z of Z.Zombies.list) {
+    if (z.dying) continue;
+    const d = Z.M.dist3(z.pos, G.player.pos);
+    if (d < 4.5 || d > 16) continue;
+    let n = 0;
+    for (const o of Z.Zombies.list) { if (!o.dying && Z.M.dist3(o.pos, z.pos) < 6) n++; }
+    const score = n - d * 0.08;
+    if (score > bestScore) { bestScore = score; best = z; }
+  }
+  if (best) G.player.yaw = Math.atan2(-(best.pos[0] - G.player.pos[0]), -(best.pos[2] - G.player.pos[2]));
 `);
 
 // --- pause / game over -----------------------------------------------------

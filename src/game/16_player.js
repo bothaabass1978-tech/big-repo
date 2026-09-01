@@ -158,7 +158,7 @@
     } else {
       p.sprinting = false;
       // recovers slower than it drains, so sprint is a resource
-      p.sprintMeter = Math.min(1, p.sprintMeter + dt / (B.sprintDuration * 1.55));
+      p.sprintMeter = Math.min(1, p.sprintMeter + dt / (B.sprintDuration * B.sprintRegenRatio));
       if (p.sprintMeter > 0.32) p.sprintLocked = false;
     }
 
@@ -279,6 +279,14 @@
   P.damage = function (p, amount, fromPos, source) {
     if (p.dead || amount <= 0) return false;
     if (p.godMode) return false;
+    // Two zombies striking on the same tick would take a full-health player
+    // straight to downed with nothing they could have done. A short spacing
+    // keeps 'two hits and you are down' true without making it unreactable.
+    const now = p.clock || 0;
+    if (source === 'zombie' && (now - (p.lastHitTime || -99)) < Z.B.PLAYER.damageCooldown) {
+      return false;
+    }
+    if (source === 'zombie') p.lastHitTime = now;
     if (p.downed) {
       // Already down: further hits just accelerate the bleedout slightly.
       p.bleedout = Math.max(0, p.bleedout - 2.5);

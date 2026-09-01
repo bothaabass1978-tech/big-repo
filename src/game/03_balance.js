@@ -27,7 +27,13 @@
     regenDelay: 2.4,       // seconds after last damage before regen begins (CoD4/WaW-era pace)
     regenRate: 25,          // hp/sec once regen starts -> 0->100 takes 4s (total ~6.4s to full from a hit)
     speedWalk: 3.6,         // m/s
-    speedSprint: 5.6,       // m/s — MUST stay above the zombie sprint cap (4.6, see zombieSpeedTier).
+    speedSprint: 5.6,       // m/s — burst speed only; see sprintDuration.
+    // The invariant that matters is not the burst figure, it is the speed a
+    // player can hold FOREVER once stamina is accounted for. With a duty cycle
+    // of f = 1/(1+regenRatio) spent sprinting, sustained speed is
+    //   f*speedSprint + (1-f)*speedWalk
+    // and THAT is what must beat the fastest zombie. B.validate() checks it.
+    sprintRegenRatio: 0.95, // recovery takes sprintDuration * this
                              // That gap is the entire "kiting is always viable" promise of the game.
     speedAds: 1.9,          // m/s while aiming down sights
     speedCrouch: 1.9,       // m/s
@@ -42,7 +48,15 @@
                              // (150 raw damage would stop one-shotting after round 1 — see balance.md
                              // Edge Cases). Combat code must special-case melee-vs-zombie: kill on hit,
                              // do not run it through the normal damage pipeline.
-    meleeRange: 2.1,        // metres
+    meleeRange: 2.1,       // the PLAYER's knife reach
+    // A zombie's claw reach is deliberately shorter than the player's knife:
+    // 2.1 m is a lunge, not a swipe, and at that range a walking player gets
+    // clipped by shamblers they had already run past.
+    zombieAttackRange: 1.72,
+    // Minimum spacing between two hits landing on the player. Without it a
+    // pair of zombies can strike on the same tick and take you from full
+    // health to downed with no chance to react at all.
+    damageCooldown: 0.32,        // metres
     meleeRate: 1.35,        // seconds between swings
     downedHealth: 1,        // hp while downed/crawling
     bleedoutTime: 45,       // seconds before permadeath while downed and un-revived
@@ -146,7 +160,7 @@
     { from: 1, to: 5, name: 'shamble', v0: 1.0, v1: 1.4 },        // R1-4: slow shamble
     { from: 5, to: 9, name: 'walk', v0: 1.9, v1: 2.6 },           // R5-8: brisk walk
     { from: 9, to: 13, name: 'jog', v0: 3.2, v1: 3.9 },           // R9-12: jog
-    { from: 13, to: Infinity, name: 'sprint', v0: 4.6, v1: 4.6 }, // R13+: capped sprint
+    { from: 13, to: Infinity, name: 'sprint', v0: 4.35, v1: 4.35 }, // R13+: capped sprint
   ];
   B.ZOMBIE_SPEED_TIERS = ZOMBIE_SPEED_TIERS;
 
@@ -170,7 +184,22 @@
 
   // Per-zombie multiplier applied on spawn so a horde reads as ragged, not a
   // marching block. Sampled once per zombie at spawn time by the caller.
+  // Spread is downward-only at the top tier so the sprint cap is a real cap:
+  // a 1.15x roll on 4.35 would put the fastest zombie back above the player's
+  // sustainable speed and quietly break kiting again.
   B.zombieSpeedSpread = { min: 0.85, max: 1.15 };
+  B.zombieSpeedSpreadTop = { min: 0.86, max: 1.0 };
+
+  /** The speed a player can hold indefinitely once sprint stamina is spent. */
+  B.sustainedPlayerSpeed = function () {
+    const f = 1 / (1 + B.PLAYER.sprintRegenRatio);
+    return f * B.PLAYER.speedSprint + (1 - f) * B.PLAYER.speedWalk;
+  };
+  /** The fastest a single zombie can ever actually move. */
+  B.fastestZombieSpeed = function () {
+    const cap = ZOMBIE_SPEED_TIERS[ZOMBIE_SPEED_TIERS.length - 1].v1;
+    return cap * B.zombieSpeedSpreadTop.max;
+  };
 
   // ===========================================================================
   // POINTS (WaW rules, exact)
@@ -327,7 +356,7 @@
       wallCost: 1200, boxOnly: false, weight: 3.9,
     },
     {
-      id: 'bar', name: 'BAR', class: 'lmg', damage: 150, headshotMult: 2.0,
+      id: 'bar', name: 'BAR', class: 'lmg', damage: 115, headshotMult: 2.0,
       magSize: 20, startReserve: 80, maxReserve: 180, rpm: 500, fireMode: 'auto',
       reloadTime: 3.3, reloadEmptyTime: 3.7, adsTime: 0.35,
       spreadHip: 3.0, spreadAds: 0.4, spreadMoveMult: 2.2,
@@ -701,6 +730,17 @@
     }
 
     // --- zombie speed: load-bearing cap must stay under player sprint ---
+    // Burst speed is not the invariant — sustainable speed is.
+    const sustained = B.sustainedPlayerSpeed();
+    const fastestZ = B.fastestZombieSpeed();
+    if (sustained <= fastestZ) {
+      problems.push('sustained player speed ' + sustained.toFixed(2)
+        + ' m/s does not beat the fastest zombie ' + fastestZ.toFixed(2)
+        + ' m/s — kiting breaks down at high rounds');
+    }
+    if (sustained - fastestZ < 0.15) {
+      problems.push('kiting margin is only ' + (sustained - fastestZ).toFixed(2) + ' m/s — too tight');
+    }
     const sprintCap = B.zombieSpeedTier(13).speed;
     if (sprintCap >= B.PLAYER.speedSprint) {
       problems.push('zombie sprint cap (' + sprintCap + ') is not below B.PLAYER.speedSprint (' + B.PLAYER.speedSprint + ') — kiting breaks');

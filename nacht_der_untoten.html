@@ -565,7 +565,7 @@ Z.assert = function (cond, msg) {
 }());
 
 
-/* ============================ 03_balance.js (836 lines) ============================ */
+/* ============================ 03_balance.js (876 lines) ============================ */
 // ---------------------------------------------------------------------------
 // 03_balance.js — Z.B: the single source of truth for every gameplay number.
 // Pure data + pure functions. No DOM, no side effects, no randomness at
@@ -595,7 +595,13 @@ Z.assert = function (cond, msg) {
     regenDelay: 2.4,       // seconds after last damage before regen begins (CoD4/WaW-era pace)
     regenRate: 25,          // hp/sec once regen starts -> 0->100 takes 4s (total ~6.4s to full from a hit)
     speedWalk: 3.6,         // m/s
-    speedSprint: 5.6,       // m/s — MUST stay above the zombie sprint cap (4.6, see zombieSpeedTier).
+    speedSprint: 5.6,       // m/s — burst speed only; see sprintDuration.
+    // The invariant that matters is not the burst figure, it is the speed a
+    // player can hold FOREVER once stamina is accounted for. With a duty cycle
+    // of f = 1/(1+regenRatio) spent sprinting, sustained speed is
+    //   f*speedSprint + (1-f)*speedWalk
+    // and THAT is what must beat the fastest zombie. B.validate() checks it.
+    sprintRegenRatio: 0.95, // recovery takes sprintDuration * this
                              // That gap is the entire "kiting is always viable" promise of the game.
     speedAds: 1.9,          // m/s while aiming down sights
     speedCrouch: 1.9,       // m/s
@@ -610,7 +616,15 @@ Z.assert = function (cond, msg) {
                              // (150 raw damage would stop one-shotting after round 1 — see balance.md
                              // Edge Cases). Combat code must special-case melee-vs-zombie: kill on hit,
                              // do not run it through the normal damage pipeline.
-    meleeRange: 2.1,        // metres
+    meleeRange: 2.1,       // the PLAYER's knife reach
+    // A zombie's claw reach is deliberately shorter than the player's knife:
+    // 2.1 m is a lunge, not a swipe, and at that range a walking player gets
+    // clipped by shamblers they had already run past.
+    zombieAttackRange: 1.72,
+    // Minimum spacing between two hits landing on the player. Without it a
+    // pair of zombies can strike on the same tick and take you from full
+    // health to downed with no chance to react at all.
+    damageCooldown: 0.32,        // metres
     meleeRate: 1.35,        // seconds between swings
     downedHealth: 1,        // hp while downed/crawling
     bleedoutTime: 45,       // seconds before permadeath while downed and un-revived
@@ -714,7 +728,7 @@ Z.assert = function (cond, msg) {
     { from: 1, to: 5, name: 'shamble', v0: 1.0, v1: 1.4 },        // R1-4: slow shamble
     { from: 5, to: 9, name: 'walk', v0: 1.9, v1: 2.6 },           // R5-8: brisk walk
     { from: 9, to: 13, name: 'jog', v0: 3.2, v1: 3.9 },           // R9-12: jog
-    { from: 13, to: Infinity, name: 'sprint', v0: 4.6, v1: 4.6 }, // R13+: capped sprint
+    { from: 13, to: Infinity, name: 'sprint', v0: 4.35, v1: 4.35 }, // R13+: capped sprint
   ];
   B.ZOMBIE_SPEED_TIERS = ZOMBIE_SPEED_TIERS;
 
@@ -738,7 +752,22 @@ Z.assert = function (cond, msg) {
 
   // Per-zombie multiplier applied on spawn so a horde reads as ragged, not a
   // marching block. Sampled once per zombie at spawn time by the caller.
+  // Spread is downward-only at the top tier so the sprint cap is a real cap:
+  // a 1.15x roll on 4.35 would put the fastest zombie back above the player's
+  // sustainable speed and quietly break kiting again.
   B.zombieSpeedSpread = { min: 0.85, max: 1.15 };
+  B.zombieSpeedSpreadTop = { min: 0.86, max: 1.0 };
+
+  /** The speed a player can hold indefinitely once sprint stamina is spent. */
+  B.sustainedPlayerSpeed = function () {
+    const f = 1 / (1 + B.PLAYER.sprintRegenRatio);
+    return f * B.PLAYER.speedSprint + (1 - f) * B.PLAYER.speedWalk;
+  };
+  /** The fastest a single zombie can ever actually move. */
+  B.fastestZombieSpeed = function () {
+    const cap = ZOMBIE_SPEED_TIERS[ZOMBIE_SPEED_TIERS.length - 1].v1;
+    return cap * B.zombieSpeedSpreadTop.max;
+  };
 
   // ===========================================================================
   // POINTS (WaW rules, exact)
@@ -895,7 +924,7 @@ Z.assert = function (cond, msg) {
       wallCost: 1200, boxOnly: false, weight: 3.9,
     },
     {
-      id: 'bar', name: 'BAR', class: 'lmg', damage: 150, headshotMult: 2.0,
+      id: 'bar', name: 'BAR', class: 'lmg', damage: 115, headshotMult: 2.0,
       magSize: 20, startReserve: 80, maxReserve: 180, rpm: 500, fireMode: 'auto',
       reloadTime: 3.3, reloadEmptyTime: 3.7, adsTime: 0.35,
       spreadHip: 3.0, spreadAds: 0.4, spreadMoveMult: 2.2,
@@ -1269,6 +1298,17 @@ Z.assert = function (cond, msg) {
     }
 
     // --- zombie speed: load-bearing cap must stay under player sprint ---
+    // Burst speed is not the invariant — sustainable speed is.
+    const sustained = B.sustainedPlayerSpeed();
+    const fastestZ = B.fastestZombieSpeed();
+    if (sustained <= fastestZ) {
+      problems.push('sustained player speed ' + sustained.toFixed(2)
+        + ' m/s does not beat the fastest zombie ' + fastestZ.toFixed(2)
+        + ' m/s — kiting breaks down at high rounds');
+    }
+    if (sustained - fastestZ < 0.15) {
+      problems.push('kiting margin is only ' + (sustained - fastestZ).toFixed(2) + ' m/s — too tight');
+    }
     const sprintCap = B.zombieSpeedTier(13).speed;
     if (sprintCap >= B.PLAYER.speedSprint) {
       problems.push('zombie sprint cap (' + sprintCap + ') is not below B.PLAYER.speedSprint (' + B.PLAYER.speedSprint + ') — kiting breaks');
@@ -1646,7 +1686,7 @@ Z.assert = function (cond, msg) {
 }());
 
 
-/* ============================ 05_audio.js (3200 lines) ============================ */
+/* ============================ 05_audio.js (3220 lines) ============================ */
 // ---------------------------------------------------------------------------
 // 05_audio.js — Z.Audio. Every sound in Nacht der Untoten, synthesized from
 // scratch with WebAudio. Zero sample assets, zero base64, zero network.
@@ -2247,7 +2287,7 @@ Z.assert = function (cond, msg) {
   gunDef('gun_m1911', 0.55, 0.80, 0.30, {
     lvl: 0.62, dist: 2.2, preDist: 1.15, clickF: 6100, clickHp: 2900, clickAmt: 0.9,
     body: [{ f: 860, q: 4.0, dec: 0.075, amt: 0.85 }, { f: 1950, q: 3.2, dec: 0.042, amt: 0.48 }],
-    thump: { f0: 215, f1: 68, dec: 0.095, amt: 0.55 },
+    thump: { f0: 262, f1: 92, dec: 0.062, amt: 0.34 },
     tail: { lp: 2500, dec: 0.22, amt: 0.24, pre: 0.013 },
     mech: { t: 0.045, f: 3100, dec: 0.02, amt: 0.16 },
   });
@@ -2357,7 +2397,7 @@ Z.assert = function (cond, msg) {
     build: function (c, out, t0, r) {
       gunshot(c, out, t0, {
         lvl: 0.68, dist: 3.0, clickF: 5200, clickHp: 2200, clickAmt: 0.9,
-        body: [{ f: 470, q: 2.8, dec: 0.13, amt: 0.92 }, { f: 1150, q: 2.4, dec: 0.07, amt: 0.5 }],
+        body: [{ f: 585, q: 2.4, dec: 0.13, amt: 0.92 }, { f: 1310, q: 2.4, dec: 0.07, amt: 0.5 }],
         thump: { f0: 134, f1: 40, dec: 0.30, amt: 0.85 },
         tail: { lp: 1600, dec: 0.55, amt: 0.40, pre: 0.017 },
       }, r);
@@ -2397,7 +2437,7 @@ Z.assert = function (cond, msg) {
   // M1919 Browning — deep chattering LMG.
   gunDef('gun_browning', 0.85, 0.90, 0.42, {
     lvl: 0.66, dist: 2.8, preDist: 1.15, clickF: 5100, clickHp: 2300, clickAmt: 0.88,
-    body: [{ f: 420, q: 4.6, dec: 0.105, amt: 0.98 }, { f: 1055, q: 3.4, dec: 0.055, amt: 0.5 },
+    body: [{ f: 368, q: 4.6, dec: 0.105, amt: 0.98 }, { f: 1055, q: 3.4, dec: 0.055, amt: 0.5 },
            { f: 2450, q: 2.6, dec: 0.026, amt: 0.22 }],
     thump: { f0: 142, f1: 48, dec: 0.20, amt: 0.86 },
     tail: { lp: 1500, dec: 0.38, amt: 0.34, pre: 0.016 },
@@ -3928,6 +3968,20 @@ Z.assert = function (cond, msg) {
       const rog = gain(c, 0);
       ro.connect(rlp); rlp.connect(rog); rog.connect(mst);
       swell(rog.gain, t0 + 0.1, 1.85, 0.30, 0.06);
+
+      // The arrival. Both reversed swells peak at t0+1.95 and then simply cut
+      // out — a backwards swell with nothing at the end of it reads as a
+      // generic horror riser, not as the round-change alarm. This is the hit
+      // they were building toward: a struck-metal toll plus a sub drop.
+      const tHit = t0 + 1.95;
+      fmBell(c, mst, tHit, 148, 2.6, 0.42, 2.74, 8.5, r);
+      impact(c, mst, tHit, { f: 96, dec: 0.42, amt: 0.75, lp: 900, noise: 0.35 }, r);
+      const arrSub = osc(c, 'sine', 84);
+      sweep(arrSub.frequency, tHit, 92, 26, 1.1);
+      const arrSubG = gain(c, 0);
+      ad(arrSubG.gain, tHit, 0.004, 1.05, 0.60);
+      arrSub.connect(arrSubG); arrSubG.connect(mst);
+      go(arrSub, tHit, tHit + 1.3);
       go(ro, t0, t0 + 2.1);
 
       // 4. sub drop under everything, then a long dark tail
@@ -4418,9 +4472,11 @@ Z.assert = function (cond, msg) {
     master = gain(ctx, 1.0);
     duckGain = gain(ctx, 1.0);
     limiter = ctx.createDynamicsCompressor();
-    limiter.threshold.value = -8;
-    limiter.knee.value = 8;
-    limiter.ratio.value = 14;
+    // Gentle bus glue. At -8 dB / 14:1 this was a near-brickwall that pulled
+    // gunfire down to ambience level while never touching the ambience itself.
+    limiter.threshold.value = -14;
+    limiter.knee.value = 6;
+    limiter.ratio.value = 3.5;
     limiter.attack.value = 0.003;
     limiter.release.value = 0.18;
     master.connect(duckGain); duckGain.connect(limiter); limiter.connect(ctx.destination);
@@ -4496,7 +4552,11 @@ Z.assert = function (cond, msg) {
   // shaper of the in-range signal — a hard, silent ceiling under ~0.97
   // rather than a wall of decimation-clipping noise. Linear (transparent)
   // below LIMITER_T, soft-knee tanh above it.
-  const LIMITER_T = 0.80;
+  // A true safety net for overs, not a tone shaper. At 0.80 this per-voice
+  // stage was squashing every loud layered sound toward the same ceiling,
+  // which — stacked with the master compressor — collapsed the dynamic range
+  // the mix depends on (quiet ambience, deafening Kar98k).
+  const LIMITER_T = 0.93;
   let limiterCurveCache = null;
   function limiterCurve() {
     if (limiterCurveCache) return limiterCurveCache;
@@ -7792,17 +7852,17 @@ Z.assert = function (cond, msg) {
     boxSpots.push({ pos: [5.4, 0, 5.4], yaw: -1.1, room: 'se' });
 
     lights.push({ pos: [-3.2, 2.95, 0.4], color: [1.00, 0.70, 0.34], radius: 8.6,
-      intensity: 2.60, flicker: 0.28, sway: 0.07, name: 'main_bulb' });
+      intensity: 1.70, flicker: 0.28, sway: 0.07, name: 'main_bulb' });
     lights.push({ pos: [8.4, 1.05, 5.9], color: [1.00, 0.48, 0.16], radius: 6.6,
-      intensity: 2.40, flicker: 0.45, name: 'fire_barrel' });
+      intensity: 1.55, flicker: 0.45, name: 'fire_barrel' });
     lights.push({ pos: [6.4, UP + 2.55, -4.2], color: [1.00, 0.74, 0.40], radius: 7.2,
-      intensity: 1.90, flicker: 0.35, sway: 0.04, name: 'east_bulb' });
+      intensity: 1.30, flicker: 0.35, sway: 0.04, name: 'east_bulb' });
     lights.push({ pos: [-5.6, UP + 2.6, -5.0], color: [1.00, 0.68, 0.32], radius: 6.2,
-      intensity: 1.35, flicker: 0.62, name: 'help_bulb' });
+      intensity: 0.95, flicker: 0.62, name: 'help_bulb' });
     lights.push({ pos: [-2.8, 4.4, 5.2], color: [0.40, 0.54, 0.90], radius: 8.4,
-      intensity: 0.95, flicker: 0, name: 'moon_shaft_s' });
+      intensity: 0.80, flicker: 0, name: 'moon_shaft_s' });
     lights.push({ pos: [6.0, UP + 2.4, -5.2], color: [0.38, 0.50, 0.88], radius: 6.4,
-      intensity: 0.75, flicker: 0, name: 'moon_shaft_n' });
+      intensity: 0.62, flicker: 0, name: 'moon_shaft_n' });
 
     // =====================================================================
     // Nav seeds + zombie spawn zones
@@ -12227,7 +12287,7 @@ Z.assert = function (cond, msg) {
 }());
 
 
-/* ============================ 16_player.js (524 lines) ============================ */
+/* ============================ 16_player.js (532 lines) ============================ */
 // ---------------------------------------------------------------------------
 // 16_player.js — the player: movement, camera, health, inventory, interaction.
 //
@@ -12388,7 +12448,7 @@ Z.assert = function (cond, msg) {
     } else {
       p.sprinting = false;
       // recovers slower than it drains, so sprint is a resource
-      p.sprintMeter = Math.min(1, p.sprintMeter + dt / (B.sprintDuration * 1.55));
+      p.sprintMeter = Math.min(1, p.sprintMeter + dt / (B.sprintDuration * B.sprintRegenRatio));
       if (p.sprintMeter > 0.32) p.sprintLocked = false;
     }
 
@@ -12509,6 +12569,14 @@ Z.assert = function (cond, msg) {
   P.damage = function (p, amount, fromPos, source) {
     if (p.dead || amount <= 0) return false;
     if (p.godMode) return false;
+    // Two zombies striking on the same tick would take a full-health player
+    // straight to downed with nothing they could have done. A short spacing
+    // keeps 'two hits and you are down' true without making it unreactable.
+    const now = p.clock || 0;
+    if (source === 'zombie' && (now - (p.lastHitTime || -99)) < Z.B.PLAYER.damageCooldown) {
+      return false;
+    }
+    if (source === 'zombie') p.lastHitTime = now;
     if (p.downed) {
       // Already down: further hits just accelerate the bleedout slightly.
       p.bleedout = Math.max(0, p.bleedout - 2.5);
@@ -12753,7 +12821,7 @@ Z.assert = function (cond, msg) {
 }());
 
 
-/* ============================ 17_zombie.js (923 lines) ============================ */
+/* ============================ 17_zombie.js (927 lines) ============================ */
 // ---------------------------------------------------------------------------
 // 17_zombie.js — zombie entities, state machine, damage model, rendering.
 //
@@ -12804,7 +12872,11 @@ Z.assert = function (cond, msg) {
     const win = opts.window;
     const zone = opts.zone;
 
-    const spread = M.lerp(Z.B.zombieSpeedSpread.min, Z.B.zombieSpeedSpread.max, rng.f());
+    // At the capped sprint tier the spread is downward-only, so no individual
+    // zombie can exceed the cap the kiting invariant is built on.
+    const band = Z.B.zombieSpeedTier(round).name === 'sprint'
+      ? Z.B.zombieSpeedSpreadTop : Z.B.zombieSpeedSpread;
+    const spread = M.lerp(band.min, band.max, rng.f());
     const hp = Z.B.roundHealth(round);
     const z = {
       id: ++idCounter,
@@ -13505,7 +13577,7 @@ Z.assert = function (cond, msg) {
     const dist = followFlow(z, playerPos, dt);
 
     // progress watchdog
-    const reachNow = Z.B.PLAYER.meleeRange * 0.8;
+    const reachNow = Z.B.PLAYER.zombieAttackRange * 0.85;
     if (z.bestDist === undefined || dist < z.bestDist - 0.25) {
       z.bestDist = dist;
       z.noProgressT = 0;
@@ -13522,7 +13594,7 @@ Z.assert = function (cond, msg) {
       }
     }
 
-    const reach = Z.B.PLAYER.meleeRange * 0.8;
+    const reach = Z.B.PLAYER.zombieAttackRange * 0.85;
     if (dist < reach && Math.abs(z.pos[1] - playerPos[1]) < 1.6 && z.attackCooldown <= 0) {
       z.state = 'attack';
       z.stateT = 0;
@@ -13547,7 +13619,7 @@ Z.assert = function (cond, msg) {
     if (!z.hasHitThisSwing && z.stateT >= ATTACK_WINDUP) {
       z.hasHitThisSwing = true;
       const d = M.distXZ(z.pos, playerPos);
-      if (d < Z.B.PLAYER.meleeRange && Math.abs(z.pos[1] - playerPos[1]) < 1.8) {
+      if (d < Z.B.PLAYER.zombieAttackRange && Math.abs(z.pos[1] - playerPos[1]) < 1.8) {
         if (Z.Audio && Z.Audio.ready) {
           Z.Audio.play('zom_attack_swipe', { pos: z.pos, vol: 0.85 });
           Z.Audio.play('zom_hit_player', { vol: 0.9 });
@@ -16748,7 +16820,7 @@ Z.assert = function (cond, msg) {
 }());
 
 
-/* ============================ 22_game.js (677 lines) ============================ */
+/* ============================ 22_game.js (684 lines) ============================ */
 // ---------------------------------------------------------------------------
 // 22_game.js — state machine, fixed-timestep loop, render order, HUD feed.
 // ---------------------------------------------------------------------------
@@ -16873,11 +16945,15 @@ Z.assert = function (cond, msg) {
     Z.Zombies.onKill = function (z, info) {
       const p = G.player;
       const mult = Z.Econ.pointsMultiplier();
+      // A body-shot kill pays 60: the 10 for the hit plus the 50 kill bonus.
+      // The killing shot never runs the hit-award path (that only fires for
+      // non-lethal hits), so the bonus has to include it here or every body
+      // kill in the game is short-paid by 10 — which it was.
       let pts;
       if (info.source === 'melee') pts = Z.B.POINTS.meleeKill;
       else if (info.source === 'explosive' || info.source === 'nuke') pts = Z.B.POINTS.explosiveKill;
       else if (info.headshot) pts = Z.B.POINTS.headshotKill;
-      else pts = Z.B.POINTS.kill;
+      else pts = Z.B.POINTS.hit + Z.B.POINTS.kill;
       if (info.source !== 'nuke') Z.Player.award(p, pts * mult, 'kill');
       p.kills++;
       if (info.headshot) p.headshots++;
@@ -17057,6 +17133,9 @@ Z.assert = function (cond, msg) {
     const bot = G.botBrain ? G.botBrain(p, dt) : null;
 
     const canAct = alive && G.mode === 'playing' && !p.downed;
+    // Downed players keep their trigger: crawling and still shooting is the
+    // whole texture of the last-stand moment.
+    const canShoot = alive && G.mode === 'playing';
     const input = {
       move: [0, 0],
       jump: false, crouch: false, sprint: false,
@@ -17099,7 +17178,7 @@ Z.assert = function (cond, msg) {
     Z.Player.eye(p, eye);
     Z.Player.forward(p, dir);
 
-    const wantFire = canAct && p.swapT <= 0 && (bot ? !!bot.fire
+    const wantFire = canShoot && p.swapT <= 0 && (bot ? !!bot.fire
       : (Z.Input.mb(0) || Z.Input.gpAxis(7) > 0.4 || Z.Input.gpButton(7)));
     const wantAds = canAct && (bot ? !!bot.ads
       : (Z.Menu.settings.toggleAds ? p.wantAds : (Z.Input.mb(2) || Z.Input.gpButton(6))));
