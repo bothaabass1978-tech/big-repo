@@ -51,7 +51,10 @@
     gl.cullFace(gl.BACK);
     gl.frontFace(gl.CCW);
     gl.clearColor(0, 0, 0, 1);
-    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+    // Canvas row 0 is the top of the image, but our box UVs put v=0 at the
+    // bottom of a wall. Without this flip every sign, poster and chalk price
+    // in the level renders upside down.
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
     gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
     return gl;
   };

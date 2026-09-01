@@ -2838,6 +2838,37 @@
     return { def: d, fixedVariant: -1 };
   }
 
+  // ---- safety limiter --------------------------------------------------
+  // Recipes are additive (many bands/layers summed with no final gain-stage
+  // bookkeeping), so a busy shot can genuinely peak past 0 dBFS before it
+  // ever reaches the master compressor. A WaveShaperNode clamps any input
+  // outside [-1,1] to the curve's own edge value (per spec), so this curve
+  // doubles as a true brickwall for arbitrarily large overs, not just a
+  // shaper of the in-range signal — a hard, silent ceiling under ~0.97
+  // rather than a wall of decimation-clipping noise. Linear (transparent)
+  // below LIMITER_T, soft-knee tanh above it.
+  const LIMITER_T = 0.80;
+  let limiterCurveCache = null;
+  function limiterCurve() {
+    if (limiterCurveCache) return limiterCurveCache;
+    const n = 4096;
+    const cv = new Float32Array(n);
+    const span = 1 - LIMITER_T;
+    for (let i = 0; i < n; i++) {
+      const x = (i * 2) / (n - 1) - 1;
+      const ax = Math.abs(x), sgn = x < 0 ? -1 : 1;
+      cv[i] = sgn * (ax <= LIMITER_T ? ax : LIMITER_T + span * Math.tanh((ax - LIMITER_T) / span));
+    }
+    limiterCurveCache = cv;
+    return cv;
+  }
+  function safetyLimiter(c) {
+    const w = c.createWaveShaper();
+    w.curve = limiterCurve();
+    w.oversample = '4x';
+    return w;
+  }
+
   // ---- offline render (also drives the buffer bake) ----------------------
   function offlineRender(name, variantIdx, seed) {
     const rd = resolveDef(name);
@@ -2852,7 +2883,10 @@
     try { oc = new OAC(2, len, sr); } catch (e) { return Promise.reject(e); }
     const r = mkRnd(seed === undefined ? (hash(name) ^ ((variantIdx | 0) * 2654435761)) >>> 0 : seed);
     const ctl = new Ctl();
-    try { d.build(oc, oc.destination, 0.002, r, ctl); }
+    const pre = gain(oc, 1);
+    const lim = safetyLimiter(oc);
+    pre.connect(lim); lim.connect(oc.destination);
+    try { d.build(oc, pre, 0.002, r, ctl); }
     catch (e) { return Promise.reject(e); }
     return oc.startRendering();
   }

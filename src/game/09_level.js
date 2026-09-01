@@ -142,7 +142,11 @@
     else if (side === 'w') pos = [X0, cy, u];
     else pos = [X1, cy, u];
 
-    const out = [pos[0] - n[0] * 1.25, floorY, pos[2] - n[2] * 1.25];
+    // Zombies always queue on the ground outside, even for upstairs windows —
+    // they scale the wall to get in, exactly as they do in the real game.
+    // Putting `out` at the window's own floor height would leave it hanging in
+    // mid-air with no navigation node under it.
+    const out = [pos[0] - n[0] * 1.25, 0, pos[2] - n[2] * 1.25];
     const inPos = [pos[0] + n[0] * 0.95, floorY, pos[2] + n[2] * 0.95];
     const repairFrom = [pos[0] + n[0] * 1.15, floorY, pos[2] + n[2] * 1.15];
 
@@ -236,25 +240,25 @@
     wall({
       axis: 'x', at: Z0 - WALL, from: X0 - WALL, to: X1 + WALL, y0: 0, y1: ROOF,
       mat: 'plaster_wall', holes: [wN1, wN2, wN3, wN4, wN5, wN6].map(winHole),
-      opts: { group: 'wall_n' },
+      opts: { group: 'wall_n', uvScale: 0.3 },
     });
     // South
     wall({
       axis: 'x', at: Z1, from: X0 - WALL, to: X1 + WALL, y0: 0, y1: ROOF,
       mat: 'plaster_wall', holes: [wS1, wS2].map(winHole),
-      opts: { group: 'wall_s' },
+      opts: { group: 'wall_s', uvScale: 0.3 },
     });
     // West
     wall({
       axis: 'z', at: X0 - WALL, from: Z0 - WALL, to: Z1 + WALL, y0: 0, y1: ROOF,
       mat: 'brick', holes: [wW1, wW2, wW3].map(winHole),
-      opts: { group: 'wall_w' },
+      opts: { group: 'wall_w', uvScale: 0.34 },
     });
     // East
     wall({
       axis: 'z', at: X1, from: Z0 - WALL, to: Z1 + WALL, y0: 0, y1: ROOF,
       mat: 'brick', holes: [wE1, wE2].map(winHole),
-      opts: { group: 'wall_e' },
+      opts: { group: 'wall_e', uvScale: 0.34 },
     });
 
     // ---- window frames (a lintel and jambs around each opening) ----------
@@ -432,10 +436,10 @@
     addBuy({ kind: 'weapon', id: 'stielhandgranate', chalk: 'chalk_grenade', cost: 250,
       pos: [X0 + 0.02, 1.45, -6.6], yaw: Math.PI / 2, facing: [1, 0, 0], room: 'main',
       use: [X0 + 1.1, 0, -6.6] });
-    addBuy({ kind: 'weapon', id: 'carbine', chalk: 'chalk_carbine', cost: 600,
+    addBuy({ kind: 'weapon', id: 'm1a1_carbine', chalk: 'chalk_carbine', cost: 600,
       pos: [-3.8, 1.45, Z1 - 0.02], yaw: Math.PI, facing: [0, 0, -1], room: 'main',
       use: [-3.8, 0, Z1 - 1.1] });
-    addBuy({ kind: 'weapon', id: 'dbshotgun', chalk: 'chalk_dbshotgun', cost: 1200,
+    addBuy({ kind: 'weapon', id: 'db_shotgun', chalk: 'chalk_dbshotgun', cost: 1200,
       pos: [4.6, 1.45, Z0 + 0.02], yaw: 0, facing: [0, 0, 1], room: 'ne',
       use: [4.6, 0, Z0 + 1.1] });
     addBuy({ kind: 'weapon', id: 'gewehr43', chalk: 'chalk_gewehr43', cost: 600,
@@ -447,9 +451,34 @@
     addBuy({ kind: 'weapon', id: 'thompson', chalk: 'chalk_thompson', cost: 1200,
       pos: [X0 + 0.02, UP + 1.45, 2.4], yaw: Math.PI / 2, facing: [1, 0, 0], room: 'catwalk',
       use: [X0 + 1.1, UP, 2.4] });
-    addBuy({ kind: 'weapon', id: 'sawnoff', chalk: 'chalk_sawnoff', cost: 1200,
+    addBuy({ kind: 'weapon', id: 'sawed_off', chalk: 'chalk_sawnoff', cost: 1200,
       pos: [X1 - 0.02, UP + 1.45, -3.2], yaw: -Math.PI / 2, facing: [-1, 0, 0], room: 'east_up',
       use: [X1 - 1.1, UP, -3.2] });
+
+    // The chalk outlines are what tell the player a wall gun is even there.
+    // They're real geometry rather than decals so they light and fog with the
+    // wall they're drawn on.
+    for (const b of buys) {
+      if (b.kind !== 'weapon' || !b.chalk) continue;
+      const f = b.facing;
+      const h = 0.52, t = 0.035;           // square plate: exactly one tile
+      const s = 1 / (h * 2);
+      if (Math.abs(f[2]) > 0.5) {
+        const z0 = f[2] > 0 ? b.pos[2] : b.pos[2] - t;
+        box([b.pos[0] - h, b.pos[1] - h, z0], [b.pos[0] + h, b.pos[1] + h, z0 + t],
+          b.chalk, {
+            solid: false, uvScale: s, group: 'chalk',
+            uvOffset: [-(b.pos[0] - h) * s, -(b.pos[1] - h) * s],
+          });
+      } else {
+        const x0 = f[0] > 0 ? b.pos[0] : b.pos[0] - t;
+        box([x0, b.pos[1] - h, b.pos[2] - h], [x0 + t, b.pos[1] + h, b.pos[2] + h],
+          b.chalk, {
+            solid: false, uvScale: s, group: 'chalk',
+            uvOffset: [-(b.pos[2] - h) * s, -(b.pos[1] - h) * s],
+          });
+      }
+    }
 
     // Debris. The use point sits beside the stair mouth, not on the treads.
     addBuy({ kind: 'debris', id: 'stairs_west', cost: 1000, pos: [-9.1, 1.0, Z1 - 0.5],

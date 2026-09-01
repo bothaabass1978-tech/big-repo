@@ -28,14 +28,14 @@
   const tmpM = m4.create();
 
   R.env = {
-    ambTop: [0.085, 0.095, 0.130],   // cold moonlight from above
-    ambBot: [0.022, 0.020, 0.024],   // near-black bounce off the floorboards
+    ambTop: [0.100, 0.100, 0.122],   // cold moonlight from above
+    ambBot: [0.030, 0.028, 0.033],   // near-black bounce off the floorboards
     sunDir: [0.35, -0.82, 0.45],
-    sunCol: [0.10, 0.12, 0.17],
+    sunCol: [0.085, 0.095, 0.130],
     fogCol: Z.C.FOG_COLOR.slice(),
     fogNear: Z.C.FOG_NEAR,
     fogFar: Z.C.FOG_FAR,
-    exposure: 1.0,
+    exposure: 1.30,
   };
 
   const MAX_L = Z.C.MAX_LIGHTS;
@@ -133,7 +133,7 @@
     '    Ld /= max(d, 0.0001);',
     '    float ndl = max(dot(N, Ld), 0.0);',
     '    float att = clamp(1.0 - d / lr, 0.0, 1.0);',
-    '    att = att * att / (1.0 + d * d * 0.35);',
+    '    att = att * att / (1.0 + d * d * 0.10);',
     '    vec3 lc = uLightColI[i].rgb * uLightColI[i].a * att;',
     '    light += lc * (ndl * 0.85 + 0.15);',
     '    if (uSpec.x > 0.0) {',
@@ -696,7 +696,9 @@
       vmLights.push({ pos: p, col: L.col, radius: L.radius, intensity: L.intensity });
     }
     // A dedicated soft key light so the weapon is always legible.
-    vmLights.push({ pos: [0.45, 0.55, 0.25], col: [0.52, 0.56, 0.68], radius: 4.5, intensity: 1.1 });
+    // Deliberately dim: the weapon must stay legible without becoming the
+    // brightest thing on screen in a map lit by two failing bulbs.
+    vmLights.push({ pos: [0.42, 0.50, 0.30], col: [0.40, 0.44, 0.55], radius: 3.2, intensity: 0.42 });
     vmSavePos = R.camera.pos;
     R.camera.pos = ORIGIN;
     frameLightsSave = frameLights.slice();

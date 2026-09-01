@@ -705,23 +705,26 @@
     const seedN = 3;
     const c = mkCanvas(size);
     const ctx = ctx2d(c);
-    const base = baseLayer(size, 64, 3 + 500, { octaves: 5, freq: 3.5, warpAmt: 0.5, warpFreq: 2.5, gain: 0.5, lac: 2.1, stops: stopsPlaster });
+    // Fine, high-frequency mottling. Big low-frequency blobs are what make a
+    // tiled wall read as a repeating pattern instead of as a wall.
+    const base = baseLayer(size, 64, 3 + 500, { octaves: 5, freq: 8.0, warpAmt: 0.28, warpFreq: 3.5, gain: 0.46, lac: 2.1, stops: stopsPlaster });
     ctx.drawImage(base, 0, 0);
     // spalled patches revealing lath/brick beneath
-    const voro = voronoiField(40, 3, 14);
+    // Many small spall patches read as damage; a few big ones read as wallpaper.
+    const voro = voronoiField(40, 3, 54);
     const img = ctx.getImageData(0, 0, size, size);
     const d = img.data;
     for (let y = 0; y < size; y++) {
       for (let x = 0; x < size; x++) {
         const fx = (x / size) * voro.res, fy = (y / size) * voro.res;
         const idx = (fy | 0) * voro.res + (fx | 0);
-        const spalled = RNG.hash2(voro.cellId[idx] * 7 + 3, 3) > 0.78;
+        const spalled = RNG.hash2(voro.cellId[idx] * 7 + 3, 3) > 0.88;
         if (spalled) {
           const i = (y * size + x) * 4;
           const lathY = (Math.sin(y * 0.6) * 0.5 + 0.5) > 0.5 ? 1 : 0;
           const brickTone = 60 + RNG.hash2(x >> 2, y >> 2) * 35;
           const lathTone = lathY ? 30 + RNG.hash2(x >> 4, y >> 4) * 20 : brickTone;
-          const soft = 1 - voro.edge[idx] * 0.7;
+          const soft = (1 - voro.edge[idx] * 0.7) * 0.65;
           d[i] = M.lerp(d[i], lathTone * 1.1, soft);
           d[i + 1] = M.lerp(d[i + 1], lathTone * 0.85, soft);
           d[i + 2] = M.lerp(d[i + 2], lathTone * 0.6, soft);
@@ -748,7 +751,7 @@
     grime(ctx, size, 3, 1);
     dirtAO(ctx, size, { strength: 0.1 });
     forceSeamEdges(c);
-    return { canvas: c, size, tile: [true, true], spec: 0.08, gloss: 0.12, emissive: 0, normal: sobelNormal(c, size / 2), tint: [1, 1, 1] };
+    return { canvas: c, size, tile: [true, true], spec: 0.08, gloss: 0.12, emissive: 0, normal: sobelNormal(c, size / 2), tint: [0.60, 0.55, 0.48] };
   }
 
   function makeBrick() {
@@ -797,7 +800,7 @@
     const size = HERO, seedN = 5;
     const c = mkCanvas(size);
     const ctx = ctx2d(c);
-    const base = baseLayer(size, 56, seedN, { octaves: 4, freq: 2.5, warpAmt: 0.3, warpFreq: 2, stops: stopsConcrete });
+    const base = baseLayer(size, 56, seedN, { octaves: 4, freq: 6.5, warpAmt: 0.22, warpFreq: 3, stops: stopsConcrete });
     ctx.drawImage(base, 0, 0);
     // aggregate speckle via voronoi cell tone variance
     const voro = voronoiField(72, seedN, 90);
@@ -1340,7 +1343,7 @@
   // Chalk wall-buy silhouettes. `draw(ctx,st,cx,cy,s)` draws the gun in a
   // roughly (-s..s) box centred at (cx,cy) using chalkLine/chalkPoly.
   const CHALK_GUNS = {
-    kar98k: { price: 500, draw: (ctx, st, cx, cy, s) => {
+    kar98k: { price: 200, draw: (ctx, st, cx, cy, s) => {
       chalkPoly(ctx, st, [[cx - s, cy + s * 0.15], [cx + s * 0.7, cy - s * 0.05], [cx + s, cy - s * 0.1]], s * 0.05);
       chalkPoly(ctx, st, [[cx - s * 0.55, cy + s * 0.25], [cx - s * 0.25, cy - s * 0.15]], s * 0.06); // stock drop
       chalkLine(ctx, st, cx + s * 0.2, cy - s * 0.02, cx + s * 0.2, cy + s * 0.25, s * 0.04); // bolt
@@ -1349,7 +1352,7 @@
       chalkPoly(ctx, st, [[cx - s * 0.9, cy + s * 0.1], [cx + s * 0.75, cy - s * 0.08], [cx + s, cy - s * 0.1]], s * 0.045);
       chalkPoly(ctx, st, [[cx - s * 0.5, cy + s * 0.2], [cx - s * 0.2, cy - s * 0.12]], s * 0.05);
     } },
-    gewehr43: { price: 1200, draw: (ctx, st, cx, cy, s) => {
+    gewehr43: { price: 600, draw: (ctx, st, cx, cy, s) => {
       chalkPoly(ctx, st, [[cx - s, cy + s * 0.15], [cx + s * 0.6, cy - s * 0.08], [cx + s, cy - s * 0.12]], s * 0.05);
       chalkLine(ctx, st, cx + s * 0.1, cy - s * 0.2, cx + s * 0.1, cy - s * 0.55, s * 0.05); // magazine up top
     } },
@@ -1358,12 +1361,12 @@
       ctx.save(); ctx.globalCompositeOperation = 'lighten'; ctx.strokeStyle = 'rgba(225,222,210,0.6)';
       ctx.beginPath(); ctx.arc(cx - s * 0.15, cy + s * 0.35, s * 0.22, 0, M.TAU); ctx.lineWidth = s * 0.05; ctx.stroke(); ctx.restore(); // drum mag
     } },
-    bar: { price: 1200, draw: (ctx, st, cx, cy, s) => {
+    bar: { price: 1800, draw: (ctx, st, cx, cy, s) => {
       chalkPoly(ctx, st, [[cx - s, cy + s * 0.12], [cx + s * 0.6, cy - s * 0.1], [cx + s, cy - s * 0.12]], s * 0.05);
       chalkLine(ctx, st, cx, cy + s * 0.1, cx, cy + s * 0.5, s * 0.045); // bipod
       chalkLine(ctx, st, cx - s * 0.15, cy + s * 0.5, cx + s * 0.15, cy + s * 0.5, s * 0.04);
     } },
-    dbshotgun: { price: 1500, draw: (ctx, st, cx, cy, s) => {
+    dbshotgun: { price: 1200, draw: (ctx, st, cx, cy, s) => {
       chalkLine(ctx, st, cx - s * 0.9, cy + s * 0.15, cx + s * 0.8, cy - s * 0.05, s * 0.09);
       chalkPoly(ctx, st, [[cx - s * 0.4, cy + s * 0.25], [cx - s * 0.1, cy - s * 0.1]], s * 0.07);
     } },
@@ -1413,7 +1416,9 @@
     ctx.restore();
     drawGrain(ctx, size, seedN, 0.05, 'screen');
     grime(ctx, size, seedN, 0.7);
-    return { canvas: c, size, tile: [false, false], spec: 0.05, gloss: 0.1, emissive: 0, normal: null, tint: [1, 1, 1] };
+    // Tinted down so the plaster backing sinks into the wall it's painted on
+    // and only the chalk strokes read from across the room.
+    return { canvas: c, size, tile: [false, false], spec: 0.05, gloss: 0.1, emissive: 0, normal: null, tint: [0.58, 0.55, 0.50] };
   }
 
   function makeZombieSkin() {
@@ -1525,7 +1530,7 @@
     edgeWear(ctx, size, seedN, { count: 6, color: [150, 148, 140], amount: 1.2 });
     grime(ctx, size, seedN, 0.8);
     forceSeamEdges(c);
-    return { canvas: c, size, tile: [true, true], spec: 0.55, gloss: 0.6, emissive: 0, normal: null, tint: [1, 1, 1] };
+    return { canvas: c, size, tile: [true, true], spec: 0.14, gloss: 0.6, emissive: 0, normal: null, tint: [1, 1, 1] };
   }
   function makeGunWood() {
     const c = tileWood(38, PROP, { axis: 'v', count: 3, freq: 1.2, stops: stopsWoodNew, knots: false, rot: false, nails: false, gapColor: 'rgba(10,7,5,0.3)', gapWidth: 0.5, stainAmt: 0, scratchCount: 8, wear: 1.2, grime: 0.4, ao: false });
