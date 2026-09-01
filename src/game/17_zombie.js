@@ -6,7 +6,16 @@
 // through, then walk at the player forever. Speed and health come from the
 // round; everything else is constant. The design relies on the horde being
 // predictable — a player must be able to read a group and out-walk it, which
-// is why the top speed is capped just under the player's sprint.
+// is why the top speed is capped just under the speed the player can sustain
+// indefinitely (not their sprint burst; see B.sustainedPlayerSpeed).
+//
+// That margin is a speed comparison in open space, and it is only half the
+// claim: out-walking a horde also needs somewhere to walk. check-level.mjs
+// measures the largest circle you can actually run inside each room, and the
+// back rooms are tight on purpose — main and catwalk give 3.9 m, ne and se
+// give 1.8-1.9 m. Retreating into a back room is meant to be a mistake, the
+// way it is on the real map, so spawn weighting is left free to follow the
+// player there. Kiting is always available; it is not available everywhere.
 // ---------------------------------------------------------------------------
 (function () {
   const S = {};

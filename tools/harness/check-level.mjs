@@ -159,5 +159,53 @@ const loopB = pathExists([6.0, 0, 5.0], [-5.5, 0, 3.0]);
 if (!(loopA && loopB)) bad('ground-floor training loop is broken');
 else console.log('  ok: ground-floor training loop verified (both directions)');
 
+// ---- per-room kiting circles ----------------------------------------------
+// The design claims kiting is viable indefinitely, and the balance harness
+// proves it as a speed comparison in open space. That is only half the claim:
+// spawn weighting biases windows toward wherever the player is standing, so
+// retreating into a small back room concentrates the horde there. If that room
+// has no room to circle in, "kiting always works" is false exactly where a
+// panicking player ends up. Measure the largest circle you can actually run.
+const DIMS = Z.Level.DIMS;
+const BODY = 0.34 + 0.32;          // player radius + zombie radius
+const RING = 20;
+function bestCircle(y) {
+  const per = {};
+  for (let x = DIMS.X0 + 0.5; x <= DIMS.X1 - 0.5; x += 0.4) {
+    for (let z = DIMS.Z0 + 0.5; z <= DIMS.Z1 - 0.5; z += 0.4) {
+      const c = [x, y, z];
+      if (Z.Phys.boxSolid([c[0], c[1] + 0.05, c[2]], R, H)) continue;
+      const room = Z.Level.roomAt(c);
+      let best = 0;
+      for (let r = 0.8; r <= 4.0; r += 0.1) {
+        let okRing = true;
+        for (let i = 0; i < RING; i++) {
+          const a = (i / RING) * Math.PI * 2;
+          const px = x + Math.cos(a) * r, pz = z + Math.sin(a) * r;
+          if (px < DIMS.X0 || px > DIMS.X1 || pz < DIMS.Z0 || pz > DIMS.Z1) { okRing = false; break; }
+          if (Z.Phys.boxSolid([px, y + 0.05, pz], R, H)) { okRing = false; break; }
+          if (Z.Level.roomAt([px, y, pz]) !== room) { okRing = false; break; }
+        }
+        if (!okRing) break;
+        best = r;
+      }
+      if (best > (per[room] || 0)) per[room] = best;
+    }
+  }
+  return per;
+}
+const circles = Object.assign({}, bestCircle(0), bestCircle(UPY));
+console.log('largest in-room kiting circle (m):',
+  Object.keys(circles).map((k) => k + ' ' + circles[k].toFixed(1)).join('  '));
+// A circle smaller than the two bodies that have to pass inside it is not a
+// loop, it is a corner you have backed into.
+for (const room of Object.keys(circles)) {
+  if (circles[room] < BODY + 0.6) {
+    bad('room "' + room + '" has no kiting circle (best radius '
+      + circles[room].toFixed(2) + ' m, need ' + (BODY + 0.6).toFixed(2) + ')');
+  }
+}
+if (!Object.keys(circles).length) bad('kiting-circle sweep found no walkable room at all');
+
 console.log(fail ? '\nLEVEL CHECK: ' + fail + ' FAILURES' : '\nLEVEL CHECK: PASS');
 process.exit(fail ? 1 : 0);

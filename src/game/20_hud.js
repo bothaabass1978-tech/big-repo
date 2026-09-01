@@ -417,20 +417,36 @@
     const rng = Z.RNG.make(Z.ART_SEED ^ 0xB100D);
     const cx = w / 2, cy = h / 2;
     x.fillStyle = COL.bloodDark;
+    // Blood on a lens is wet and soft-edged. Straight lineTo() segments between
+    // sampled radii gave hard-cornered hexagons the size of a fist; the ragged
+    // outline needs curves through the sample points, and the whole splat needs
+    // a radial falloff so it fades into the glass instead of ending on a line.
     function blob(bx, by, r) {
-      x.beginPath();
-      const pts = 10;
-      for (let i = 0; i <= pts; i++) {
+      const pts = 14;
+      const px = [], py = [];
+      for (let i = 0; i < pts; i++) {
         const a = (i / pts) * M.TAU;
-        const rr = r * (0.72 + rng.f() * 0.5);
-        const px = bx + Math.cos(a) * rr, py = by + Math.sin(a) * rr;
-        if (i === 0) x.moveTo(px, py); else x.lineTo(px, py);
+        const rr = r * (0.62 + rng.f() * 0.62);
+        px.push(bx + Math.cos(a) * rr); py.push(by + Math.sin(a) * rr);
+      }
+      x.beginPath();
+      // midpoint-to-midpoint quadratics: a closed curve with no visible corners
+      x.moveTo((px[pts - 1] + px[0]) / 2, (py[pts - 1] + py[0]) / 2);
+      for (let i = 0; i < pts; i++) {
+        const n = (i + 1) % pts;
+        x.quadraticCurveTo(px[i], py[i], (px[i] + px[n]) / 2, (py[i] + py[n]) / 2);
       }
       x.closePath();
+      const g = x.createRadialGradient(bx, by, r * 0.20, bx, by, r * 1.15);
+      g.addColorStop(0, COL.bloodDark);
+      g.addColorStop(0.62, COL.bloodDark);
+      g.addColorStop(1, 'rgba(46,4,4,0)');
+      x.fillStyle = g;
       x.fill();
+      x.fillStyle = COL.bloodDark;
     }
     // edge-hugging clusters, denser toward corners, thin toward center
-    const clusters = 22;
+    const clusters = 30;
     for (let i = 0; i < clusters; i++) {
       const edge = rng.i(4);
       let bx, by;
@@ -439,8 +455,8 @@
       else if (edge === 1) { bx = t * w; by = h - rng.f() * h * 0.22; }
       else if (edge === 2) { bx = rng.f() * w * 0.18; by = t * h; }
       else { bx = w - rng.f() * w * 0.18; by = t * h; }
-      x.globalAlpha = 0.5 + rng.f() * 0.5;
-      blob(bx, by, Math.min(w, h) * (0.06 + rng.f() * 0.09));
+      x.globalAlpha = 0.34 + rng.f() * 0.42;
+      blob(bx, by, Math.min(w, h) * (0.030 + rng.f() * 0.055));
     }
     // a soft radial vignette baked in underneath, so low intensities still read
     x.globalAlpha = 1;
@@ -656,18 +672,11 @@
       g.addColorStop(1, 'rgba(90,0,0,' + a1.toFixed(3) + ')');
       ctx.fillStyle = g;
       ctx.fillRect(0, 0, W, Hh);
-      // desaturate toward monochrome as health drops, strongest at edges
-      if (supportsBlend()) {
-        ctx.save();
-        ctx.globalCompositeOperation = 'saturation';
-        const g2 = ctx.createRadialGradient(cx, cy, Math.min(W, Hh) * 0.15, cx, cy, Math.max(W, Hh) * 0.7);
-        const a2 = 0.25 + (1 - health / maxHealth) * 0.35;
-        g2.addColorStop(0, 'rgba(128,128,128,0)');
-        g2.addColorStop(1, 'rgba(128,128,128,' + a2.toFixed(3) + ')');
-        ctx.fillStyle = g2;
-        ctx.fillRect(0, 0, W, Hh);
-        ctx.restore();
-      }
+      // No blend-mode desaturation here: this canvas is a transparent overlay,
+      // so compositing against it only greys its own empty pixels and lays a
+      // flat slab over the frame. The renderer's post pass already pulls
+      // saturation down from screen.blood, where it can see the scene.
+
     }
 
     if (typeof scr.flash === 'number' && scr.flash > 0.003) {
@@ -678,14 +687,6 @@
       ctx.fillStyle = 'rgba(0,0,0,' + M.clamp01(scr.fade).toFixed(3) + ')';
       ctx.fillRect(0, 0, W, Hh);
     }
-  }
-
-  let _blendChecked = null;
-  function supportsBlend() {
-    if (_blendChecked !== null) return _blendChecked;
-    try { ctx.save(); ctx.globalCompositeOperation = 'saturation'; _blendChecked = (ctx.globalCompositeOperation === 'saturation'); ctx.restore(); }
-    catch (e) { _blendChecked = false; }
-    return _blendChecked;
   }
 
   // Two quick pulses ("lub-dub") per ~0.9s cycle, output 0..1.
