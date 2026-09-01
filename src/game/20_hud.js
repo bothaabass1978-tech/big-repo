@@ -835,14 +835,17 @@
   // ---------------------------------------------------------------------------
   function drawRound(state, dt) {
     const a = anim.round;
-    if (a.shown === null) return;
+    // Round 0 is the pre-game lobby state and should show nothing.
+    if (a.shown === null || (a.shown | 0) < 1) return;
     const x0 = 30 * S;
     const h = 30 * S;
     const yLabel = Hh - 30 * S - 46 * S;
 
     drawLabel(ctx, 'ROUND', x0, yLabel, 13 * S, COL.labelDim, 'left', 2 * S);
 
-    const yNum = yLabel - h - 2 * S;
+    // Clear the label by a full line: at 2 px of separation the numeral sat
+    // on top of the R and the word read as "OUND".
+    const yNum = yLabel - h - 14 * S;
 
     if (a.phase === 'bleed') {
       const p = M.clamp01(a.t / 0.5);

@@ -62,7 +62,7 @@
   // Local fallback geometry, so the game is complete even if the model module
   // has nothing for a given prop.
   // -------------------------------------------------------------------------
-  let plankMesh = null, boxMesh = null, machineMesh = null, orbMesh = null;
+  let plankMesh = null, boxMesh = null, machineMesh = null, orbMesh = null, panelMesh = null;
 
   function buildMeshes() {
     if (plankMesh) return;
@@ -84,6 +84,29 @@
     b = Z.Mesh.builder();
     b.cyl(0, 0, 0.16, 0.16, -0.16, 0.16, 10, { uvScale: 1 });
     orbMesh = Z.Render.uploadMesh(b.finish('concrete'));
+
+    // Centred unit plate: composing a base-anchored box for the perk panel
+    // left it hovering above the machine instead of set into its front.
+    b = Z.Mesh.builder();
+    // uvOffset puts u,v in 0..1 across the plate; without it the -0.5..0.5
+    // world range wraps and you see four quadrants of the label at once.
+    b.box([-0.5, -0.5, -0.02], [0.5, 0.5, 0.02], { uvScale: 1, uvOffset: [0.5, 0.5] });
+    panelMesh = Z.Render.uploadMesh(b.finish('perk_jugg'));
+
+    // Upload the real prop meshes. Without this every prop silently fell back
+    // to the crude placeholder box above.
+    if (Z.Models && Z.Models.props) {
+      for (const k in Z.Models.props) {
+        const pr = Z.Models.props[k];
+        if (pr && pr.verts && !pr.gpu) pr.gpu = Z.Render.uploadMesh(pr);
+      }
+    }
+    if (Z.Models && Z.Models.guns) {
+      for (const k in Z.Models.guns) {
+        const g = Z.Models.guns[k];
+        if (g && g.mesh && !g.gpu) g.gpu = Z.Render.uploadMesh(g.mesh);
+      }
+    }
   }
 
   // -------------------------------------------------------------------------
@@ -527,10 +550,10 @@
       const prop = Z.Models && Z.Models.props && Z.Models.props['perk_machine_' + shortPerk(m.id)];
       M.m4.compose(mm, m.pos[0], m.pos[1], m.pos[2], m.yaw, 0, 0, 1, 1, 1);
       Z.Render.drawMesh(prop && prop.gpu ? prop.gpu : machineMesh, mm, { mat: 'metal_rusty' });
-      // lit front panel
-      M.m4.compose(mm, m.pos[0] + Math.sin(m.yaw) * 0.33, m.pos[1] + 1.15,
-        m.pos[2] + Math.cos(m.yaw) * 0.33, m.yaw, 0, 0, 0.62, 0.78, 0.06);
-      Z.Render.drawMesh(machineMesh, mm, { mat: panelMat(m.id), emissive: 0.75 });
+      // lit front panel, set into the machine's face
+      M.m4.compose(mm, m.pos[0] + Math.sin(m.yaw) * 0.32, m.pos[1] + 1.16,
+        m.pos[2] + Math.cos(m.yaw) * 0.32, m.yaw, 0, 0, 0.62, 0.86, 1);
+      Z.Render.drawMesh(panelMesh, mm, { mat: panelMat(m.id), emissive: 0.85 });
       Z.Render.addLight([m.pos[0], m.pos[1] + 1.3, m.pos[2]], perkLight(m.id), 3.4, 0.6);
     }
   };

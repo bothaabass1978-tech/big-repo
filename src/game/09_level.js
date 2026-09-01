@@ -493,9 +493,9 @@
     // =====================================================================
     // Quick Revive sits near spawn; Juggernog is buried in the HELP room so
     // committing to it is a real risk. That spatial cost is the point.
-    perkSpots.push({ id: 'revive', pos: [-9.0, 0, -3.4], yaw: Math.PI / 2, room: 'main' });
-    perkSpots.push({ id: 'jugg', pos: [-8.2, UP, -6.9], yaw: 0, room: 'help' });
-    perkSpots.push({ id: 'speed', pos: [7.4, UP, -7.0], yaw: 0, room: 'east_up' });
+    perkSpots.push({ id: 'quickrevive', pos: [-9.0, 0, -3.4], yaw: Math.PI / 2, room: 'main' });
+    perkSpots.push({ id: 'juggernog', pos: [-8.2, UP, -6.9], yaw: 0, room: 'help' });
+    perkSpots.push({ id: 'speedcola', pos: [7.4, UP, -7.0], yaw: 0, room: 'east_up' });
     perkSpots.push({ id: 'doubletap', pos: [8.6, 0, 6.4], yaw: -Math.PI / 2, room: 'se' });
 
     boxSpots.push({ pos: [-1.8, 0, 4.6], yaw: 0.3, room: 'main' });

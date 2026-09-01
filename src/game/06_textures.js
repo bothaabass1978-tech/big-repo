@@ -1418,7 +1418,7 @@
     grime(ctx, size, seedN, 0.7);
     // Tinted down so the plaster backing sinks into the wall it's painted on
     // and only the chalk strokes read from across the room.
-    return { canvas: c, size, tile: [false, false], spec: 0.05, gloss: 0.1, emissive: 0, normal: null, tint: [0.58, 0.55, 0.50] };
+    return { canvas: c, size, tile: [false, false], spec: 0.05, gloss: 0.1, emissive: 0, normal: null, tint: [0.78, 0.75, 0.68] };
   }
 
   function makeZombieSkin() {
@@ -1454,7 +1454,7 @@
     }
     grime(ctx, size, seedN, 1);
     forceSeamEdges(c);
-    return { canvas: c, size, tile: [true, true], spec: 0.12, gloss: 0.15, emissive: 0, normal: null, tint: [1, 1, 1] };
+    return { canvas: c, size, tile: [true, true], spec: 0.12, gloss: 0.15, emissive: 0, normal: null, tint: [0.66, 0.72, 0.58] };
   }
   function makeZombieCloth() {
     const size = PROP, seedN = 35;
@@ -1479,7 +1479,7 @@
     stains(ctx, size, seedN, { count: 4, color: [55, 8, 8], alpha: 0.45, minR: 0.05, maxR: 0.15 });
     grime(ctx, size, seedN, 1.2);
     forceSeamEdges(c);
-    return { canvas: c, size, tile: [true, true], spec: 0.02, gloss: 0.05, emissive: 0, normal: null, tint: [1, 1, 1] };
+    return { canvas: c, size, tile: [true, true], spec: 0.02, gloss: 0.05, emissive: 0, normal: null, tint: [0.58, 0.60, 0.50] };
   }
   function makeZombieFace() {
     const size = PROP, seedN = 36;
@@ -1518,7 +1518,7 @@
     ctx.restore();
     stains(ctx, size, seedN, { count: 3, color: [45, 40, 30], alpha: 0.25 });
     grime(ctx, size, seedN, 1);
-    return { canvas: c, size, tile: [false, false], spec: 0.12, gloss: 0.15, emissive: 0, normal: null, tint: [1, 1, 1] };
+    return { canvas: c, size, tile: [false, false], spec: 0.12, gloss: 0.15, emissive: 0, normal: null, tint: [0.70, 0.74, 0.62] };
   }
   function makeGunMetal() {
     const size = PROP, seedN = 37;

@@ -65,7 +65,7 @@
       state: 'approach',
       stateT: 0,
       window: win || null,
-      variant: rng.i(4),
+      variant: rng.i(6),
       seed: rng.f() * 1000,
       helmet: rng.bool(0.35),
 
@@ -784,14 +784,19 @@
       if (d > 55) continue;
       const anim = z.dying ? z.deathAnim : z.anim;
       const t = z.dying ? z.deathT : z.animT;
+      const vi = z.variant % S.gpu.length;
+      const src = S.src[vi];
+      // The variant meshes are built with different bone-length scales, so the
+      // pose has to be generated at the SAME scale or the skin stretches into
+      // a tall smear instead of a body.
       Z.Models.poseZombie(jointBuf, anim, t, {
         speed: z.speed, seed: z.seed, crawler: z.crawler,
         attackPhase: z.attackPhase, limbsMissing: z.limbsMissing,
-        stagger: z.stagger, variant: z.variant,
+        stagger: z.stagger, variant: vi,
+        heightScale: (src && src.heightScale) || 1,
       });
       M.m4.compose(modelM, z.pos[0], z.pos[1], z.pos[2], z.yaw, 0, 0, 1, 1, 1);
-      const mesh = S.gpu[z.variant] || S.gpu[0];
-      Z.Render.drawSkinned(mesh, modelM, jointBuf, null);
+      Z.Render.drawSkinned(S.gpu[vi], modelM, jointBuf, null);
     }
   };
 
@@ -808,9 +813,14 @@
   S.uploadModels = function () {
     if (!Z.Models || !Z.Models.zombie) return false;
     S.gpu = [];
+    S.src = [];
     const variants = Z.Models.zombieVariants && Z.Models.zombieVariants.length
       ? Z.Models.zombieVariants : [Z.Models.zombie];
-    for (const v of variants) S.gpu.push(Z.Render.uploadMesh(v));
+    for (const v of variants) {
+      S.gpu.push(Z.Render.uploadMesh(v));
+      S.src.push(v);
+    }
+    S.variantCount = S.gpu.length;
     return true;
   };
 
