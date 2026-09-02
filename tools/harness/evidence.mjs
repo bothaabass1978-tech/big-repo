@@ -189,7 +189,8 @@ await page.evaluate(() => {
   Z.Game.resume();
   Z.Game.gameOver();
 });
-await page.waitForTimeout(2600);
+// The stats reveal is staggered; capture it settled, not mid-animation.
+await page.waitForTimeout(4200);
 await page.screenshot({ path: join(OUT, 'ev-14-gameover.png') });
 
 const stats = await page.evaluate(() => window.__Z.Game.debug.stats());

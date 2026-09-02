@@ -7,19 +7,35 @@
   Z.Input = I;
 
   const keys = Object.create(null);      // code -> true while held
-  // Edges are collected into sets by the DOM handlers and cleared at the end
-  // of the frame that consumed them. Tagging them with a frame counter instead
-  // is off by one — a key pressed between frames is stamped with the OLD frame
-  // number, and by the time anything asks, the counter has already advanced,
-  // so every single press edge is missed. That silently kills reload, buy,
-  // swap, melee, grenade and pause while held-key movement still works.
+  // Edges are double-buffered. DOM handlers only ever write to the `pending`
+  // set; update() promotes pending into the readable set at the top of a
+  // frame, and nothing clears the readable set until the next promotion.
+  //
+  // The obvious single-buffer version — collect edges, clear them at the end
+  // of the frame that consumed them — drops input. A key pressed after the
+  // frame has already read its edges but before it clears them is set and
+  // then destroyed unread. That window is a few milliseconds at 60 fps and
+  // over a hundred on a machine struggling to hold 7, which is exactly when a
+  // player is mashing the key. Reload, buy, swap, melee, grenade and pause all
+  // ride on these edges, so they would intermittently do nothing at all.
+  //
+  // (Tagging edges with a frame counter, the other obvious approach, is worse:
+  // it is off by one, because a key pressed between frames is stamped with the
+  // old frame number and never matches when anything asks.)
   let edgeDown = Object.create(null);
   let edgeUp = Object.create(null);
+  let pendDown = Object.create(null);
+  let pendUp = Object.create(null);
   let frame = 0;
 
   const mouse = { buttons: 0, dx: 0, dy: 0, wheel: 0, x: 0, y: 0 };
+  // Same double buffering for the mouse: `pend*` is written by the DOM, the
+  // unprefixed arrays are what the frame reads.
   const mbDownEdge = [false, false, false, false, false];
   const mbUpEdge = [false, false, false, false, false];
+  const mbDownPend = [false, false, false, false, false];
+  const mbUpPend = [false, false, false, false, false];
+  const pendMouse = { dx: 0, dy: 0, wheel: 0 };
 
   I.locked = false;
   I.enabled = true;
@@ -54,27 +70,29 @@
     if (!I.enabled) return;
     // Never swallow devtools / reload
     if (e.code === 'F5' || e.code === 'F12' || (e.ctrlKey && e.code === 'KeyR')) return;
-    if (!keys[e.code]) edgeDown[e.code] = true;
+    if (!keys[e.code]) pendDown[e.code] = true;
     keys[e.code] = true;
     I.lastInputWasGamepad = false;
     if (e.code === 'Tab' || e.code === 'Space' || e.code.startsWith('Arrow')) e.preventDefault();
   }
   function onKeyUp(e) {
     keys[e.code] = false;
-    edgeUp[e.code] = true;
+    pendUp[e.code] = true;
   }
   function onBlur() {
     for (const k in keys) keys[k] = false;
     mouse.buttons = 0;
     edgeDown = Object.create(null);
     edgeUp = Object.create(null);
+    pendDown = Object.create(null);
+    pendUp = Object.create(null);
   }
 
   function onMouseMove(e) {
     if (I.locked) {
       // movementX/Y are already raw when pointer-locked
-      mouse.dx += e.movementX || 0;
-      mouse.dy += e.movementY || 0;
+      pendMouse.dx += e.movementX || 0;
+      pendMouse.dy += e.movementY || 0;
     }
     mouse.x = e.clientX; mouse.y = e.clientY;
     I.lastInputWasGamepad = false;
@@ -82,7 +100,7 @@
   function onMouseDown(e) {
     if (!I.enabled) return;
     const b = e.button;
-    if (!(mouse.buttons & (1 << b))) mbDownEdge[b] = true;
+    if (!(mouse.buttons & (1 << b))) mbDownPend[b] = true;
     mouse.buttons |= (1 << b);
     I.lastInputWasGamepad = false;
     if (I.locked) e.preventDefault();
@@ -90,10 +108,10 @@
   function onMouseUp(e) {
     const b = e.button;
     mouse.buttons &= ~(1 << b);
-    mbUpEdge[b] = true;
+    mbUpPend[b] = true;
   }
   function onWheel(e) {
-    mouse.wheel += Math.sign(e.deltaY);
+    pendMouse.wheel += Math.sign(e.deltaY);
     if (I.locked) e.preventDefault();
   }
   function onLockChange() {
@@ -125,17 +143,36 @@
   // --- per-frame ------------------------------------------------------------
   I.update = function () {
     frame++;
+    // Promote whatever the DOM has queued since the last promotion. Anything
+    // that arrives later in this frame lands in the fresh pending set and is
+    // read by the next one, rather than being cleared unseen.
+    edgeDown = pendDown; pendDown = Object.create(null);
+    edgeUp = pendUp; pendUp = Object.create(null);
+    mouse.dx = pendMouse.dx; mouse.dy = pendMouse.dy; mouse.wheel = pendMouse.wheel;
+    pendMouse.dx = 0; pendMouse.dy = 0; pendMouse.wheel = 0;
+    for (let i = 0; i < mbDownEdge.length; i++) {
+      mbDownEdge[i] = mbDownPend[i]; mbDownPend[i] = false;
+      mbUpEdge[i] = mbUpPend[i]; mbUpPend[i] = false;
+    }
     pollGamepad();
   };
   I.postUpdate = function () {
-    mouse.dx = 0; mouse.dy = 0; mouse.wheel = 0;
-    edgeDown = Object.create(null);
-    edgeUp = Object.create(null);
-    for (let i = 0; i < mbDownEdge.length; i++) { mbDownEdge[i] = false; mbUpEdge[i] = false; }
+    // Edges are NOT cleared here — update() owns that, by promotion. Clearing
+    // at end of frame is what destroyed input arriving mid-frame.
     if (I.gamepad) { I.gamepad.prevButtons = I.gamepad.buttons.slice(); }
   };
 
   // --- queries --------------------------------------------------------------
+  // Drop an edge so nothing downstream sees it. The menu uses this for keys it
+  // has already acted on: it handles Escape synchronously in its own DOM
+  // listener, but the edge is still sitting in this frame's set, so the game
+  // loop's global key handler would act on the very same keypress a moment
+  // later — resuming and then instantly re-pausing.
+  I.consume = function (code) {
+    delete edgeDown[code];
+    delete pendDown[code];
+  };
+
   I.down = (code) => !!keys[code];
   I.pressed = (code) => !!edgeDown[code];
   I.released = (code) => !!edgeUp[code];

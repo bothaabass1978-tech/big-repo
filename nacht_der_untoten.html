@@ -1584,7 +1584,7 @@ Z.assert = function (cond, msg) {
 }());
 
 
-/* ============================ 04_input.js (241 lines) ============================ */
+/* ============================ 04_input.js (278 lines) ============================ */
 // ---------------------------------------------------------------------------
 // 04_input.js — keyboard / mouse / gamepad. Raw mouse deltas, pointer lock,
 // edge-triggered state, rebindable actions.
@@ -1594,19 +1594,35 @@ Z.assert = function (cond, msg) {
   Z.Input = I;
 
   const keys = Object.create(null);      // code -> true while held
-  // Edges are collected into sets by the DOM handlers and cleared at the end
-  // of the frame that consumed them. Tagging them with a frame counter instead
-  // is off by one — a key pressed between frames is stamped with the OLD frame
-  // number, and by the time anything asks, the counter has already advanced,
-  // so every single press edge is missed. That silently kills reload, buy,
-  // swap, melee, grenade and pause while held-key movement still works.
+  // Edges are double-buffered. DOM handlers only ever write to the `pending`
+  // set; update() promotes pending into the readable set at the top of a
+  // frame, and nothing clears the readable set until the next promotion.
+  //
+  // The obvious single-buffer version — collect edges, clear them at the end
+  // of the frame that consumed them — drops input. A key pressed after the
+  // frame has already read its edges but before it clears them is set and
+  // then destroyed unread. That window is a few milliseconds at 60 fps and
+  // over a hundred on a machine struggling to hold 7, which is exactly when a
+  // player is mashing the key. Reload, buy, swap, melee, grenade and pause all
+  // ride on these edges, so they would intermittently do nothing at all.
+  //
+  // (Tagging edges with a frame counter, the other obvious approach, is worse:
+  // it is off by one, because a key pressed between frames is stamped with the
+  // old frame number and never matches when anything asks.)
   let edgeDown = Object.create(null);
   let edgeUp = Object.create(null);
+  let pendDown = Object.create(null);
+  let pendUp = Object.create(null);
   let frame = 0;
 
   const mouse = { buttons: 0, dx: 0, dy: 0, wheel: 0, x: 0, y: 0 };
+  // Same double buffering for the mouse: `pend*` is written by the DOM, the
+  // unprefixed arrays are what the frame reads.
   const mbDownEdge = [false, false, false, false, false];
   const mbUpEdge = [false, false, false, false, false];
+  const mbDownPend = [false, false, false, false, false];
+  const mbUpPend = [false, false, false, false, false];
+  const pendMouse = { dx: 0, dy: 0, wheel: 0 };
 
   I.locked = false;
   I.enabled = true;
@@ -1641,27 +1657,29 @@ Z.assert = function (cond, msg) {
     if (!I.enabled) return;
     // Never swallow devtools / reload
     if (e.code === 'F5' || e.code === 'F12' || (e.ctrlKey && e.code === 'KeyR')) return;
-    if (!keys[e.code]) edgeDown[e.code] = true;
+    if (!keys[e.code]) pendDown[e.code] = true;
     keys[e.code] = true;
     I.lastInputWasGamepad = false;
     if (e.code === 'Tab' || e.code === 'Space' || e.code.startsWith('Arrow')) e.preventDefault();
   }
   function onKeyUp(e) {
     keys[e.code] = false;
-    edgeUp[e.code] = true;
+    pendUp[e.code] = true;
   }
   function onBlur() {
     for (const k in keys) keys[k] = false;
     mouse.buttons = 0;
     edgeDown = Object.create(null);
     edgeUp = Object.create(null);
+    pendDown = Object.create(null);
+    pendUp = Object.create(null);
   }
 
   function onMouseMove(e) {
     if (I.locked) {
       // movementX/Y are already raw when pointer-locked
-      mouse.dx += e.movementX || 0;
-      mouse.dy += e.movementY || 0;
+      pendMouse.dx += e.movementX || 0;
+      pendMouse.dy += e.movementY || 0;
     }
     mouse.x = e.clientX; mouse.y = e.clientY;
     I.lastInputWasGamepad = false;
@@ -1669,7 +1687,7 @@ Z.assert = function (cond, msg) {
   function onMouseDown(e) {
     if (!I.enabled) return;
     const b = e.button;
-    if (!(mouse.buttons & (1 << b))) mbDownEdge[b] = true;
+    if (!(mouse.buttons & (1 << b))) mbDownPend[b] = true;
     mouse.buttons |= (1 << b);
     I.lastInputWasGamepad = false;
     if (I.locked) e.preventDefault();
@@ -1677,10 +1695,10 @@ Z.assert = function (cond, msg) {
   function onMouseUp(e) {
     const b = e.button;
     mouse.buttons &= ~(1 << b);
-    mbUpEdge[b] = true;
+    mbUpPend[b] = true;
   }
   function onWheel(e) {
-    mouse.wheel += Math.sign(e.deltaY);
+    pendMouse.wheel += Math.sign(e.deltaY);
     if (I.locked) e.preventDefault();
   }
   function onLockChange() {
@@ -1712,17 +1730,36 @@ Z.assert = function (cond, msg) {
   // --- per-frame ------------------------------------------------------------
   I.update = function () {
     frame++;
+    // Promote whatever the DOM has queued since the last promotion. Anything
+    // that arrives later in this frame lands in the fresh pending set and is
+    // read by the next one, rather than being cleared unseen.
+    edgeDown = pendDown; pendDown = Object.create(null);
+    edgeUp = pendUp; pendUp = Object.create(null);
+    mouse.dx = pendMouse.dx; mouse.dy = pendMouse.dy; mouse.wheel = pendMouse.wheel;
+    pendMouse.dx = 0; pendMouse.dy = 0; pendMouse.wheel = 0;
+    for (let i = 0; i < mbDownEdge.length; i++) {
+      mbDownEdge[i] = mbDownPend[i]; mbDownPend[i] = false;
+      mbUpEdge[i] = mbUpPend[i]; mbUpPend[i] = false;
+    }
     pollGamepad();
   };
   I.postUpdate = function () {
-    mouse.dx = 0; mouse.dy = 0; mouse.wheel = 0;
-    edgeDown = Object.create(null);
-    edgeUp = Object.create(null);
-    for (let i = 0; i < mbDownEdge.length; i++) { mbDownEdge[i] = false; mbUpEdge[i] = false; }
+    // Edges are NOT cleared here — update() owns that, by promotion. Clearing
+    // at end of frame is what destroyed input arriving mid-frame.
     if (I.gamepad) { I.gamepad.prevButtons = I.gamepad.buttons.slice(); }
   };
 
   // --- queries --------------------------------------------------------------
+  // Drop an edge so nothing downstream sees it. The menu uses this for keys it
+  // has already acted on: it handles Escape synchronously in its own DOM
+  // listener, but the edge is still sitting in this frame's set, so the game
+  // loop's global key handler would act on the very same keypress a moment
+  // later — resuming and then instantly re-pausing.
+  I.consume = function (code) {
+    delete edgeDown[code];
+    delete pendDown[code];
+  };
+
   I.down = (code) => !!keys[code];
   I.pressed = (code) => !!edgeDown[code];
   I.released = (code) => !!edgeUp[code];
@@ -7713,7 +7750,7 @@ Z.assert = function (cond, msg) {
 }());
 
 
-/* ============================ 09_level.js (647 lines) ============================ */
+/* ============================ 09_level.js (652 lines) ============================ */
 // ---------------------------------------------------------------------------
 // 09_level.js — Nacht der Untoten.
 //
@@ -8170,6 +8207,11 @@ Z.assert = function (cond, msg) {
     addBuy({ kind: 'weapon', id: 'sawed_off', chalk: 'chalk_sawnoff', cost: 1200,
       pos: [X1 - 0.02, UP + 1.45, -3.2], yaw: -Math.PI / 2, facing: [-1, 0, 0], room: 'east_up',
       use: [X1 - 1.1, UP, -3.2] });
+    // The M1897 is one of the four wall guns the real map is known for, and it
+    // had a price with nowhere to spend it. Upstairs, as on the original.
+    addBuy({ kind: 'weapon', id: 'trench_gun', chalk: 'chalk_trenchgun', cost: 1500,
+      pos: [5.8, UP + 1.45, Z0 + 0.02], yaw: 0, facing: [0, 0, 1], room: 'east_up',
+      use: [5.8, UP, Z0 + 1.1] });
 
     // The chalk outlines are what tell the player a wall gun is even there.
     // They're real geometry rather than decals so they light and fog with the
@@ -15144,7 +15186,7 @@ Z.assert = function (cond, msg) {
 }());
 
 
-/* ============================ 20_hud.js (1211 lines) ============================ */
+/* ============================ 20_hud.js (1214 lines) ============================ */
 // ---------------------------------------------------------------------------
 // 20_hud.js — Z.HUD. Draws the in-game HUD to the 2D `#hud` canvas.
 //
@@ -16316,8 +16358,11 @@ Z.assert = function (cond, msg) {
       ctx.globalAlpha = 1;
     }
 
-    const listStart = roundHold + 0.9;
-    const stagger = 0.4;
+    // The whole reveal used to take 4.7 s before the last row landed, which is
+    // a long time to sit staring at a black screen after dying. Brisk enough
+    // to read as a deliberate stagger, short enough not to outstay it.
+    const listStart = roundHold + 0.55;
+    const stagger = 0.19;
     let y = Hh * 0.52;
     const rowH = 34 * S;
     for (let i = 0; i < lines.length; i++) {
@@ -16357,7 +16402,7 @@ Z.assert = function (cond, msg) {
 }());
 
 
-/* ============================ 21_menu.js (1050 lines) ============================ */
+/* ============================ 21_menu.js (1055 lines) ============================ */
 // ---------------------------------------------------------------------------
 // 21_menu.js — Z.Menu. DOM-based front-end: main menu, pause, settings,
 // controls (key rebinding), game-over, loading.
@@ -17085,8 +17130,13 @@ Z.assert = function (cond, msg) {
       case 'ArrowRight': case 'KeyD': adjustSelected(1); e.preventDefault(); break;
       case 'Enter': case 'NumpadEnter': case 'Space': activateSelected(); e.preventDefault(); break;
       case 'Escape': goBack(); e.preventDefault(); break;
-      default: break;
+      default: return;
     }
+    // We acted on this key, so take it out of the input edge set. Otherwise
+    // the game loop reads the same press on its next frame: Escape would
+    // resume through goBack() here and then immediately re-pause there, and
+    // the game would look stuck on the pause screen.
+    if (Z.Input && Z.Input.consume) Z.Input.consume(e.code);
   }
 
   // ===========================================================================
@@ -17409,7 +17459,7 @@ Z.assert = function (cond, msg) {
 }());
 
 
-/* ============================ 22_game.js (706 lines) ============================ */
+/* ============================ 22_game.js (709 lines) ============================ */
 // ---------------------------------------------------------------------------
 // 22_game.js — state machine, fixed-timestep loop, render order, HUD feed.
 // ---------------------------------------------------------------------------
@@ -17688,8 +17738,11 @@ Z.assert = function (cond, msg) {
 
   function handleGlobalKeys() {
     if (Z.Input.actPressed('pause')) {
+      // Only pause from here. While the pause menu is up it owns Escape
+      // (Menu.onKeyDown -> goBack -> onResume), and handling it in both places
+      // means one keypress resumes and then immediately re-pauses, so the game
+      // looks stuck. Resume is the menu's job.
       if (G.mode === 'playing') G.pause();
-      else if (G.mode === 'paused') G.resume();
     }
     // Clicking the canvas re-acquires pointer lock after an accidental escape.
     if (G.mode === 'playing' && !Z.Input.locked && Z.Input.mbPressed(0)) Z.Input.lock();

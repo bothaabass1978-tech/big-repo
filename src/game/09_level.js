@@ -454,6 +454,11 @@
     addBuy({ kind: 'weapon', id: 'sawed_off', chalk: 'chalk_sawnoff', cost: 1200,
       pos: [X1 - 0.02, UP + 1.45, -3.2], yaw: -Math.PI / 2, facing: [-1, 0, 0], room: 'east_up',
       use: [X1 - 1.1, UP, -3.2] });
+    // The M1897 is one of the four wall guns the real map is known for, and it
+    // had a price with nowhere to spend it. Upstairs, as on the original.
+    addBuy({ kind: 'weapon', id: 'trench_gun', chalk: 'chalk_trenchgun', cost: 1500,
+      pos: [5.8, UP + 1.45, Z0 + 0.02], yaw: 0, facing: [0, 0, 1], room: 'east_up',
+      use: [5.8, UP, Z0 + 1.1] });
 
     // The chalk outlines are what tell the player a wall gun is even there.
     // They're real geometry rather than decals so they light and fog with the

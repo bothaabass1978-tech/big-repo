@@ -1169,8 +1169,11 @@
       ctx.globalAlpha = 1;
     }
 
-    const listStart = roundHold + 0.9;
-    const stagger = 0.4;
+    // The whole reveal used to take 4.7 s before the last row landed, which is
+    // a long time to sit staring at a black screen after dying. Brisk enough
+    // to read as a deliberate stagger, short enough not to outstay it.
+    const listStart = roundHold + 0.55;
+    const stagger = 0.19;
     let y = Hh * 0.52;
     const rowH = 34 * S;
     for (let i = 0; i < lines.length; i++) {

@@ -725,8 +725,13 @@
       case 'ArrowRight': case 'KeyD': adjustSelected(1); e.preventDefault(); break;
       case 'Enter': case 'NumpadEnter': case 'Space': activateSelected(); e.preventDefault(); break;
       case 'Escape': goBack(); e.preventDefault(); break;
-      default: break;
+      default: return;
     }
+    // We acted on this key, so take it out of the input edge set. Otherwise
+    // the game loop reads the same press on its next frame: Escape would
+    // resume through goBack() here and then immediately re-pause there, and
+    // the game would look stuck on the pause screen.
+    if (Z.Input && Z.Input.consume) Z.Input.consume(e.code);
   }
 
   // ===========================================================================

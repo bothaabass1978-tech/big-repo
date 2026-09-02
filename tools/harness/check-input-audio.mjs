@@ -105,18 +105,24 @@ const reloading = await page.evaluate(() => window.__Z.Player.weapon(window.__Z.
 if (!reloading) bad('R did not start a reload');
 else ok('R starts a reload');
 
-// pause via Escape
-await page.keyboard.down('Escape');
-await page.evaluate(() => { window.__Z.Input.update(); });
-await page.keyboard.up('Escape');
-await page.waitForTimeout(300);
+// Pause via Escape. Unlike the other keys this one is handled in
+// handleGlobalKeys(), which only runs inside the real rAF loop — so we must
+// NOT pump Z.Input.update() by hand here. Input edges are promoted by
+// update(), so calling it out-of-band promotes the press and then the next
+// real frame promotes an empty set straight over it, destroying the edge
+// before the loop ever reads it. Press, then give the loop real frames.
+// Software rendering runs around 7 fps, hence the generous waits.
+async function tapAndSettle(key) {
+  await page.keyboard.down(key);
+  await page.waitForTimeout(500);
+  await page.keyboard.up(key);
+  await page.waitForTimeout(500);
+}
+await tapAndSettle('Escape');
 const mode = await page.evaluate(() => window.__Z.Game.mode);
 if (mode !== 'paused') bad('Escape did not pause (mode=' + mode + ')');
 else ok('Escape pauses the game');
-await page.keyboard.down('Escape');
-await page.evaluate(() => { window.__Z.Input.update(); });
-await page.keyboard.up('Escape');
-await page.waitForTimeout(250);
+await tapAndSettle('Escape');
 const mode2 = await page.evaluate(() => window.__Z.Game.mode);
 if (mode2 !== 'playing') bad('Escape did not resume (mode=' + mode2 + ')');
 else ok('Escape resumes');

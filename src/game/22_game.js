@@ -276,8 +276,11 @@
 
   function handleGlobalKeys() {
     if (Z.Input.actPressed('pause')) {
+      // Only pause from here. While the pause menu is up it owns Escape
+      // (Menu.onKeyDown -> goBack -> onResume), and handling it in both places
+      // means one keypress resumes and then immediately re-pauses, so the game
+      // looks stuck. Resume is the menu's job.
       if (G.mode === 'playing') G.pause();
-      else if (G.mode === 'paused') G.resume();
     }
     // Clicking the canvas re-acquires pointer lock after an accidental escape.
     if (G.mode === 'playing' && !Z.Input.locked && Z.Input.mbPressed(0)) Z.Input.lock();
