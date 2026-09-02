@@ -758,14 +758,14 @@
     ctx.restore();
     scratches(ctx, size, 3, 6, { maxLen: 0.4 });
     grime(ctx, size, 3, 0.5);
-    return { canvas: c, size, tile: [false, false], spec: 0.06, gloss: 0.2, emissive: 0, normal: null, tint: [1, 1, 1] };
+    return { canvas: c, size, tile: [false, false], spec: 0.06, gloss: 0.2, emissive: 0, normal: sobelNormal(c, size / 2), tint: [1, 1, 1] };
   }
   function makeWoodStair() {
     const c = tileWood(4, PROP, {
       axis: 'u', count: 3, freq: 1.6, stops: stopsWoodDark, knots: true, rot: false, nails: false,
       gapColor: 'rgba(4,3,3,0.9)', gapWidth: 2, stainAmt: 0.2, stainCount: 2, scratchCount: 14, wear: 1.6, grime: 1,
     });
-    return { canvas: c, size: PROP, tile: [true, true], spec: 0.06, gloss: 0.16, emissive: 0, normal: null, tint: [1, 1, 1] };
+    return { canvas: c, size: PROP, tile: [true, true], spec: 0.06, gloss: 0.16, emissive: 0, normal: sobelNormal(c, PROP / 2), tint: [1, 1, 1] };
   }
   function makeCeilingWood() {
     const c = mkCanvas(HERO);
@@ -787,7 +787,7 @@
     grime(ctx, HERO, 7, 1.3);
     dirtAO(ctx, HERO, { strength: 0.22 });
     forceSeamEdges(c);
-    return { canvas: c, size: HERO, tile: [true, true], spec: 0.04, gloss: 0.1, emissive: 0, normal: null, tint: [0.85, 0.85, 0.9] };
+    return { canvas: c, size: HERO, tile: [true, true], spec: 0.04, gloss: 0.1, emissive: 0, normal: sobelNormal(c, HERO / 2), tint: [0.85, 0.85, 0.9] };
   }
   function makeWindowFrame() {
     const size = PROP;
@@ -820,7 +820,7 @@
     stains(ctx, size, 14, { count: 3, color: [10, 9, 9], alpha: 0.3 });
     scratches(ctx, size, 14, 8, { maxLen: 0.2 });
     grime(ctx, size, 14, 1.1);
-    return { canvas: c, size, tile: [false, false], spec: 0.1, gloss: 0.25, emissive: 0, normal: null, tint: [0.52, 0.50, 0.46] };
+    return { canvas: c, size, tile: [false, false], spec: 0.1, gloss: 0.25, emissive: 0, normal: sobelNormal(c, size / 2), tint: [0.52, 0.50, 0.46] };
   }
 
   function makePlasterWall() {
@@ -1078,7 +1078,7 @@
     }
     grime(ctx, size, seedN, 1);
     forceSeamEdges(c);
-    return { canvas: c, size, tile: [true, true], spec: 0.02, gloss: 0.05, emissive: 0, normal: null, tint: [1, 1, 1] };
+    return { canvas: c, size, tile: [true, true], spec: 0.02, gloss: 0.05, emissive: 0, normal: sobelNormal(c, size / 2), tint: [1, 1, 1] };
   }
 
   function makeRubble() {
@@ -1109,7 +1109,11 @@
     grime(ctx, size, seedN, 1.2);
     dirtAO(ctx, size, { strength: 0.12 });
     forceSeamEdges(c);
-    return { canvas: c, size, tile: [true, true], spec: 0.03, gloss: 0.06, emissive: 0, normal: null, tint: [1, 1, 1] };
+    // Debris drifts pick their chunk colour from the concrete ramp, whose mid
+    // stop is a light warm grey — about twice the albedo of the boards it lies
+    // on, so the floor read as patches of snow. Plaster that has been lying in
+    // a bombed-out farmhouse is filthy; pull it well under the floor.
+    return { canvas: c, size, tile: [true, true], spec: 0.03, gloss: 0.06, emissive: 0, normal: sobelNormal(c, size / 2), tint: [0.40, 0.38, 0.34] };
   }
 
   function makeMetalRusty() {
@@ -1193,7 +1197,7 @@
     grime(ctx, size, seedN, 1.1);
     dirtAO(ctx, size, { strength: 0.14 });
     forceSeamEdges(c);
-    return { canvas: c, size, tile: [true, true], spec: 0.06, gloss: 0.12, emissive: 0, normal: null, tint: [1, 1, 1] };
+    return { canvas: c, size, tile: [true, true], spec: 0.06, gloss: 0.12, emissive: 0, normal: sobelNormal(c, size / 2), tint: [1, 1, 1] };
   }
 
   function makeSandbag() {
@@ -1226,7 +1230,7 @@
     stains(ctx, size, seedN, { count: 3, color: [12, 10, 8], alpha: 0.3 });
     grime(ctx, size, seedN, 1);
     forceSeamEdges(c);
-    return { canvas: c, size, tile: [true, true], spec: 0.02, gloss: 0.04, emissive: 0, normal: null, tint: [1, 1, 1] };
+    return { canvas: c, size, tile: [true, true], spec: 0.02, gloss: 0.04, emissive: 0, normal: sobelNormal(c, size / 2), tint: [1, 1, 1] };
   }
 
   function makeBloodWall() {
@@ -1305,7 +1309,7 @@
     }
     ctx.putImageData(img, 0, 0);
     grime(ctx, size, seedN, 0.6);
-    return { canvas: c, size, tile: [false, false], spec: 0.08, gloss: 0.16, emissive: 0, normal: null, tint: [1, 1, 1] };
+    return { canvas: c, size, tile: [false, false], spec: 0.08, gloss: 0.16, emissive: 0, normal: sobelNormal(c, size / 2), tint: [1, 1, 1] };
   }
 
   function makeBarrelMetal() {
@@ -1339,7 +1343,7 @@
     scratches(ctx, size, seedN, 14, { maxLen: 0.3 });
     grime(ctx, size, seedN, 0.9);
     forceSeamEdges(c);
-    return { canvas: c, size, tile: [true, false], spec: 0.3, gloss: 0.35, emissive: 0, normal: null, tint: [1, 1, 1] };
+    return { canvas: c, size, tile: [true, false], spec: 0.3, gloss: 0.35, emissive: 0, normal: sobelNormal(c, size / 2), tint: [1, 1, 1] };
   }
 
   function makeSignHelp() {
@@ -1695,7 +1699,7 @@
     // Near-neutral, faintly green. The texture is already a green-grey ramp,
     // and a green tint on top of it stacked into a bright pea-green that read
     // as a painted card rather than ashen dead flesh in feldgrau.
-    return { canvas: c, size, tile: [true, true], spec: 0.12, gloss: 0.15, emissive: 0, normal: null, tint: [0.70, 0.65, 0.78] };
+    return { canvas: c, size, tile: [true, true], spec: 0.12, gloss: 0.15, emissive: 0, normal: sobelNormal(c, size / 2), tint: [0.70, 0.65, 0.78] };
   }
   // zombie_cloth and zombie_face removed 2026-09-02: both were fully
   // generated and registered but never referenced anywhere (repo-wide grep
@@ -1718,11 +1722,11 @@
     edgeWear(ctx, size, seedN, { count: 6, color: [150, 148, 140], amount: 1.2 });
     grime(ctx, size, seedN, 0.8);
     forceSeamEdges(c);
-    return { canvas: c, size, tile: [true, true], spec: 0.14, gloss: 0.6, emissive: 0, normal: null, tint: [2.30, 2.30, 2.42] };
+    return { canvas: c, size, tile: [true, true], spec: 0.14, gloss: 0.6, emissive: 0, normal: sobelNormal(c, size / 2), tint: [2.30, 2.30, 2.42] };
   }
   function makeGunWood() {
     const c = tileWood(38, PROP, { axis: 'v', count: 3, freq: 1.2, stops: stopsWoodNew, knots: false, rot: false, nails: false, gapColor: 'rgba(10,7,5,0.3)', gapWidth: 0.5, stainAmt: 0, scratchCount: 8, wear: 1.2, grime: 0.4, ao: false });
-    return { canvas: c, size: PROP, tile: [true, true], spec: 0.18, gloss: 0.4, emissive: 0, normal: null, tint: [1.35, 1.30, 1.22] };
+    return { canvas: c, size: PROP, tile: [true, true], spec: 0.18, gloss: 0.4, emissive: 0, normal: sobelNormal(c, PROP / 2), tint: [1.35, 1.30, 1.22] };
   }
   function makeHands() {
     const size = PROP, seedN = 39;

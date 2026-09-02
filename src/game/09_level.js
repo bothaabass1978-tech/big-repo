@@ -212,7 +212,14 @@
     rng.reseed(Z.ART_SEED ^ 0x4E41);
 
     // ---- exterior ground: mud ring, then the void ------------------------
-    box([-24, -0.45, -22], [24, 0, 22], 'dirt_ground', { uvScale: 0.25, group: 'outside' });
+    // The outdoor ground spans the whole map, including under the building,
+    // and the interior wood floor's top face is also at y=0. Two coplanar
+    // surfaces z-fight, and which one wins varies with view angle and depth
+    // precision — that is the "spilled paper / snow" blotching on the floor
+    // that three separate reviews attributed to a texture. Drop the ground a
+    // few centimetres so the two never coincide; it is far below the 0.46 m
+    // step-up, so nothing about walking or climbing in changes.
+    box([-24, -0.45, -22], [24, -0.04, 22], 'dirt_ground', { uvScale: 0.25, group: 'outside' });
 
     // ---- ground floor slab -----------------------------------------------
     box([X0 - WALL, -0.30, Z0 - WALL], [X1 + WALL, 0, Z1 + WALL], 'wood_floor',

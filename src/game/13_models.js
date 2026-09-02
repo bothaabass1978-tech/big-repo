@@ -69,28 +69,28 @@
   // =========================================================================
   const COL = {
     // --- zombie ---
-    cloth: [0.255, 0.268, 0.222],      // feldgrau greatcoat, filthy
-    clothDark: [0.150, 0.160, 0.135],
-    clothWorn: [0.330, 0.330, 0.262],
+    cloth: [0.536, 0.563, 0.466],      // feldgrau greatcoat, filthy
+    clothDark: [0.315, 0.336, 0.284],
+    clothWorn: [0.693, 0.693, 0.550],
     clothMud: [0.205, 0.190, 0.150],
-    trouser: [0.220, 0.215, 0.185],
-    trouserDark: [0.140, 0.138, 0.118],
-    leather: [0.100, 0.082, 0.066],    // belt, boots, straps
-    leatherHi: [0.160, 0.132, 0.104],
-    skin: [0.475, 0.500, 0.395],       // grey-green dead flesh
-    skinPale: [0.560, 0.575, 0.470],
-    skinDark: [0.185, 0.198, 0.168],
-    flesh: [0.360, 0.120, 0.110],      // stumps / open wounds
-    fleshDark: [0.170, 0.052, 0.050],
-    fleshWet: [0.460, 0.080, 0.075],
-    bone: [0.700, 0.685, 0.575],
-    teeth: [0.760, 0.730, 0.610],
+    trouser: [0.462, 0.452, 0.389],
+    trouserDark: [0.294, 0.290, 0.248],
+    leather: [0.210, 0.172, 0.139],    // belt, boots, straps
+    leatherHi: [0.336, 0.277, 0.218],
+    skin: [0.997, 1.050, 0.830],       // grey-green dead flesh
+    skinPale: [1.176, 1.208, 0.987],
+    skinDark: [0.389, 0.416, 0.353],
+    flesh: [0.756, 0.252, 0.231],      // stumps / open wounds
+    fleshDark: [0.357, 0.109, 0.105],
+    fleshWet: [0.966, 0.168, 0.158],
+    bone: [1.470, 1.439, 1.208],
+    teeth: [1.596, 1.533, 1.281],
     eye: [0.03, 0.03, 0.03],
     // The signature read: two amber points that stay legible across a black
     // room. Emissive, so they survive the lighting falloff entirely.
     eyeGlow: [1.00, 0.62, 0.13],
-    helmet: [0.176, 0.192, 0.176],     // stahlhelm, worn field grey
-    helmetDark: [0.110, 0.122, 0.112],
+    helmet: [0.370, 0.403, 0.370],     // stahlhelm, worn field grey
+    helmetDark: [0.231, 0.256, 0.235],
     // --- weapons ---
     metal: [0.300, 0.312, 0.330],
     metalHi: [0.430, 0.445, 0.465],
