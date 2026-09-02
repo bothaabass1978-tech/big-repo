@@ -109,6 +109,30 @@ await page.evaluate((god) => {
     // Nacht is played by kiting the horde around a loop, not by backpedalling
     // into a corner. The bot follows a circuit through the main hall and lets
     // the horde string out behind it, which is what the balance is tuned for.
+    // --- shopping ----------------------------------------------------------
+    // A real player buys a wall gun in round 1 and tops up ammo between
+    // rounds. Without that the bot empties the starting pistol's 40 rounds
+    // partway through round 2 and the run stalls with nothing left to shoot
+    // with — which tells us about the bot, not about the game.
+    const wep = Z.Player.weapon(p);
+    const ammoLeft = wep.mag + wep.reserve;
+    let shop = null;
+    if (!threat || threatD > 5.5) {
+      let bestCost = -1;
+      for (const bItem of Z.Level.level.buys) {
+        if (bItem.kind !== 'weapon' || !bItem.use) continue;
+        if (!Z.Level.isRoomOpen(bItem.room)) continue;
+        const owned = wep.id === bItem.id;
+        // Buy the best gun affordable; if we already hold it, come back only
+        // when the reserve is genuinely low, which is the ammo-refill case.
+        const want = owned ? (ammoLeft < wep.def.magSize * 2) : (wep.id === 'm1911' || ammoLeft < 12);
+        if (!want) continue;
+        const cost = owned ? Math.round(bItem.cost / 2) : bItem.cost;
+        if (p.points < cost + 100) continue;
+        if (bItem.cost > bestCost) { bestCost = bItem.cost; shop = bItem; }
+      }
+    }
+
     if (!window.__LOOP) {
       // Keep the circuit well clear of every wall. Waypoints tucked into
       // corners are how the bot walks itself into a dead end and dies to
@@ -121,9 +145,12 @@ await page.evaluate((god) => {
     }
     const loop = window.__LOOP;
     if (loop.length) {
-      const wp = loop[window.__LOOPI % loop.length];
+      const wp = shop ? [shop.use[0], shop.use[2]] : loop[window.__LOOPI % loop.length];
       const wd = Math.hypot(wp[0] - p.pos[0], wp[1] - p.pos[2]);
-      if (wd < 1.4) window.__LOOPI++;
+      if (!shop && wd < 1.4) window.__LOOPI++;
+      // Re-path immediately when the goal switches, or the bot keeps walking
+      // the old circuit leg while "shopping".
+      if (window.__SHOPPING !== !!shop) { window.__SHOPPING = !!shop; botPathT = 0; }
 
       // Path to the waypoint so the bot goes around furniture, not into it.
       botPathT -= dt;
@@ -212,6 +239,14 @@ await page.evaluate((god) => {
     }
 
     // --- spend points ------------------------------------------------------
+    if (shop) {
+      const sd = Math.hypot(shop.use[0] - p.pos[0], shop.use[2] - p.pos[2]);
+      if (sd < 1.6) {
+        inp.aimYaw = Math.atan2(-(shop.pos[0] - p.pos[0]), -(shop.pos[2] - p.pos[2]));
+        inp.aimPitch = 0;
+        inp.move[0] = 0; inp.move[1] = 0;
+      }
+    }
     const act = Z.Econ.findInteraction(p, eye, Z.Player.forward(p, [0, 0, 0]));
     if (act && act.kind === 'repair' && (!threat || threatD > 7)) {
       inp.use = true;
