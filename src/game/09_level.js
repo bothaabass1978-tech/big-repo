@@ -564,6 +564,13 @@
       }
     }
 
+    // Window n1, the Kar98k corridor, had no flanking clutter at all.
+    clutter([-9.35, 0, Z0 + 0.14], [-8.62, 0.42, Z0 + 0.74], 'crate_wood',
+      { uvScale: 1.15, lowProfile: true });
+    clutter([-9.2, 0.42, Z0 + 0.2], [-8.7, 0.80, Z0 + 0.68], 'crate_wood', { uvScale: 1.35 });
+    clutter([-6.55, 0, Z0 + 0.16], [-6.05, 0.40, Z0 + 0.66], 'crate_wood',
+      { uvScale: 1.25, lowProfile: true });
+
     // The HELP room's south wall stub is what a player faces cresting the
     // stairs, and it was bare concrete. Give it something to land on.
     clutter([-6.2, UP, -2.55], [-5.3, UP + 0.62, -2.05], 'crate_wood', { uvScale: 1.1 });
@@ -643,6 +650,35 @@
       intensity: 1.15, flicker: 0.52, name: 'sw_embers' });
     lights.push({ pos: [0.8, UP + 2.45, -2.2], color: [1.00, 0.70, 0.36], radius: 7.0,
       intensity: 1.05, flicker: 0.40, sway: 0.05, name: 'catwalk_bulb' });
+
+    // Wall sconces. The main hall carries seven of the map's thirteen windows
+    // and had exactly one ceiling bulb, so most of its wall footage sat outside
+    // any warm falloff and dropped to the ambient floor — which is deliberately
+    // low, and is why that room kept reading brown while the rooms with a bulb
+    // in frame read amber. Mounted at eye height rather than hung from the
+    // ceiling, so each one also gives the eye something to land on along a
+    // stretch of otherwise bare plaster.
+    function sconce(x, y, z, n, name) {
+      const t = 0.055;                       // how far the fitting stands proud
+      // back plate flat against the wall
+      box([x - (n[2] ? 0.09 : t), y - 0.11, z - (n[0] ? 0.09 : t)],
+        [x + (n[2] ? 0.09 : t), y + 0.11, z + (n[0] ? 0.09 : t)],
+        'barrel_metal', { uvScale: 5, solid: false });
+      // arm out into the room
+      const ax = x + n[0] * 0.13, az = z + n[2] * 0.13;
+      box([Math.min(x, ax) - 0.018, y + 0.02, Math.min(z, az) - 0.018],
+        [Math.max(x, ax) + 0.018, y + 0.055, Math.max(z, az) + 0.018],
+        'barrel_metal', { uvScale: 6, solid: false });
+      // glass, self-lit
+      const gx = x + n[0] * 0.19, gz = z + n[2] * 0.19;
+      box([gx - 0.048, y - 0.055, gz - 0.048], [gx + 0.048, y + 0.052, gz + 0.048],
+        'bulb_glass', { uvScale: 1, solid: false });
+      lights.push({ pos: [gx, y, gz], color: [1.00, 0.68, 0.31], radius: 7.6,
+        intensity: 1.30, flicker: 0.30, name: name });
+    }
+    sconce(-1.4, 1.78, Z0 + 0.12, [0, 0, 1], 'hall_sconce_n');
+    sconce(X0 + 0.12, 1.78, -4.6, [1, 0, 0], 'hall_sconce_w');
+    sconce(-5.2, 1.78, Z1 - 0.12, [0, 0, -1], 'hall_sconce_s');
 
     // Every warm emitter was a bare point light with no geometry, so the rooms
     // had pools of amber coming from nowhere. The hanging bulb on its cord is

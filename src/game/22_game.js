@@ -554,7 +554,7 @@
     Z.Render.beginQuads();
     let n = 0;
     for (const L of lv.lights) {
-      if (!/_bulb$/.test(L.name)) continue;
+      if (!/_(bulb|sconce)$/.test(L.name)) continue;
       // Ride the same flicker the light itself does, so the halo dims with it
       // instead of floating at a constant brightness over a guttering bulb.
       const f = L.flicker
