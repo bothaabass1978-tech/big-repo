@@ -1593,6 +1593,22 @@
       chalkSilhouette(ctx, st, SHOTGUN_SIL, cx, cy, s);
       chalkLine(ctx, st, cx + s * 0.08, cy - s * 0.14, cx + s * 0.52, cy - s * 0.14, s * 0.025); // second (over/under) barrel
     } },
+    // M1897 Trench Gun: single barrel (SHOTGUN_SIL, no second-barrel line),
+    // distinguished by a ventilated heat shield sleeved over the front of
+    // the barrel, a pump/slide handle hanging below it, and a bayonet lug
+    // near the muzzle.
+    trenchgun: { price: 1500, draw: (ctx, st, cx, cy, s) => {
+      chalkSilhouette(ctx, st, SHOTGUN_SIL, cx, cy, s);
+      chalkLine(ctx, st, cx + s * 0.15, cy - s * 0.13, cx + s * 0.48, cy - s * 0.13, s * 0.025); // heat shield top
+      chalkLine(ctx, st, cx + s * 0.15, cy + s * 0.12, cx + s * 0.48, cy + s * 0.12, s * 0.025); // heat shield bottom
+      chalkLine(ctx, st, cx + s * 0.15, cy - s * 0.13, cx + s * 0.15, cy + s * 0.12, s * 0.025); // heat shield front cap
+      for (let i = 0; i < 4; i++) {
+        const x = cx + s * (0.21 + i * 0.07);
+        chalkLine(ctx, st, x, cy - s * 0.12, x, cy + s * 0.11, s * 0.015); // vent slats
+      }
+      chalkPoly(ctx, st, [[cx + s * 0.24, cy + s * 0.10], [cx + s * 0.24, cy + s * 0.21], [cx + s * 0.06, cy + s * 0.21], [cx + s * 0.06, cy + s * 0.10]], s * 0.03); // pump/slide handle
+      chalkLine(ctx, st, cx + s * 0.52, cy + s * 0.10, cx + s * 0.58, cy + s * 0.19, s * 0.025); // bayonet lug
+    } },
     sawnoff: { price: 1200, draw: (ctx, st, cx, cy, s) => {
       chalkSilhouette(ctx, st, SAWNOFF_SIL, cx, cy, s);
       chalkLine(ctx, st, cx + s * 0.05, cy - s * 0.14, cx + s * 0.28, cy - s * 0.14, s * 0.025); // second barrel, both cut short

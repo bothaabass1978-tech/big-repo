@@ -358,14 +358,23 @@
       // NOTE: the Gewehr 43 is NOT on the real Nacht der Untoten wall roster
       // (that list is exactly: M1A1 Carbine, Kar98k, Double-Barrelled
       // Shotgun, Thompson, BAR, M1897 Trench Gun, Sawed-Off,
-      // Stielhandgranate). It is kept here as a deliberate scope addition —
-      // same rule as B.PERKS below (loot-table/economy additions must state
-      // their rationale): it fills the semi-auto-rifle wall-buy gap between
-      // the Carbine and the box-only STG-44/FG42, giving the ground floor a
-      // second rifle path before anyone has to gamble on the box. If the
-      // goal becomes a byte-for-byte reproduction of the real wall roster,
-      // cut this entry AND its wall location + chalk decal in 09_level.js
-      // (owned by another agent) — nothing else in this file depends on it.
+      // Stielhandgranate). It is kept here as a deliberate, period-plausible
+      // scope addition — same rule as B.PERKS below (loot-table/economy
+      // additions must state their rationale): without it, the wall's only
+      // two rifle-tier options are the Kar98k (bolt-action) and the M1A1
+      // Carbine (semi-auto) before a player has to gamble on the box for
+      // the STG-44/FG42. This gives the ground floor a second, mid-tier
+      // semi-auto rifle path.
+      // If the goal ever becomes a byte-for-byte reproduction of the real
+      // wall roster: clearing wallCost/boxOnly here is NOT sufficient by
+      // itself. 09_level.js's wall-buy price is its own hardcoded `cost:`
+      // literal on the addBuy() call, independent of this field (see
+      // Z.Econ.findInteraction in 19_econ.js — `cost = buy.cost` for a
+      // fresh wall purchase, not Z.B.getWeapon(id).wallCost) — cutting only
+      // this entry would leave that level location pricing and working
+      // exactly as before, just silently out of sync with this file.
+      // Removing it for real means deleting the addBuy entry + chalk decal
+      // in 09_level.js too (owned by another agent).
     },
     // --- wall shotguns ---------------------------------------------------------
     {

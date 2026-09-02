@@ -68,16 +68,31 @@ const rows = await page.evaluate(async (names) => {
     }
     const rms = Math.sqrt(sumSq / n);
 
-    // Time to reach 90% of peak — the transient. A gunshot that takes 40 ms
-    // to get there reads as a "pop", not a crack.
+    // Everything below is measured from the first audible sample, not from
+    // t=0. The render path starts the recipe 2 ms in and passes it through a
+    // 4x-oversampled WaveShaper limiter, whose resampling filters add their
+    // own latency — measuring from zero reports that dead lead-in as if it
+    // were a slow attack, which is how a perfectly sharp shot can look like a
+    // 10 ms ramp.
+    let start = 0;
+    for (let i = 0; i < n; i++) { if (Math.abs(x[i]) > peak * 0.001) { start = i; break; } }
+
+    // Time from onset to 90% of peak. On its own this is still misleading: a
+    // shot with a sharp crack followed by a louder low thump 30 ms later
+    // reports 30 ms, because the global peak is in the thump. So also measure
+    // how much of the peak has arrived in the first 3 ms — that is what
+    // decides whether a gunshot reads as a crack or a pop.
     let attack = 0;
-    for (let i = 0; i < n; i++) {
-      if (Math.abs(x[i]) >= peak * 0.9) { attack = i / buf.sampleRate; break; }
+    for (let i = start; i < n; i++) {
+      if (Math.abs(x[i]) >= peak * 0.9) { attack = (i - start) / buf.sampleRate; break; }
     }
+    const early = Math.min(n, start + Math.ceil(0.003 * buf.sampleRate));
+    let onset = 0;
+    for (let i = start; i < early; i++) { const a = Math.abs(x[i]); if (a > onset) onset = a; }
     // Audible tail: last sample above -60 dBFS relative to peak.
     let last = 0;
     for (let i = n - 1; i >= 0; i--) {
-      if (Math.abs(x[i]) > peak * 0.001) { last = i / buf.sampleRate; break; }
+      if (Math.abs(x[i]) > peak * 0.001) { last = (i - start) / buf.sampleRate; break; }
     }
     // Spectral centroid by Goertzel over log-spaced bands — cheap, and enough
     // to say whether two guns occupy the same place in the spectrum.
@@ -93,7 +108,7 @@ const rows = await page.evaluate(async (names) => {
       num += f * mag; den += mag;
     }
     return {
-      peak, rms, attack, dur: last, clipped,
+      peak, rms, attack, onset, dur: last, clipped,
       centroid: den > 0 ? num / den : 0,
     };
   }
@@ -127,33 +142,47 @@ const pad = (s, n) => String(s).padEnd(n);
 const num = (v, n, d) => String(v.toFixed(d)).padStart(n);
 
 console.log(pad('sound', 20) + num(0, 8, 0).replace('0', 'peak').padStart(8)
-  + '   rms   attack    dur  centroid  var  same');
+  + '   rms   attack  onset    dur  centroid  var  same');
 console.log('-'.repeat(76));
 let fail = 0;
 const bad = (m) => { console.log('  FAIL ' + m); fail++; };
 const guns = [];
+// Sounds a player hears many times in a row, where an identical waveform on
+// every repeat is the classic synthesized-audio tell.
+const REPEATS = /^(gun_|zom_|board_|reload_|plr_hurt|step)/;
 for (const r of rows) {
   if (r.error) { console.log(pad(r.name, 20) + '  ERROR ' + r.error); fail++; continue; }
   console.log(pad(r.name, 20)
     + num(dbfs(r.peak), 7, 1) + num(dbfs(r.rms), 7, 1)
-    + num(r.attack * 1000, 8, 1) + 'ms' + num(r.dur, 6, 2) + 's'
+    + num(r.attack * 1000, 8, 1) + 'ms' + num(dbfs(r.onset / (r.peak || 1)), 6, 1) + 'dB'
+    + num(r.dur, 6, 2) + 's'
     + num(r.centroid, 9, 0) + 'Hz' + (r.variants ? num(r.variants, 4, 0) : '   ?')
     + (r.identicalRepeat ? '  yes' : '   no'));
   if (r.name.startsWith('gun_')) guns.push(r);
   if (r.clipped > 8) bad(r.name + ' clips (' + r.clipped + ' samples at full scale)');
   if (r.peak < 0.02) bad(r.name + ' is effectively silent (peak ' + dbfs(r.peak).toFixed(1) + ' dBFS)');
   if (r.dur < 0.02) bad(r.name + ' is shorter than 20 ms');
-  if (r.identicalRepeat) {
+  // Only sounds that fire repeatedly in quick succession need variants. A
+  // round-change sting or a perk jingle is a ceremonial one-shot and is
+  // *supposed* to be the same every time — the original's round sting is one
+  // fixed cue, and randomising it would be wrong.
+  if (r.identicalRepeat && REPEATS.test(r.name)) {
     bad(r.name + (r.variants === 1
       ? ' has a single variant — every repeat is the same waveform'
       : ' has ' + r.variants + ' variants that render identically'));
   }
 }
 
-// A gunshot's transient is the whole character. Anything slower than ~8 ms to
-// 90% of peak reads as a soft pop rather than a crack.
+// A gunshot's transient is the whole character. Judge it by how much of the
+// shot has landed in the first 3 ms: a crack is within ~9 dB of its own peak
+// by then, a soft pop is 20+ dB down and ramps in afterwards.
 for (const g of guns) {
-  if (g.attack > 0.008) bad(g.name + ' has a soft transient (' + (g.attack * 1000).toFixed(1) + ' ms to 90% peak, want < 8)');
+  const on = dbfs(g.onset / (g.peak || 1));
+  if (on < -9) {
+    bad(g.name + ' has a soft transient (only ' + on.toFixed(1)
+      + ' dB of peak in the first 3 ms, want > -9; peak lands at '
+      + (g.attack * 1000).toFixed(1) + ' ms)');
+  }
 }
 // Guns must be tellable apart with your eyes shut. If two sit within 8% of
 // each other in both loudness and spectral centre, they are reskins.

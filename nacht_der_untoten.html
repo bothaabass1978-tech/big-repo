@@ -565,7 +565,7 @@ Z.assert = function (cond, msg) {
 }());
 
 
-/* ============================ 03_balance.js (1008 lines) ============================ */
+/* ============================ 03_balance.js (1017 lines) ============================ */
 // ---------------------------------------------------------------------------
 // 03_balance.js — Z.B: the single source of truth for every gameplay number.
 // Pure data + pure functions. No DOM, no side effects, no randomness at
@@ -926,14 +926,23 @@ Z.assert = function (cond, msg) {
       // NOTE: the Gewehr 43 is NOT on the real Nacht der Untoten wall roster
       // (that list is exactly: M1A1 Carbine, Kar98k, Double-Barrelled
       // Shotgun, Thompson, BAR, M1897 Trench Gun, Sawed-Off,
-      // Stielhandgranate). It is kept here as a deliberate scope addition —
-      // same rule as B.PERKS below (loot-table/economy additions must state
-      // their rationale): it fills the semi-auto-rifle wall-buy gap between
-      // the Carbine and the box-only STG-44/FG42, giving the ground floor a
-      // second rifle path before anyone has to gamble on the box. If the
-      // goal becomes a byte-for-byte reproduction of the real wall roster,
-      // cut this entry AND its wall location + chalk decal in 09_level.js
-      // (owned by another agent) — nothing else in this file depends on it.
+      // Stielhandgranate). It is kept here as a deliberate, period-plausible
+      // scope addition — same rule as B.PERKS below (loot-table/economy
+      // additions must state their rationale): without it, the wall's only
+      // two rifle-tier options are the Kar98k (bolt-action) and the M1A1
+      // Carbine (semi-auto) before a player has to gamble on the box for
+      // the STG-44/FG42. This gives the ground floor a second, mid-tier
+      // semi-auto rifle path.
+      // If the goal ever becomes a byte-for-byte reproduction of the real
+      // wall roster: clearing wallCost/boxOnly here is NOT sufficient by
+      // itself. 09_level.js's wall-buy price is its own hardcoded `cost:`
+      // literal on the addBuy() call, independent of this field (see
+      // Z.Econ.findInteraction in 19_econ.js — `cost = buy.cost` for a
+      // fresh wall purchase, not Z.B.getWeapon(id).wallCost) — cutting only
+      // this entry would leave that level location pricing and working
+      // exactly as before, just silently out of sync with this file.
+      // Removing it for real means deleting the addBuy entry + chalk decal
+      // in 09_level.js too (owned by another agent).
     },
     // --- wall shotguns ---------------------------------------------------------
     {
@@ -5074,7 +5083,7 @@ Z.assert = function (cond, msg) {
 }());
 
 
-/* ============================ 06_textures.js (1983 lines) ============================ */
+/* ============================ 06_textures.js (1999 lines) ============================ */
 // ---------------------------------------------------------------------------
 // 06_textures.js — Z.Tex: all game textures, generated to <canvas> at runtime.
 // No image assets. Everything below is procedural. Owner: technical-artist.
@@ -6669,6 +6678,22 @@ Z.assert = function (cond, msg) {
     dbshotgun: { price: 1200, draw: (ctx, st, cx, cy, s) => {
       chalkSilhouette(ctx, st, SHOTGUN_SIL, cx, cy, s);
       chalkLine(ctx, st, cx + s * 0.08, cy - s * 0.14, cx + s * 0.52, cy - s * 0.14, s * 0.025); // second (over/under) barrel
+    } },
+    // M1897 Trench Gun: single barrel (SHOTGUN_SIL, no second-barrel line),
+    // distinguished by a ventilated heat shield sleeved over the front of
+    // the barrel, a pump/slide handle hanging below it, and a bayonet lug
+    // near the muzzle.
+    trenchgun: { price: 1500, draw: (ctx, st, cx, cy, s) => {
+      chalkSilhouette(ctx, st, SHOTGUN_SIL, cx, cy, s);
+      chalkLine(ctx, st, cx + s * 0.15, cy - s * 0.13, cx + s * 0.48, cy - s * 0.13, s * 0.025); // heat shield top
+      chalkLine(ctx, st, cx + s * 0.15, cy + s * 0.12, cx + s * 0.48, cy + s * 0.12, s * 0.025); // heat shield bottom
+      chalkLine(ctx, st, cx + s * 0.15, cy - s * 0.13, cx + s * 0.15, cy + s * 0.12, s * 0.025); // heat shield front cap
+      for (let i = 0; i < 4; i++) {
+        const x = cx + s * (0.21 + i * 0.07);
+        chalkLine(ctx, st, x, cy - s * 0.12, x, cy + s * 0.11, s * 0.015); // vent slats
+      }
+      chalkPoly(ctx, st, [[cx + s * 0.24, cy + s * 0.10], [cx + s * 0.24, cy + s * 0.21], [cx + s * 0.06, cy + s * 0.21], [cx + s * 0.06, cy + s * 0.10]], s * 0.03); // pump/slide handle
+      chalkLine(ctx, st, cx + s * 0.52, cy + s * 0.10, cx + s * 0.58, cy + s * 0.19, s * 0.025); // bayonet lug
     } },
     sawnoff: { price: 1200, draw: (ctx, st, cx, cy, s) => {
       chalkSilhouette(ctx, st, SAWNOFF_SIL, cx, cy, s);
