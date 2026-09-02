@@ -387,22 +387,31 @@
       box(b, hx - 0.062 * rk, hy - 0.075, hz - 0.086 * rk, hx + 0.062 * rk, hy - 0.005, hz + 0.028 * rk, COL.skinDark);
       // exposed teeth strip where the jaw hangs open
       box(b, hx - 0.05 * rk, hy - 0.028, hz - 0.09 * rk, hx + 0.05 * rk, hy - 0.010, hz - 0.06 * rk, COL.teeth, { shade: false });
-      // Brow ridge: a dark band straight across, so the whole upper face is
-      // in shadow and the head stops reading as one flat lit card.
-      box(b, hx - 0.084 * rk, hy + 0.118, hz - 0.094 * rk, hx + 0.084 * rk, hy + 0.150, hz - 0.062 * rk,
-        COL.skinDark, { shade: false });
+      // Brow ridge. It has to genuinely protrude, not sit flush — at the same
+      // depth as the skull face it was a differently-tinted rectangle painted
+      // on a flat plane, which is what made the head read as a card. But only
+      // just proud: at 0.026 it became a shelf that turned the head into a
+      // peaked lid with the eyes as slits underneath it.
+      box(b, hx - 0.084 * rk, hy + 0.124, hz - 0.100 * rk, hx + 0.084 * rk, hy + 0.146, hz - 0.076 * rk,
+        COL.skinDark);
+      // Nose ridge — the other shape that makes a box read as a face at range.
+      box(b, hx - 0.016 * rk, hy + 0.040, hz - 0.104 * rk, hx + 0.016 * rk, hy + 0.108, hz - 0.084 * rk,
+        COL.skin);
       // sunken eye sockets — dark recess, then a smaller glowing pupil set
       // just proud of it so the amber reads as coming from inside the skull.
       box(b, hx - 0.062 * rk, hy + 0.092, hz - 0.095 * rk, hx - 0.014 * rk, hy + 0.132, hz - 0.066 * rk, COL.eye, { shade: false });
       box(b, hx + 0.014 * rk, hy + 0.092, hz - 0.095 * rk, hx + 0.062 * rk, hy + 0.132, hz - 0.066 * rk, COL.eye, { shade: false });
       // cheekbone shadow under each socket — the hollow-cheeked corpse read
-      box(b, hx - 0.070 * rk, hy + 0.040, hz - 0.092 * rk, hx - 0.020 * rk, hy + 0.078, hz - 0.070 * rk,
+      box(b, hx - 0.074 * rk, hy + 0.036, hz - 0.086 * rk, hx - 0.022 * rk, hy + 0.082, hz - 0.052 * rk,
         COL.skinDark, { shade: false });
-      box(b, hx + 0.020 * rk, hy + 0.040, hz - 0.092 * rk, hx + 0.070 * rk, hy + 0.078, hz - 0.070 * rk,
+      box(b, hx + 0.022 * rk, hy + 0.036, hz - 0.086 * rk, hx + 0.074 * rk, hy + 0.082, hz - 0.052 * rk,
         COL.skinDark, { shade: false });
-      b.setEmissive(1);
-      box(b, hx - 0.050 * rk, hy + 0.106, hz - 0.098 * rk, hx - 0.026 * rk, hy + 0.124, hz - 0.086 * rk, COL.eyeGlow, { shade: false });
-      box(b, hx + 0.026 * rk, hy + 0.106, hz - 0.098 * rk, hx + 0.050 * rk, hy + 0.124, hz - 0.086 * rk, COL.eyeGlow, { shade: false });
+      // Small and not blinding. These are meant to read as two points burning
+      // in a socket; at the previous size and strength they blew out into
+      // cream rectangles that turned the head into a lit window.
+      b.setEmissive(0.55);
+      box(b, hx - 0.044 * rk, hy + 0.108, hz - 0.099 * rk, hx - 0.028 * rk, hy + 0.122, hz - 0.088 * rk, COL.eyeGlow, { shade: false });
+      box(b, hx + 0.028 * rk, hy + 0.108, hz - 0.099 * rk, hx + 0.044 * rk, hy + 0.122, hz - 0.088 * rk, COL.eyeGlow, { shade: false });
       b.setEmissive(0);
       // torn cheek patch
       box(b, hx + 0.055 * rk, hy + 0.02, hz - 0.05 * rk, hx + 0.086 * rk, hy + 0.06, hz + 0.01 * rk, COL.fleshDark, { shade: false });

@@ -120,7 +120,17 @@ await shot('ev-09-horde.png', `
 await page.evaluate(() => {
   const Z = window.__Z;
   const G = Z.Game;
-  const z = Z.Zombies.nearestTo(G.player.pos, 40);
+  // Frame a zombie at a range you would actually shoot from. The nearest one
+  // is usually inside melee reach, and a head filling a quarter of the screen
+  // says nothing about how the horde reads in a fight.
+  let z = null, bestD = 1e9;
+  for (const c of Z.Zombies.list) {
+    if (c.dying) continue;
+    const d = Z.M.dist3(c.pos, G.player.pos);
+    if (d < 3.5 || d > 9) continue;
+    if (Math.abs(d - 5.5) < bestD) { bestD = Math.abs(d - 5.5); z = c; }
+  }
+  if (!z) z = Z.Zombies.nearestTo(G.player.pos, 40);
   if (z) {
     G.player.yaw = Math.atan2(-(z.pos[0] - G.player.pos[0]), -(z.pos[2] - G.player.pos[2]));
   }

@@ -506,8 +506,13 @@
     // every world bulb and renders as an unlit black slab. Short radius and
     // low intensity so it reads as eye adaptation, not a flashlight.
     const vcam = Z.Render.camera;
+    // Wide radius, low intensity. The attenuation curve is att^2/(1+d^2*0.1),
+    // which over a short radius is brutally steep: at r=5.4 this light was 23x
+    // brighter at 1 m than at 4 m, so a zombie on the lens blew out to a pale
+    // block while one at mid-fight range got nothing and fell to a silhouette.
+    // Stretching the radius flattens that to about 4x across the same span.
     Z.Render.addLight([vcam.pos[0], vcam.pos[1] - 0.10, vcam.pos[2]],
-      [0.62, 0.58, 0.52], 5.4, 0.62, 'camfill');
+      [0.62, 0.58, 0.52], 14.0, 0.30, 'camfill');
 
     Z.Render.beginScene();
     Z.Render.drawWorld();
