@@ -7831,7 +7831,7 @@ Z.assert = function (cond, msg) {
 }());
 
 
-/* ============================ 09_level.js (841 lines) ============================ */
+/* ============================ 09_level.js (848 lines) ============================ */
 // ---------------------------------------------------------------------------
 // 09_level.js — Nacht der Untoten.
 //
@@ -8507,10 +8507,17 @@ Z.assert = function (cond, msg) {
       // shade the fitting read as a bright dot rather than a lamp from across
       // the room, which was the whole point of putting it at eye height.
       const gx = x + n[0] * 0.19, gz = z + n[2] * 0.19;
-      box([gx - 0.062, y - 0.070, gz - 0.062], [gx + 0.062, y + 0.062, gz + 0.062],
+      box([gx - 0.055, y - 0.075, gz - 0.055], [gx + 0.055, y + 0.055, gz + 0.055],
         'bulb_glass', { uvScale: 1, solid: false });
-      box([gx - 0.105, y + 0.062, gz - 0.105], [gx + 0.105, y + 0.108, gz + 0.105],
-        'barrel_metal', { uvScale: 4, solid: false });
+      // Conical shade. A flat plate at window height, on the same wall plane
+      // and in the same rectangular proportion family as the boarding either
+      // side of it, reads as a third smaller window — the silhouette has to
+      // differ by shape, not just by being lit.
+      for (let i = 0; i < 3; i++) {
+        const r = 0.155 - i * 0.038, y0 = y + 0.055 + i * 0.032;
+        box([gx - r, y0, gz - r], [gx + r, y0 + 0.034, gz + r],
+          'barrel_metal', { uvScale: 3, solid: false });
+      }
       lights.push({ pos: [gx, y, gz], color: [1.00, 0.68, 0.31], radius: 7.6,
         intensity: 1.30, flicker: 0.30, name: name });
     }
@@ -17852,7 +17859,7 @@ Z.assert = function (cond, msg) {
 }());
 
 
-/* ============================ 22_game.js (742 lines) ============================ */
+/* ============================ 22_game.js (745 lines) ============================ */
 // ---------------------------------------------------------------------------
 // 22_game.js — state machine, fixed-timestep loop, render order, HUD feed.
 // ---------------------------------------------------------------------------
@@ -18409,7 +18416,10 @@ Z.assert = function (cond, msg) {
     Z.Render.beginQuads();
     let n = 0;
     for (const L of lv.lights) {
-      if (!/_(bulb|sconce)$/.test(L.name)) continue;
+      // Match anywhere, not at the end: the sconces are named for the wall
+      // they sit on (hall_sconce_n, help_sconce_w), so an end-anchored test
+      // matched none of them and every sconce in the map went un-haloed.
+      if (!/(_bulb$|sconce)/.test(L.name)) continue;
       // Ride the same flicker the light itself does, so the halo dims with it
       // instead of floating at a constant brightness over a guttering bulb.
       const f = L.flicker

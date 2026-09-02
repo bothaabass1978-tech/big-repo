@@ -554,7 +554,10 @@
     Z.Render.beginQuads();
     let n = 0;
     for (const L of lv.lights) {
-      if (!/_(bulb|sconce)$/.test(L.name)) continue;
+      // Match anywhere, not at the end: the sconces are named for the wall
+      // they sit on (hall_sconce_n, help_sconce_w), so an end-anchored test
+      // matched none of them and every sconce in the map went un-haloed.
+      if (!/(_bulb$|sconce)/.test(L.name)) continue;
       // Ride the same flicker the light itself does, so the halo dims with it
       // instead of floating at a constant brightness over a guttering bulb.
       const f = L.flicker
