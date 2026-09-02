@@ -206,7 +206,17 @@
     '.wa-menu__screen{ position:absolute; inset:0; display:none; flex-direction:column; }\n' +
     '.wa-menu__screen.is-active{ display:flex; }\n' +
     '.wa-menu__screen--pause{ background:rgba(4,3,2,0.74); }\n' +
-    '.wa-menu__screen--main,.wa-menu__screen--settings,.wa-menu__screen--controls,\n' +
+    // The renderer already drifts a camera slowly through the farmhouse behind
+    // the main menu, and an opaque background threw all of it away — you sat
+    // looking at a black void with text on it. Scrim it instead: heavy enough
+    // at the top for the title and rows to stay legible, thin enough at the
+    // bottom that the room, the boarded windows and the failing bulbs read.
+    '.wa-menu__screen--main{ background:\n' +
+    '  radial-gradient(125% 90% at 50% 32%, rgba(6,4,2,0.10) 0%, rgba(6,4,2,0.48) 60%, rgba(6,4,2,0.78) 100%),\n' +
+    '  linear-gradient(to bottom, rgba(6,4,2,0.50) 0%, rgba(6,4,2,0.16) 46%, rgba(6,4,2,0.30) 100%); }\n' +
+    // Settings, controls and the stats screens are read, not admired — they
+    // stay opaque so long option lists never fight the moving image behind.
+    '.wa-menu__screen--settings,.wa-menu__screen--controls,\n' +
     '.wa-menu__screen--gameover,.wa-menu__screen--loading{ background:' + COL.bg + '; }\n' +
 
     // grain overlay — generated noise tile, animated by stepping the offset.

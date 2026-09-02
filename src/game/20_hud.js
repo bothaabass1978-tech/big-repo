@@ -566,6 +566,14 @@
 
     const mode = state.mode || 'playing';
 
+    // Nothing of the run belongs on screen before it starts. The menu draws
+    // over a live render of the level, and without this the previous run's
+    // points, ammo and round counter sat on top of the main menu.
+    if (mode === 'menu' || mode === 'loading') {
+      ctx.restore();
+      return;
+    }
+
     if (mode === 'gameover') {
       drawGameOver(state, dt);
       ctx.restore();
