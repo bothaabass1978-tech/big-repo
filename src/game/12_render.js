@@ -32,13 +32,17 @@
     // whose fill comes from tungsten bulbs bouncing off bare boards, so a
     // strongly blue ambient made every surface outside a bulb's radius read
     // as cold grey. The map is lit amber and pooled, not blue and even.
-    ambTop: [0.086, 0.082, 0.090],
+    ambTop: [0.118, 0.108, 0.104],
     // Not literally black. At 0.018 every vertical face outside a bulb's
     // radius crushed to 0,0,0 in the tonemap, so crates, walls and zombies
     // alike became flat silhouettes. This is the floor that keeps a shape
     // readable without lifting the room out of darkness — and it is warm,
     // because what little bounce there is comes off wood.
-    ambBot: [0.050, 0.041, 0.031],
+    // Raised again after round six: the warm bias was right but the level was
+    // too low, so only the bulbs and their immediate pools read warm and the
+    // rooms between them stayed a flat grey wash. Black Ops' Nacht never has a
+    // genuinely dead patch — every corner keeps some bounce.
+    ambBot: [0.086, 0.070, 0.052],
     sunDir: [0.35, -0.82, 0.45],
     sunCol: [0.046, 0.052, 0.074],
     fogCol: Z.C.FOG_COLOR.slice(),

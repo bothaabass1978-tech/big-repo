@@ -332,6 +332,17 @@
       box([x, C1 - 0.20, Z0 + 0.1], [x + 0.15, C1, Z1 - 0.1], 'ceiling_wood',
         { uvScale: 1.2, solid: false });
     }
+    // And the upper floor, under the roof. The HELP room read as a solid black
+    // ceiling because the joist treatment stopped at the ground floor — the
+    // room you climb the stairs into had nothing overhead at all.
+    for (let x = X0 + 0.6; x < X1 - 0.4; x += 1.25) {
+      box([x, C2 - 0.22, Z0 + 0.1], [x + 0.17, C2, Z1 - 0.1], 'ceiling_wood',
+        { uvScale: 1.2, solid: false });
+    }
+    for (const cz of [-5.4, -0.8, 4.0]) {
+      box([X0 + 0.1, C2 - 0.34, cz], [X1 - 0.1, C2 - 0.22, cz + 0.28], 'ceiling_wood',
+        { uvScale: 1.0, solid: false });
+    }
 
     // ---- interior dividing wall, upper floor ------------------------------
     // Runs from the north wall to z = 0.8, leaving the last 1.2 m open as the
@@ -497,6 +508,42 @@
     addBuy({ kind: 'weapon', id: 'trench_gun', chalk: 'chalk_trenchgun', cost: 1500,
       pos: [5.8, UP + 1.45, Z0 + 0.02], yaw: 0, facing: [0, 0, 1], room: 'east_up',
       use: [5.8, UP, Z0 + 1.1] });
+
+    // Ammo boxes stacked beside each wall gun. In the real map a chalk outline
+    // never sits on bare plaster — there is always crate and box clutter under
+    // it, which is half of why the walls read as busy. Offset along the wall so
+    // they fall outside the 1.05 m reserve around the use point; clutter() culls
+    // anything that intrudes anyway, so a misjudged one drops rather than
+    // blocking the buy.
+    for (const b of buys) {
+      if (b.kind !== 'weapon' || !b.use) continue;
+      const f = b.facing;
+      const lx = -f[2], lz = f[0];                 // along the wall
+      const fy = b.use[1];
+      for (const side of [-1, 1]) {
+        const cx = b.pos[0] + lx * 1.62 * side, cz = b.pos[2] + lz * 1.62 * side;
+        const inward = 0.34;
+        const ox = cx + f[0] * inward, oz = cz + f[2] * inward;
+        if (side < 0) {
+          clutter([ox - 0.42, fy, oz - 0.34], [ox + 0.42, fy + 0.56, oz + 0.34],
+            'crate_wood', { uvScale: 1.1 });
+          // stacked, and turned a little so it is not a tower of clones
+          clutter([ox - 0.28, fy + 0.56, oz - 0.26], [ox + 0.34, fy + 1.02, oz + 0.30],
+            'crate_wood', { uvScale: 1.3 });
+        } else {
+          clutter([ox - 0.36, fy, oz - 0.30], [ox + 0.36, fy + 0.44, oz + 0.30],
+            'crate_wood', { uvScale: 1.25 });
+        }
+      }
+    }
+
+    // The HELP room's south wall stub is what a player faces cresting the
+    // stairs, and it was bare concrete. Give it something to land on.
+    clutter([-6.2, UP, -2.55], [-5.3, UP + 0.62, -2.05], 'crate_wood', { uvScale: 1.1 });
+    clutter([-6.05, UP + 0.62, -2.5], [-5.4, UP + 1.06, -2.1], 'crate_wood', { uvScale: 1.3 });
+    clutter([-4.6, UP, -2.5], [-3.9, UP + 0.5, -2.06], 'crate_wood', { uvScale: 1.2 });
+    clutter([-3.1, UP, -2.52], [-2.78, UP + 0.9, -2.2], 'barrel_metal', { uvScale: 1.4 });
+    clutter([-2.2, UP, -2.5], [-1.7, UP + 0.34, -2.1], 'rubble', { uvScale: 0.9 });
 
     // The chalk outlines are what tell the player a wall gun is even there.
     // They're real geometry rather than decals so they light and fog with the

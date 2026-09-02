@@ -69,11 +69,11 @@
   // =========================================================================
   const COL = {
     // --- zombie ---
-    cloth: [0.470, 0.494, 0.409],      // feldgrau greatcoat, filthy
-    clothDark: [0.284, 0.302, 0.256],
-    clothWorn: [0.575, 0.575, 0.457],
+    cloth: [0.386, 0.406, 0.336],      // feldgrau greatcoat, filthy
+    clothDark: [0.232, 0.247, 0.209],
+    clothWorn: [0.478, 0.478, 0.380],
     clothMud: [0.205, 0.190, 0.150],
-    trouser: [0.406, 0.397, 0.342],
+    trouser: [0.330, 0.323, 0.278],
     trouserDark: [0.294, 0.290, 0.248],
     leather: [0.210, 0.172, 0.139],    // belt, boots, straps
     leatherHi: [0.336, 0.277, 0.218],
