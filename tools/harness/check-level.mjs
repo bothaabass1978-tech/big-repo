@@ -159,6 +159,20 @@ const loopB = pathExists([6.0, 0, 5.0], [-5.5, 0, 3.0]);
 if (!(loopA && loopB)) bad('ground-floor training loop is broken');
 else console.log('  ok: ground-floor training loop verified (both directions)');
 
+// ---- wall fixtures must not sit on a window --------------------------------
+// Sconces are placed by hand against room extents, so it is easy to drop one
+// straight onto a boarded window: the first pass put three of them there, and
+// it only showed up because a screenshot happened to frame one.
+for (const L of lv.lights) {
+  if (!/_sconce/.test(L.name || '')) continue;
+  for (const w of lv.windows) {
+    const d = Math.hypot(L.pos[0] - w.pos[0], L.pos[2] - w.pos[2]);
+    if (d < 1.0 && Math.abs(L.pos[1] - w.pos[1]) < 1.2) {
+      bad('sconce ' + L.name + ' sits on window ' + w.id + ' (' + d.toFixed(2) + ' m apart)');
+    }
+  }
+}
+
 // ---- per-room kiting circles ----------------------------------------------
 // The design claims kiting is viable indefinitely, and the balance harness
 // proves it as a speed comparison in open space. That is only half the claim:

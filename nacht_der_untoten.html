@@ -7838,7 +7838,7 @@ Z.assert = function (cond, msg) {
 }());
 
 
-/* ============================ 09_level.js (818 lines) ============================ */
+/* ============================ 09_level.js (841 lines) ============================ */
 // ---------------------------------------------------------------------------
 // 09_level.js — Nacht der Untoten.
 //
@@ -8406,9 +8406,9 @@ Z.assert = function (cond, msg) {
     }
 
     // Window n1, the Kar98k corridor, had no flanking clutter at all.
-    clutter([-9.35, 0, Z0 + 0.14], [-8.62, 0.42, Z0 + 0.74], 'crate_wood',
+    clutter([-9.55, 0, Z0 + 0.14], [-8.92, 0.42, Z0 + 0.74], 'crate_wood',
       { uvScale: 1.15, lowProfile: true });
-    clutter([-9.2, 0.42, Z0 + 0.2], [-8.7, 0.80, Z0 + 0.68], 'crate_wood', { uvScale: 1.35 });
+    clutter([-9.42, 0.42, Z0 + 0.2], [-8.98, 0.80, Z0 + 0.68], 'crate_wood', { uvScale: 1.35 });
     clutter([-6.55, 0, Z0 + 0.16], [-6.05, 0.40, Z0 + 0.66], 'crate_wood',
       { uvScale: 1.25, lowProfile: true });
 
@@ -8510,16 +8510,39 @@ Z.assert = function (cond, msg) {
       box([Math.min(x, ax) - 0.018, y + 0.02, Math.min(z, az) - 0.018],
         [Math.max(x, ax) + 0.018, y + 0.055, Math.max(z, az) + 0.018],
         'barrel_metal', { uvScale: 6, solid: false });
-      // glass, self-lit
+      // glass, self-lit, with a shade over it — at 0.096 m across and no
+      // shade the fitting read as a bright dot rather than a lamp from across
+      // the room, which was the whole point of putting it at eye height.
       const gx = x + n[0] * 0.19, gz = z + n[2] * 0.19;
-      box([gx - 0.048, y - 0.055, gz - 0.048], [gx + 0.048, y + 0.052, gz + 0.048],
+      box([gx - 0.062, y - 0.070, gz - 0.062], [gx + 0.062, y + 0.062, gz + 0.062],
         'bulb_glass', { uvScale: 1, solid: false });
+      box([gx - 0.105, y + 0.062, gz - 0.105], [gx + 0.105, y + 0.108, gz + 0.105],
+        'barrel_metal', { uvScale: 4, solid: false });
       lights.push({ pos: [gx, y, gz], color: [1.00, 0.68, 0.31], radius: 7.6,
         intensity: 1.30, flicker: 0.30, name: name });
     }
+    // Placed in the gaps BETWEEN windows. First pass put three of these on top
+    // of a window each — n5, w1 and s1 — because the positions were picked off
+    // room extents rather than off the window list.
+    // north wall, main: windows at -7.6, -3.4, 0.6
     sconce(-1.4, 1.78, Z0 + 0.12, [0, 0, 1], 'hall_sconce_n');
-    sconce(X0 + 0.12, 1.78, -4.6, [1, 0, 0], 'hall_sconce_w');
-    sconce(-5.2, 1.78, Z1 - 0.12, [0, 0, -1], 'hall_sconce_s');
+    sconce(-5.5, 1.78, Z0 + 0.12, [0, 0, 1], 'hall_sconce_n2');
+    // west wall, main: windows at z -4.6 and 0.4
+    sconce(X0 + 0.12, 1.78, -2.1, [1, 0, 0], 'hall_sconce_w');
+    // south wall, main: windows at -6.2 and -1.2
+    sconce(-3.7, 1.78, Z1 - 0.12, [0, 0, -1], 'hall_sconce_s');
+    // The other rooms had the same structural problem and none of the fix.
+    // The HELP room's Gewehr43 wall in particular gates a 600-point weapon
+    // and had no warm source anywhere near it.
+    // HELP room north wall: windows at -6.0 and -1.0
+    sconce(-3.5, UP + 1.78, Z0 + 0.12, [0, 0, 1], 'help_sconce_n');
+    sconce(X0 + 0.12, UP + 1.78, -5.6, [1, 0, 0], 'help_sconce_w');
+    // north-east room: window n4 at 6.4, and this belongs east of the divider
+    sconce(4.8, 1.78, Z0 + 0.12, [0, 0, 1], 'ne_sconce_n');
+    // south-east room: window e1 at z 5.2
+    sconce(X1 - 0.12, 1.78, 2.4, [-1, 0, 0], 'se_sconce_e');
+    sconce(X1 - 0.12, UP + 1.78, -1.2, [-1, 0, 0], 'eastup_sconce_e');
+    sconce(-2.2, UP + 1.78, Z1 - 0.12, [0, 0, -1], 'catwalk_sconce_s');
 
     // Every warm emitter was a bare point light with no geometry, so the rooms
     // had pools of amber coming from nowhere. The hanging bulb on its cord is
