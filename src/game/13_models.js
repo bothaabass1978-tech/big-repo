@@ -79,7 +79,7 @@
     leatherHi: [0.160, 0.132, 0.104],
     skin: [0.475, 0.500, 0.395],       // grey-green dead flesh
     skinPale: [0.560, 0.575, 0.470],
-    skinDark: [0.300, 0.325, 0.260],
+    skinDark: [0.185, 0.198, 0.168],
     flesh: [0.360, 0.120, 0.110],      // stumps / open wounds
     fleshDark: [0.170, 0.052, 0.050],
     fleshWet: [0.460, 0.080, 0.075],
@@ -387,10 +387,19 @@
       box(b, hx - 0.062 * rk, hy - 0.075, hz - 0.086 * rk, hx + 0.062 * rk, hy - 0.005, hz + 0.028 * rk, COL.skinDark);
       // exposed teeth strip where the jaw hangs open
       box(b, hx - 0.05 * rk, hy - 0.028, hz - 0.09 * rk, hx + 0.05 * rk, hy - 0.010, hz - 0.06 * rk, COL.teeth, { shade: false });
+      // Brow ridge: a dark band straight across, so the whole upper face is
+      // in shadow and the head stops reading as one flat lit card.
+      box(b, hx - 0.084 * rk, hy + 0.118, hz - 0.094 * rk, hx + 0.084 * rk, hy + 0.150, hz - 0.062 * rk,
+        COL.skinDark, { shade: false });
       // sunken eye sockets — dark recess, then a smaller glowing pupil set
       // just proud of it so the amber reads as coming from inside the skull.
-      box(b, hx - 0.058 * rk, hy + 0.10, hz - 0.093 * rk, hx - 0.018 * rk, hy + 0.128, hz - 0.07 * rk, COL.eye, { shade: false });
-      box(b, hx + 0.018 * rk, hy + 0.10, hz - 0.093 * rk, hx + 0.058 * rk, hy + 0.128, hz - 0.07 * rk, COL.eye, { shade: false });
+      box(b, hx - 0.062 * rk, hy + 0.092, hz - 0.095 * rk, hx - 0.014 * rk, hy + 0.132, hz - 0.066 * rk, COL.eye, { shade: false });
+      box(b, hx + 0.014 * rk, hy + 0.092, hz - 0.095 * rk, hx + 0.062 * rk, hy + 0.132, hz - 0.066 * rk, COL.eye, { shade: false });
+      // cheekbone shadow under each socket — the hollow-cheeked corpse read
+      box(b, hx - 0.070 * rk, hy + 0.040, hz - 0.092 * rk, hx - 0.020 * rk, hy + 0.078, hz - 0.070 * rk,
+        COL.skinDark, { shade: false });
+      box(b, hx + 0.020 * rk, hy + 0.040, hz - 0.092 * rk, hx + 0.070 * rk, hy + 0.078, hz - 0.070 * rk,
+        COL.skinDark, { shade: false });
       b.setEmissive(1);
       box(b, hx - 0.050 * rk, hy + 0.106, hz - 0.098 * rk, hx - 0.026 * rk, hy + 0.124, hz - 0.086 * rk, COL.eyeGlow, { shade: false });
       box(b, hx + 0.026 * rk, hy + 0.106, hz - 0.098 * rk, hx + 0.050 * rk, hy + 0.124, hz - 0.086 * rk, COL.eyeGlow, { shade: false });

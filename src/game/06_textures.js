@@ -1692,7 +1692,10 @@
     }
     grime(ctx, size, seedN, 1);
     forceSeamEdges(c);
-    return { canvas: c, size, tile: [true, true], spec: 0.12, gloss: 0.15, emissive: 0, normal: null, tint: [0.66, 0.72, 0.58] };
+    // Near-neutral, faintly green. The texture is already a green-grey ramp,
+    // and a green tint on top of it stacked into a bright pea-green that read
+    // as a painted card rather than ashen dead flesh in feldgrau.
+    return { canvas: c, size, tile: [true, true], spec: 0.12, gloss: 0.15, emissive: 0, normal: null, tint: [0.70, 0.65, 0.78] };
   }
   // zombie_cloth and zombie_face removed 2026-09-02: both were fully
   // generated and registered but never referenced anywhere (repo-wide grep
