@@ -637,6 +637,13 @@
     drawPowerups(state, dt);
     drawPrompt(state, dt);
 
+    // Where pointer lock was refused — a sandboxed frame, mostly — the player
+    // has no way of knowing the mouse works differently unless we say so.
+    if (state.dragLook) {
+      drawLabel(ctx, 'POINTER LOCK UNAVAILABLE \u2014 HOLD LEFT MOUSE TO LOOK',
+        W / 2, 26 * S, 11 * S, COL.labelDim, 'center', 1.6 * S);
+    }
+
     if (mode === 'downed') drawDowned(state, dt);
 
     drawDebug(state, dt);

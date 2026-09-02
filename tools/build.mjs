@@ -42,8 +42,32 @@ if (!tpl.includes('/*__GAME_BUNDLE__*/')) { console.error('template missing bund
 const html = tpl.replace('/*__GAME_BUNDLE__*/', () => bundle);
 
 writeFileSync(OUT, html);
+
+// Second target: the same game as body content only, for hosts that supply
+// their own document skeleton (Claude artifacts wrap the file in doctype/html/
+// head/body at publish time, so shipping our own would nest a document).
+// Same bundle, same behaviour — only the wrapper differs.
+const ART = join(ROOT, 'nacht_der_untoten.artifact.html');
+const headOpen = html.indexOf('<head>');
+const headClose = html.indexOf('</head>');
+const bodyOpen = html.indexOf('<body>');
+const bodyClose = html.lastIndexOf('</body>');
+if (headOpen < 0 || headClose < 0 || bodyOpen < 0 || bodyClose < 0) {
+  console.error('build: cannot locate head/body in the shell to make the artifact variant');
+  process.exit(1);
+}
+// Keep <title> and <style> from the head — the wrapper's head has neither of
+// ours — and drop <meta charset>/<meta viewport>, which the wrapper supplies.
+const headInner = html.slice(headOpen + 6, headClose)
+  .replace(/<meta[^>]*>\s*/g, '')
+  .trim();
+const bodyInner = html.slice(bodyOpen + 6, bodyClose).trim();
+const artifact = headInner + '\n' + bodyInner + '\n';
+writeFileSync(ART, artifact);
+
 const kb = (Buffer.byteLength(html) / 1024).toFixed(1);
 console.log(`built ${OUT}`);
+console.log(`built ${ART}  (${(Buffer.byteLength(artifact) / 1024).toFixed(1)} KB, body content only)`);
 console.log(`  modules: ${files.length}  source lines: ${totalLines}  size: ${kb} KB`);
 for (const f of files) {
   const n = readFileSync(join(SRC, f), 'utf8').split('\n').length;

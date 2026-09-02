@@ -283,7 +283,9 @@
       if (G.mode === 'playing') G.pause();
     }
     // Clicking the canvas re-acquires pointer lock after an accidental escape.
-    if (G.mode === 'playing' && !Z.Input.locked && Z.Input.mbPressed(0)) Z.Input.lock();
+    // Don't keep re-asking for a lock that has already been refused — in a
+    // sandboxed frame that fires on every shot.
+    if (G.mode === 'playing' && !Z.Input.locked && !Z.Input.dragLook && Z.Input.mbPressed(0)) Z.Input.lock();
   }
 
   // -------------------------------------------------------------------------
@@ -601,6 +603,7 @@
 
     return {
       mode: p.dead ? 'gameover' : (p.downed ? 'downed' : (G.mode === 'paused' ? 'paused' : G.mode)),
+      dragLook: !!(Z.Input && Z.Input.dragLook && !Z.Input.locked),
       round: Z.Rounds.round,
       roundPhase: Z.Rounds.phase,
       roundTimer: Z.Rounds.timeToNextRound(),

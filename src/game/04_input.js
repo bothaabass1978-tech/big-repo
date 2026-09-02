@@ -38,6 +38,11 @@
   const pendMouse = { dx: 0, dy: 0, wheel: 0 };
 
   I.locked = false;
+  // Set when pointer lock is unavailable: look by dragging with the left
+  // button held instead. Off by default — it is strictly worse than a locked
+  // pointer and should only engage where lock genuinely cannot be had.
+  I.dragLook = false;
+  let dragging = false;
   I.enabled = true;
   I.sensitivity = 1.0;       // multiplier on raw deltas
   I.adsSensScale = 0.75;
@@ -93,6 +98,13 @@
       // movementX/Y are already raw when pointer-locked
       pendMouse.dx += e.movementX || 0;
       pendMouse.dy += e.movementY || 0;
+    } else if (I.dragLook && dragging) {
+      // Fallback for contexts that refuse pointer lock — a sandboxed iframe,
+      // or a browser that denies the request. movementX/Y are still reported
+      // for an ordinary move, so drag-to-look costs nothing extra; it is only
+      // worse to play, not unplayable.
+      pendMouse.dx += e.movementX || (e.clientX - mouse.x) || 0;
+      pendMouse.dy += e.movementY || (e.clientY - mouse.y) || 0;
     }
     mouse.x = e.clientX; mouse.y = e.clientY;
     I.lastInputWasGamepad = false;
@@ -103,12 +115,14 @@
     if (!(mouse.buttons & (1 << b))) mbDownPend[b] = true;
     mouse.buttons |= (1 << b);
     I.lastInputWasGamepad = false;
+    if (b === 0) dragging = true;
     if (I.locked) e.preventDefault();
   }
   function onMouseUp(e) {
     const b = e.button;
     mouse.buttons &= ~(1 << b);
     mbUpPend[b] = true;
+    if (b === 0) dragging = false;
   }
   function onWheel(e) {
     pendMouse.wheel += Math.sign(e.deltaY);
@@ -135,8 +149,20 @@
 
   I.lock = function () {
     if (!canvas || I.locked) return;
-    const p = canvas.requestPointerLock && canvas.requestPointerLock({ unadjustedMovement: true });
-    if (p && p.catch) p.catch(() => { try { canvas.requestPointerLock(); } catch (e) { /* ignore */ } });
+    if (!canvas.requestPointerLock) { I.dragLook = true; return; }
+    let p = null;
+    try { p = canvas.requestPointerLock({ unadjustedMovement: true }); } catch (e) { p = null; }
+    if (p && p.catch) {
+      p.catch(function () {
+        try {
+          const q = canvas.requestPointerLock();
+          if (q && q.catch) q.catch(function () { I.dragLook = true; });
+        } catch (e) { I.dragLook = true; }
+      });
+    }
+    // Some engines return undefined and simply never fire pointerlockchange.
+    // If we are still unlocked shortly after asking, assume it was refused.
+    setTimeout(function () { if (!I.locked) I.dragLook = true; }, 700);
   };
   I.unlock = function () { if (document.exitPointerLock) document.exitPointerLock(); };
 
