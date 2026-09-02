@@ -122,7 +122,11 @@
     x.closePath();
   }
 
-  function digitCharWidth(h) { return h * 0.58; }
+  // A seven-segment '1' is only the two right-hand bars, so in a full-width
+  // cell it sits hard against the right edge with dead space beside it — at
+  // round 1 the counter read as a stray scratch next to the word ROUND.
+  // Give it a narrow cell and centre the bars in it.
+  function digitCharWidth(h, ch) { return ch === '1' ? h * 0.26 : h * 0.58; }
 
   function drawSegShape(x, ch, w, h, t) {
     const mid = h / 2;
@@ -133,9 +137,9 @@
       if (segs.indexOf('g') >= 0) hbar(x, w / 2, mid, w, t);
       if (segs.indexOf('d') >= 0) hbar(x, w / 2, h - t / 2, w, t);
       if (segs.indexOf('f') >= 0) vbar(x, t / 2, mid / 2, mid, t);
-      if (segs.indexOf('b') >= 0) vbar(x, w - t / 2, mid / 2, mid, t);
+      if (segs.indexOf('b') >= 0) vbar(x, ch === '1' ? w / 2 : w - t / 2, mid / 2, mid, t);
       if (segs.indexOf('e') >= 0) vbar(x, t / 2, mid + mid / 2, mid, t);
-      if (segs.indexOf('c') >= 0) vbar(x, w - t / 2, mid + mid / 2, mid, t);
+      if (segs.indexOf('c') >= 0) vbar(x, ch === '1' ? w / 2 : w - t / 2, mid + mid / 2, mid, t);
       x.fill();
       return;
     }
@@ -172,7 +176,7 @@
   }
 
   function drawDigitChar(x, ch, px, py, h, color) {
-    const w = h * 0.58, t = Math.max(1.4, h * 0.15);
+    const w = digitCharWidth(h, ch), t = Math.max(1.4, h * 0.15);
     x.save();
     x.translate(px, py);
     x.transform(1, 0, -0.16, 1, 0, 0);
@@ -190,7 +194,7 @@
     spacing = spacing == null ? h * 0.16 : spacing;
     let w = 0;
     for (let i = 0; i < str.length; i++) {
-      w += (str[i] === ' ' ? h * 0.32 : digitCharWidth(h)) + (i < str.length - 1 ? spacing : 0);
+      w += (str[i] === ' ' ? h * 0.32 : digitCharWidth(h, str[i])) + (i < str.length - 1 ? spacing : 0);
     }
     return w;
   }
@@ -205,7 +209,7 @@
     else if (align === 'right') cx = px - totalW;
     for (let i = 0; i < str.length; i++) {
       const ch = str[i];
-      const cw = ch === ' ' ? h * 0.32 : digitCharWidth(h);
+      const cw = ch === ' ' ? h * 0.32 : digitCharWidth(h, ch);
       if (ch !== ' ') drawDigitChar(x, ch, cx, py, h, color);
       cx += cw + spacing;
     }
@@ -844,7 +848,11 @@
     // Round 0 is the pre-game lobby state and should show nothing.
     if (a.shown === null || (a.shown | 0) < 1) return;
     const x0 = 30 * S;
-    const h = 30 * S;
+    // The round counter is the dominant element of this HUD — it is the number
+    // a player checks constantly and the one the whole game is scored by. At
+    // 30 it sat *smaller* than the points readout below it, which inverts the
+    // hierarchy the original has.
+    const h = 44 * S;
     const yLabel = Hh - 30 * S - 46 * S;
 
     drawLabel(ctx, 'ROUND', x0, yLabel, 13 * S, COL.labelDim, 'left', 2 * S);
