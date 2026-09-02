@@ -26,6 +26,13 @@
     this.emisV = 0;
     // optional transform stack applied to vert()/box()/cyl()
     this.xf = null;
+    // Multiplies every part's uvScale. uvScale is authored in tiles per metre,
+    // which is a sane unit for a wall and a useless one for a weapon: a pistol
+    // receiver is 0.15 m long, so the uvScale of 3 the gun builder authored
+    // put less than half a texture tile across it and every gun in the game
+    // rendered as flat untextured colour. Rather than retune forty call sites
+    // by hand, the whole builder gets a multiplier.
+    this.uvMul = 1;
   }
   Mesh.builder = () => new Builder();
 
@@ -33,6 +40,7 @@
   Builder.prototype.setEmissive = function (e) { this.emisV = e || 0; return this; };
   Builder.prototype.setJoint = function (j) { this.joint = j | 0; return this; };
   Builder.prototype.setTransform = function (m) { this.xf = m; return this; };
+  Builder.prototype.setUvMul = function (k) { this.uvMul = k || 1; return this; };
 
   Builder.prototype.vcount = function () { return this.pos.length / 3; };
 
@@ -75,7 +83,7 @@
   Builder.prototype.box = function (min, max, opts) {
     opts = opts || {};
     const faces = opts.faces === undefined ? 63 : opts.faces;
-    const s = opts.uvScale === undefined ? 1 : opts.uvScale;
+    const s = (opts.uvScale === undefined ? 1 : opts.uvScale) * this.uvMul;
     const uo = opts.uvOffset ? opts.uvOffset[0] : 0;
     const vo = opts.uvOffset ? opts.uvOffset[1] : 0;
     const x0 = min[0], y0 = min[1], z0 = min[2];
@@ -139,7 +147,7 @@
     opts = opts || {};
     seg = seg || 10;
     const caps = opts.caps !== false;
-    const uvScale = opts.uvScale === undefined ? 1 : opts.uvScale;
+    const uvScale = (opts.uvScale === undefined ? 1 : opts.uvScale) * this.uvMul;
     const ring0 = [], ring1 = [];
     for (let i = 0; i <= seg; i++) {
       const a = (i / seg) * Math.PI * 2;

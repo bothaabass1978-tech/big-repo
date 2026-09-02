@@ -88,7 +88,16 @@
     eye: [0.03, 0.03, 0.03],
     // The signature read: two amber points that stay legible across a black
     // room. Emissive, so they survive the lighting falloff entirely.
-    eyeGlow: [1.00, 0.62, 0.13],
+    //
+    // Deliberately dark and very saturated. vCol feeds BOTH the albedo and the
+    // emissive term, so a bright value here is added twice — once lit by the
+    // room, once self-lit — and the sum clipped the red channel and dragged
+    // green up with it, turning what should be two orange embers into two flat
+    // cream rectangles that read as LEDs glued to a box. The frame is gamma
+    // encoded, which compresses ratios hard — a linear R:G of 2.7 leaves the
+    // curve as 1.3 on screen — so the only way to keep the hue is to stay off
+    // the top of it: saturated, and never clipping.
+    eyeGlow: [0.90, 0.22, 0.02],
     helmet: [0.370, 0.403, 0.370],     // stahlhelm, worn field grey
     helmetDark: [0.231, 0.256, 0.235],
     // --- weapons ---
@@ -324,6 +333,14 @@
     const seed = (opts.seed || 0) >>> 0;
     const rest = restPositions(hsc);
     const b = Z.Mesh.builder();
+    // Same defect as the guns had, and the reason the zombies read as
+    // untextured boxes: the local box() helper passes no uvScale, so every
+    // part defaulted to one tile per metre and a 0.16 m head got 0.16 of a
+    // tile — a single flat patch of colour stretched over the whole face,
+    // with the brow ridge, nose ridge and cheek hollows built underneath it
+    // and invisible. Seven tiles per metre puts real skin grain on a head and
+    // still tiles sanely across a 0.5 m torso.
+    b.setUvMul(7);
 
     // ---- baked AO: darker under chin, armpits, crotch, inside coat -------
     function ao(x, y, z, nx, ny, nz) {
@@ -409,9 +426,9 @@
       // Small and not blinding. These are meant to read as two points burning
       // in a socket; at the previous size and strength they blew out into
       // cream rectangles that turned the head into a lit window.
-      b.setEmissive(0.55);
-      box(b, hx - 0.044 * rk, hy + 0.108, hz - 0.099 * rk, hx - 0.028 * rk, hy + 0.122, hz - 0.088 * rk, COL.eyeGlow, { shade: false });
-      box(b, hx + 0.028 * rk, hy + 0.108, hz - 0.099 * rk, hx + 0.044 * rk, hy + 0.122, hz - 0.088 * rk, COL.eyeGlow, { shade: false });
+      b.setEmissive(0.60);
+      box(b, hx - 0.042 * rk, hy + 0.109, hz - 0.097 * rk, hx - 0.029 * rk, hy + 0.121, hz - 0.088 * rk, COL.eyeGlow, { shade: false });
+      box(b, hx + 0.029 * rk, hy + 0.109, hz - 0.097 * rk, hx + 0.042 * rk, hy + 0.121, hz - 0.088 * rk, COL.eyeGlow, { shade: false });
       b.setEmissive(0);
       // torn cheek patch
       box(b, hx + 0.055 * rk, hy + 0.02, hz - 0.05 * rk, hx + 0.086 * rk, hy + 0.06, hz + 0.01 * rk, COL.fleshDark, { shade: false });
@@ -1074,6 +1091,12 @@
 
   function buildGun(id, spec) {
     const b = Z.Mesh.builder();
+    // Gun parts are authored in tiles per metre like everything else, which at
+    // weapon scale meant a fraction of a tile per part -- flat colour, no
+    // machining, no grain. Eight tiles per authored unit puts three or four
+    // across a pistol receiver, which is what makes the difference between a
+    // weapon and a grey box in a frame where the gun is a fifth of the screen.
+    b.setUvMul(8);
     const s = spec;
     const bl = s.bl, br = s.br, rl = s.rl, rh = s.rh, rw = s.rw;
     const zBack = 0.06;                 // receiver starts just behind the grip
@@ -1295,6 +1318,7 @@
   // -------------------------------------------------------------------------
   function buildArms() {
     const b = Z.Mesh.builder();
+    b.setUvMul(8);            // same reason as buildGun: hands are 4 cm across
     // Sleeve and glove are separate colours: at 0.62 flat for both, the arms
     // were one pale tan block with the hands invisible inside it. The palette
     // already carried the right values, they were simply never used.
@@ -1421,7 +1445,12 @@
   //  hip/ADS blend, sway lag, walk bob, recoil kick, the reload dip and the
   //  sprint carry all compose here into one matrix.
   // -------------------------------------------------------------------------
-  const HIP = [0.132, -0.168, -0.360];
+  // The hip carry sits further out and lower than it used to. At -0.360 the
+  // M1911's 0.15 m receiver began 0.27 m from the eye and subtended most of
+  // the lower right quadrant, seen almost end-on: no barrel, no sight line,
+  // no grip, just the back corner of a metal block. A pistol whose profile
+  // you cannot read is indistinguishable from a placeholder.
+  const HIP = [0.140, -0.186, -0.445];
   const ADS = [0.000, -0.052, -0.235];
   const _gm = m4.create();
 
@@ -1435,8 +1464,11 @@
     const sway = st.sway || [0, 0];
     const bob = st.bob || [0, 0];
 
-    // Long weapons sit further forward so they don't fill the screen.
-    const lenAdj = g ? Z.M.clamp((g.spec.bl + g.spec.rl - 0.5) * 0.16, -0.03, 0.10) : 0;
+    // Long weapons sit further forward still so they don't fill the screen.
+    // The old lower clamp of -0.03 pulled SHORT weapons back toward the eye,
+    // which is the opposite of what a pistol needs: it is the small guns that
+    // have fine detail to read and the least room to read it in.
+    const lenAdj = g ? Z.M.clamp((g.spec.bl + g.spec.rl - 0.5) * 0.16, 0, 0.10) : 0;
 
     let px = Z.M.lerp(HIP[0], ADS[0], e);
     let py = Z.M.lerp(HIP[1], ADS[1], e);

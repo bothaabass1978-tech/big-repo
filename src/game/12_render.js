@@ -760,12 +760,21 @@
     const vmLights = [];
     const vmView = m4.view(tmpM, R.camera.pos[0], R.camera.pos[1], R.camera.pos[2],
       R.camera.yaw, R.camera.pitch, R.camera.roll);
+    // While transforming the world lights into viewmodel space, also work out
+    // what colour the room the player is standing in actually is. See the key
+    // light below for why.
+    let kr = 0, kg = 0, kb = 0, kw = 0;
+    const cp = R.camera.pos;
     for (const L of frameLights) {
       // The camera fill light lives AT the camera, which is the origin of
       // viewmodel space — it would sit inside the weapon at zero distance and
       // light it at full intensity, washing the gun out to a pale slab. It is
       // there for nearby world geometry; the viewmodel has its own key below.
       if (L.tag === 'camfill') continue;
+      const dx = L.pos[0] - cp[0], dy = L.pos[1] - cp[1], dz = L.pos[2] - cp[2];
+      const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+      const wgt = L.intensity * Math.max(0, 1 - d / Math.max(L.radius, 0.001));
+      kr += L.col[0] * wgt; kg += L.col[1] * wgt; kb += L.col[2] * wgt; kw += wgt;
       const p = [0, 0, 0];
       m4.xformPoint(p, vmView, L.pos);
       vmLights.push({ pos: p, col: L.col, radius: L.radius, intensity: L.intensity });
@@ -777,10 +786,36 @@
     // albedo was a flat 0.46 grey with a broken specular wash sitting on top
     // of it. Both of those are fixed, so the intensity is only modestly up.
     // Key: forward, above and to the gun side, so it rakes across the receiver.
-    vmLights.push({ pos: [0.52, 0.44, -0.60], col: [0.64, 0.62, 0.58], radius: 2.6, intensity: 0.78 });
-    // Cool fill from the opposite side so the far face is separated rather
-    // than merging into the background.
-    vmLights.push({ pos: [-0.46, 0.08, -0.28], col: [0.34, 0.36, 0.42], radius: 2.1, intensity: 0.26 });
+    // Its COLOUR comes from the room rather than from a constant. A neutral
+    // studio key is why the weapon read as a cold grey slab pasted onto a warm
+    // scene: measured off a frame in the main hall the gun sat at rgb
+    // 80/73/72 — R and B within 10% of each other — while the plaster, floor
+    // and brick around it all ran 118/87/64. Nothing in this house emits
+    // neutral light. Weighted by each world light's reach at the camera, so
+    // the gun goes amber under a bulb and blue-grey under a roof hole, and
+    // pulled a third of the way back to neutral so a single saturated source
+    // cannot tint the whole weapon.
+    const amb = R.env.ambBot;
+    kr += amb[0] * 0.9; kg += amb[1] * 0.9; kb += amb[2] * 0.9; kw += 0.9;
+    let key = [kr / kw, kg / kw, kb / kw];
+    const kmax = Math.max(key[0], key[1], key[2], 0.0001);
+    for (let i = 0; i < 3; i++) key[i] = M.lerp(key[i] / kmax, 1, 0.34) * 0.72;
+    // Its BRIGHTNESS comes from the room too. A fixed key made the weapon the
+    // brightest object on screen whenever the player stood in a dark corner --
+    // a lit gun floating in an unlit room, which is the single most artificial
+    // thing a first-person frame can do. kw is the summed reach of every world
+    // light at the camera plus the ambient floor, so this tracks the pools of
+    // amber the player walks through.
+    const lit = M.clamp01((kw - 0.9) / 1.8);
+    vmLights.push({ pos: [0.52, 0.44, -0.60], col: key, radius: 2.6,
+      intensity: 0.30 + 0.72 * lit });
+    // Fill from the opposite side so the far face is separated rather than
+    // merging into the background. Deliberately the cool complement of
+    // whatever the key turned out to be, not a fixed blue: a constant blue
+    // fill puts back exactly the blue channel the warm key just removed.
+    const fill = [0.30 + (1 - key[0]) * 0.16, 0.32 + (1 - key[1]) * 0.16,
+      0.36 + (1 - key[2]) * 0.20];
+    vmLights.push({ pos: [-0.46, 0.08, -0.28], col: fill, radius: 2.1, intensity: 0.20 });
     vmSavePos = R.camera.pos;
     R.camera.pos = ORIGIN;
     frameLightsSave = frameLights.slice();

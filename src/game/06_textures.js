@@ -698,7 +698,13 @@
       wear: 0.55, wearStretch: 4, wearCount: 5,
       newness: 0.80, grime: 1,
     });
-    return { canvas: c, size: HERO, tile: [true, true], spec: 0.06, gloss: 0.18, emissive: 0, normal: sobelNormal(c, HERO / 2), tint: [1, 1, 1] };
+    // Knocked well down. Untinted, the floorboards measured brighter than the
+    // plaster walls above them (88/74/56 against 55/45/33) and were the
+    // brightest large surface in almost every frame. That is backwards for an
+    // interior: a floor catches the least light and the most filth, and in the
+    // reference the boards are the darkest big thing on screen, which is what
+    // lets the amber pools from the bulbs read as pools at all.
+    return { canvas: c, size: HERO, tile: [true, true], spec: 0.06, gloss: 0.18, emissive: 0, normal: sobelNormal(c, HERO / 2), tint: [0.62, 0.56, 0.47] };
   }
   function makeWoodWall() {
     const c = tileWood(2, HERO, {
@@ -1004,7 +1010,11 @@
     grime(ctx, size, seedN, 1.2);
     dirtAO(ctx, size, { strength: 0.15 });
     forceSeamEdges(c);
-    return { canvas: c, size, tile: [true, true], spec: 0.07, gloss: 0.14, emissive: 0, normal: sobelNormal(c, size / 2), tint: [1, 1, 1] };
+    // Sooted down from the raw brick colour. Untinted this was a bright, even
+    // salmon -- the single brightest surface in the house -- which reads as a
+    // recently pointed garden wall rather than as brick exposed by a shell
+    // hit in a house that has been burning.
+    return { canvas: c, size, tile: [true, true], spec: 0.07, gloss: 0.14, emissive: 0, normal: sobelNormal(c, size / 2), tint: [0.68, 0.60, 0.54] };
   }
 
   function makeConcrete() {
@@ -1750,7 +1760,12 @@
     edgeWear(ctx, size, seedN, { count: 6, color: [150, 148, 140], amount: 1.2 });
     grime(ctx, size, seedN, 0.8);
     forceSeamEdges(c);
-    return { canvas: c, size, tile: [true, true], spec: 0.14, gloss: 0.6, emissive: 0, normal: sobelNormal(c, size / 2), tint: [2.30, 2.30, 2.42] };
+    // Very slightly warm-neutral rather than blue. Blued steel looks cold
+    // because of what it reflects, not because of its albedo, and a tint with
+    // B above R fought the room: in an amber-lit hall the weapon measured
+    // R/B 1.11 while the plaster, floor and brick around it all ran 1.6-1.7,
+    // which is what made it read as a grey slab pasted onto the scene.
+    return { canvas: c, size, tile: [true, true], spec: 0.14, gloss: 0.6, emissive: 0, normal: sobelNormal(c, size / 2), tint: [2.36, 2.28, 2.22] };
   }
   function makeGunWood() {
     const c = tileWood(38, PROP, { axis: 'v', count: 3, freq: 1.2, stops: stopsWoodNew, knots: false, rot: false, nails: false, gapColor: 'rgba(10,7,5,0.3)', gapWidth: 0.5, stainAmt: 0, scratchCount: 8, wear: 1.2, grime: 0.4, ao: false });
