@@ -337,25 +337,25 @@
       const pel = rest[J.pelvis], sp = rest[J.spine], ch = rest[J.chest], nk = rest[J.neck];
       // pelvis / hip block
       b.setJoint(J.pelvis);
-      box(b, -0.145 * bulk, pel[1] - 0.10, -0.11 * bulk, 0.145 * bulk, pel[1] + 0.075, 0.115 * bulk, COL.clothDark);
+      box(b, -0.145 * bulk, pel[1] - 0.10, -0.145 * bulk, 0.145 * bulk, pel[1] + 0.075, 0.150 * bulk, COL.clothDark);
       // groin/crotch dark AO wedge
       box(b, -0.06 * bulk, pel[1] - 0.14, -0.05 * bulk, 0.06 * bulk, pel[1] - 0.08, 0.05 * bulk, COL.clothDark, { shade: false });
 
       // lower torso / abdomen — spine joint
       b.setJoint(J.spine);
-      box(b, -0.155 * bulk, sp[1] - 0.02, -0.115 * bulk, 0.155 * bulk, sp[1] + 0.135, 0.12 * bulk, COL.cloth);
+      box(b, -0.155 * bulk, sp[1] - 0.02, -0.150 * bulk, 0.155 * bulk, sp[1] + 0.135, 0.156 * bulk, COL.cloth);
 
       // upper torso / ribcage — chest joint, ASYMMETRIC shoulders baked in
       b.setJoint(J.chest);
-      box(b, -0.185 * bulk, ch[1] - 0.03, -0.125 * bulk, 0.20 * bulk, ch[1] + 0.145, 0.13 * bulk, COL.cloth);
+      box(b, -0.185 * bulk, ch[1] - 0.03, -0.165 * bulk, 0.20 * bulk, ch[1] + 0.145, 0.170 * bulk, COL.cloth);
       // right shoulder pad: bigger / higher (worn greatcoat epaulette, torn)
-      box(b, 0.15 * bulk, ch[1] + 0.09, -0.10 * bulk, 0.235 * bulk, ch[1] + 0.175, 0.105 * bulk, COL.clothWorn);
+      box(b, 0.15 * bulk, ch[1] + 0.11, -0.135 * bulk, 0.245 * bulk, ch[1] + 0.200, 0.140 * bulk, COL.clothWorn);
       // left shoulder pad: smaller, sits lower — reads asymmetric at a glance
-      box(b, -0.20 * bulk, ch[1] + 0.06, -0.085 * bulk, -0.145 * bulk, ch[1] + 0.135, 0.085 * bulk, COL.clothDark);
+      box(b, -0.210 * bulk, ch[1] + 0.08, -0.115 * bulk, -0.145 * bulk, ch[1] + 0.160, 0.115 * bulk, COL.clothDark);
       // belt
-      box(b, -0.165 * bulk, pel[1] + 0.055, -0.125 * bulk, 0.165 * bulk, pel[1] + 0.10, 0.13 * bulk, COL.leather);
+      box(b, -0.165 * bulk, pel[1] + 0.055, -0.160 * bulk, 0.165 * bulk, pel[1] + 0.10, 0.166 * bulk, COL.leather);
       // buckle
-      box(b, -0.028, pel[1] + 0.06, -0.135 * bulk, 0.028, pel[1] + 0.095, -0.118 * bulk, COL.brass, { shade: false });
+      box(b, -0.028, pel[1] + 0.06, -0.170 * bulk, 0.028, pel[1] + 0.095, -0.153 * bulk, COL.brass, { shade: false });
 
       // damage: torso always carries some tear (corpse), variant emphasises it
       const tearBig = !!opts.tornCoat;
@@ -377,7 +377,7 @@
       const nk = rest[J.neck], hd = rest[J.head];
       b.setJoint(J.neck);
       b.setColor(COL.skinDark[0], COL.skinDark[1], COL.skinDark[2]);
-      b.cyl(nk[0], nk[2], 0.052 * rk, 0.060 * rk, nk[1] - 0.015, nk[1] + 0.075, 7, { caps: false, uvScale: 3 });
+      b.cyl(nk[0], nk[2], 0.066 * rk, 0.074 * rk, nk[1] - 0.015, nk[1] + 0.075, 7, { caps: false, uvScale: 3 });
 
       b.setJoint(J.head);
       const hx = hd[0], hy = hd[1], hz = hd[2];
@@ -417,31 +417,34 @@
       // fixed to the torso, does not swing with the arm)
       b.setJoint(shJ);
       b.setColor(COL.clothWorn[0] * 0.9, COL.clothWorn[1] * 0.9, COL.clothWorn[2] * 0.9);
-      b.cyl(sh[0], sh[2], 0.005 * rk, 0.062 * rk, sh[1] - 0.03, sh[1] + 0.03, 6, { caps: true, uvScale: 3 });
+      b.cyl(sh[0], sh[2], 0.005 * rk, 0.078 * rk, sh[1] - 0.03, sh[1] + 0.03, 6, { caps: true, uvScale: 3 });
 
       // upper arm — sleeve coloured, tapered
       b.setJoint(arJ);
       b.setColor(COL.sleeve[0], COL.sleeve[1], COL.sleeve[2]);
-      limbDown(b, ar[0], ar[1], ar[2], REACH[arJ === J.armL ? 'armL' : 'armR'] * hsc, 0.052 * rk, 0.043 * rk);
+      limbDown(b, ar[0], ar[1], ar[2], REACH[arJ === J.armL ? 'armL' : 'armR'] * hsc, 0.068 * rk, 0.056 * rk);
 
       // forearm — sleeve for the top third, bare grimy skin below (rolled cuff)
       b.setJoint(faJ);
       const faLen = REACH[faJ === J.foreArmL ? 'foreArmL' : 'foreArmR'] * hsc;
       b.setColor(COL.sleeveDark[0], COL.sleeveDark[1], COL.sleeveDark[2]);
-      limbDown(b, fa[0], fa[1], fa[2], faLen * 0.4, 0.043 * rk, 0.038 * rk);
+      limbDown(b, fa[0], fa[1], fa[2], faLen * 0.4, 0.056 * rk, 0.049 * rk);
       const cuffY = fa[1] - faLen * 0.4;
       b.setColor(COL.skinDark[0], COL.skinDark[1], COL.skinDark[2]);
-      limbDown(b, fa[0], cuffY, fa[2], faLen * 0.6, 0.038 * rk, 0.030 * rk);
+      limbDown(b, fa[0], cuffY, fa[2], faLen * 0.6, 0.049 * rk, 0.039 * rk);
 
       // hand — palm paddle + three splayed clawed fingers, reaching
       b.setJoint(haJ);
       b.setColor(COL.skinDark[0], COL.skinDark[1], COL.skinDark[2]);
-      ob(b, ha[0], ha[1] - 0.035, ha[2] - 0.01, 0.032 * rk, 0.045, 0.014, 0, 0, 0, {});
+      ob(b, ha[0], ha[1] - 0.035, ha[2] - 0.01, 0.042 * rk, 0.052, 0.020, 0, 0, 0, {});
       for (let i = 0; i < 3; i++) {
         const spread = (i - 1) * 0.34;
         const fx = ha[0] + spread * 0.045;
-        ob(b, fx, ha[1] - 0.085, ha[2] - 0.045, 0.010 * rk, 0.032, 0.010, 0.55 + spread * 0.3, spread * 0.5, spread * 0.2, {});
+        ob(b, fx, ha[1] - 0.090, ha[2] - 0.048, 0.014 * rk, 0.044, 0.014, 0.55 + spread * 0.3, spread * 0.5, spread * 0.2, {});
       }
+      // thumb, angled off the side — without it the hand ended in a paddle
+      ob(b, ha[0] + (L ? -0.036 : 0.036) * rk, ha[1] - 0.062, ha[2] - 0.020,
+        0.013 * rk, 0.034, 0.013, 0.30, 0, (L ? -0.7 : 0.7), {});
     }
 
     function leg(side) {
@@ -454,23 +457,23 @@
       b.setJoint(lgJ);
       b.setColor(COL.trouser[0], COL.trouser[1], COL.trouser[2]);
       const thighLen = REACH[lgJ === J.legL ? 'legL' : 'legR'] * hsc;
-      limbDown(b, lg[0], lg[1], lg[2], thighLen, 0.062 * rk, 0.050 * rk);
+      limbDown(b, lg[0], lg[1], lg[2], thighLen, 0.078 * rk, 0.063 * rk);
 
       // shin — trouser top, leather boot bottom
       b.setJoint(shJ);
       const shinLen = REACH[shJ === J.shinL ? 'shinL' : 'shinR'] * hsc;
       b.setColor(COL.trouserDark[0], COL.trouserDark[1], COL.trouserDark[2]);
-      limbDown(b, sh[0], sh[1], sh[2], shinLen * 0.55, 0.050 * rk, 0.042 * rk);
+      limbDown(b, sh[0], sh[1], sh[2], shinLen * 0.55, 0.063 * rk, 0.053 * rk);
       const bootY = sh[1] - shinLen * 0.55;
       b.setColor(COL.leather[0], COL.leather[1], COL.leather[2]);
-      limbDown(b, sh[0], bootY, sh[2], shinLen * 0.45, 0.044 * rk, 0.040 * rk);
+      limbDown(b, sh[0], bootY, sh[2], shinLen * 0.45, 0.055 * rk, 0.050 * rk);
 
       // boot — wedge extending forward, dark sole
       b.setJoint(ftJ);
       b.setColor(COL.leatherHi[0], COL.leatherHi[1], COL.leatherHi[2]);
-      box(b, ft[0] - 0.044 * rk, ft[1] - 0.032, ft[2] - 0.20 * rk, ft[0] + 0.044 * rk, ft[1] + 0.048, ft[2] + 0.045 * rk, null);
+      box(b, ft[0] - 0.058 * rk, ft[1] - 0.032, ft[2] - 0.20 * rk, ft[0] + 0.058 * rk, ft[1] + 0.059, ft[2] + 0.050 * rk, null);
       b.setColor(COL.leatherHi[0] * 0.55, COL.leatherHi[1] * 0.55, COL.leatherHi[2] * 0.55);
-      box(b, ft[0] - 0.046 * rk, ft[1] - 0.045, ft[2] - 0.205 * rk, ft[0] + 0.046 * rk, ft[1] - 0.028, ft[2] + 0.05 * rk, null);
+      box(b, ft[0] - 0.066 * rk, ft[1] - 0.048, ft[2] - 0.212 * rk, ft[0] + 0.066 * rk, ft[1] - 0.028, ft[2] + 0.056 * rk, null);
     }
 
     function stump(joint, at, dir) {
@@ -606,7 +609,7 @@
       const asym = (side === 'L' ? -1 : 1) * P.armAsym;
       add(rot, sh, 0, 0, (side === 'L' ? 1 : -1) * P.shoulderDroop * 0.5);
       add(rot, ar, swingFwd((58 + P.reachBias) * reachAmt) + asym * 0.3, 0, rollOut(side, 14 * reachAmt));
-      add(rot, fa, swingFwd(48 * reachAmt), 0, 0);
+      add(rot, fa, swingFwd(10 + 38 * reachAmt), 0, 0);
     }
   }
 
@@ -666,25 +669,27 @@
   //  fn(...,phase=0,...) approx== fn(...,phase=1,...); see animDuration().
   // -------------------------------------------------------------------------
   function animShamble(rot, ph, lt, params, P, rootExtra) {
-    basePose(rot, P, 1);
+    // Arms hang heavy. rollOut() scales with this, so a high value here reads
+    // as a T-pose from across the room; reaching belongs to run and attack.
+    basePose(rot, P, 0.20);
     legCycle(rot, ph, 20, 34, P, 3.5);
     rootExtra[1] += -0.012 + 0.012 * sin(ph * TAU * 2 - 0.6);
     rootExtra[0] += 0.012 * sin(ph * TAU) * P.yawWobble;
     add(rot, J.chest, 0, 0.05 * sin(ph * TAU) * P.yawWobble, 0);
     add(rot, J.spine, 0, -0.03 * sin(ph * TAU), 0);
     // small idle arm sway so the reach never looks perfectly frozen
-    add(rot, J.armL, swingFwd(4 * sin(ph * TAU * 2 + 1)));
-    add(rot, J.armR, swingFwd(4 * sin(ph * TAU * 2 + 1 + PI)));
+    add(rot, J.armL, swingFwd(7 * sin(ph * TAU * 2 + 1)));
+    add(rot, J.armR, swingFwd(7 * sin(ph * TAU * 2 + 1 + PI)));
   }
 
   function animWalk(rot, ph, lt, params, P, rootExtra) {
-    basePose(rot, P, 0.9);
+    basePose(rot, P, 0.35);
     legCycle(rot, ph, 26, 40, P, 4.5);
     rootExtra[1] += -0.016 + 0.016 * sin(ph * TAU * 2 - 0.6);
     rootExtra[0] += 0.014 * sin(ph * TAU) * P.yawWobble;
     add(rot, J.chest, 0, 0.07 * sin(ph * TAU) * P.yawWobble, 0);
-    add(rot, J.armL, swingFwd(7 * sin(ph * TAU * 2 + 1)));
-    add(rot, J.armR, swingFwd(7 * sin(ph * TAU * 2 + 1 + PI)));
+    add(rot, J.armL, swingFwd(11 * sin(ph * TAU * 2 + 1)));
+    add(rot, J.armR, swingFwd(11 * sin(ph * TAU * 2 + 1 + PI)));
   }
 
   function animRun(rot, ph, lt, params, P, rootExtra) {
