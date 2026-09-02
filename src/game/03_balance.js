@@ -63,7 +63,11 @@
     // Math.max(damageCooldownMin, damageCooldown - (crowd - 1) * 0.035)).
     // 0.176s = 0.55 * damageCooldown: fast enough that a real swarm is
     // dangerous, slow enough that every individual hit is still reactable
-    // (roughly in line with typical human visual-reaction-time floors).
+    // This floor is NOT reactable and is not meant to be: at crowd >= 6 two
+    // lethal hits can land ~176 ms apart, inside simple visual reaction time.
+    // Being surrounded by six is a positioning failure, and the game's answer
+    // to it is that you should not have let it happen — the skill test is
+    // avoiding the corner, not escaping it.
     // This makes that ratio an explicit, named, designer-tunable balance
     // constant instead of a magic 0.55 living only in 16_player.js's
     // fallback expression — no behavioural change from what was already
@@ -164,10 +168,12 @@
   // --- Zombie movement speed -----------------------------------------------
   // Four hand-authored tiers, linearly interpolated across each tier's round
   // span so the transition feels continuous rather than stepped. The R13+
-  // sprint tier is a HARD CAP at 4.6 m/s — deliberately, permanently below
-  // the player's 5.6 m/s sprint (B.PLAYER.speedSprint). This is load-bearing:
-  // it is what keeps "training" (running a kiting loop) a viable strategy at
-  // every round of the game, forever, by design. See balance.md Edge Cases.
+  // sprint tier is a HARD CAP at 4.35 m/s. The number that matters is not the
+  // player's 5.6 m/s sprint burst — sprint is a stamina resource and cannot be
+  // held — but the speed they can sustain indefinitely, B.sustainedPlayerSpeed()
+  // at 4.63 m/s. The cap sits permanently below that. This is load-bearing: it
+  // is what keeps "training" (running a kiting loop) viable at every round of
+  // the game, forever, by design. See balance.md Edge Cases.
   const ZOMBIE_SPEED_TIERS = [
     { from: 1, to: 5, name: 'shamble', v0: 1.0, v1: 1.4 },        // R1-4: slow shamble
     { from: 5, to: 9, name: 'walk', v0: 1.9, v1: 2.6 },           // R5-8: brisk walk

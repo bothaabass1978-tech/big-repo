@@ -1030,6 +1030,30 @@
     trenchgun: 'trench_gun', browning: 'm1919', flamethrower: 'm2_flamethrower',
   };
 
+  // Vertex colours on gun meshes are MODULATION, not albedo.
+  //
+  // World brushes leave vCol at 1.0 and take their albedo entirely from
+  // texture x tint; the shader multiplies all three. gun_metal's texture x
+  // tint already lands at 0.237 — about right for blued steel on its own — so
+  // feeding it the palette's absolute-albedo values (COL.blued at 0.105)
+  // multiplied it down to 0.028 and the weapon rendered as a black cut-out.
+  // These are the same palette relationships expressed as multipliers around
+  // the material, so the parts still separate but the gun sits where the
+  // material says it should.
+  const G = {
+    // Near-neutral: gun_metal's own tint already leans blue, so tinting these
+    // blue as well stacked into a weapon that read as cold plastic.
+    blued: [0.70, 0.68, 0.66],
+    metalDark: [0.88, 0.86, 0.84],
+    metal: [1.18, 1.16, 1.14],
+    metalHi: [1.62, 1.60, 1.56],
+    brass: [1.35, 1.05, 0.48],
+    wood: [1.00, 0.92, 0.82],
+    woodDark: [0.66, 0.58, 0.50],
+    sleeve: [0.72, 0.80, 0.66],
+    glove: [0.46, 0.40, 0.34],
+  };
+
   function buildGun(id, spec) {
     const b = Z.Mesh.builder();
     const s = spec;
@@ -1039,7 +1063,7 @@
     const muzzleZ = zFront - bl;
 
     // --- receiver ---------------------------------------------------------
-    b.setColor(COL.blued[0], COL.blued[1], COL.blued[2]);
+    b.setColor(G.blued[0], G.blued[1], G.blued[2]);
     b.box([-rw, -rh * 0.45, zFront], [rw, rh * 0.55, zBack], { uvScale: 3 });
 
     // --- barrel -----------------------------------------------------------
@@ -1050,76 +1074,76 @@
     } else {
       tubeZ(b, 0, barrelY, zFront, muzzleZ, br, 8);
       if (s.muzzleBrake) {
-        b.setColor(COL.metalHi[0], COL.metalHi[1], COL.metalHi[2]);
+        b.setColor(G.metalHi[0], G.metalHi[1], G.metalHi[2]);
         tubeZ(b, 0, barrelY, muzzleZ + 0.06, muzzleZ - 0.03, br * 2.1, 8);
-        b.setColor(COL.blued[0], COL.blued[1], COL.blued[2]);
+        b.setColor(G.blued[0], G.blued[1], G.blued[2]);
       }
     }
 
     // --- heat shield / handguard ------------------------------------------
     if (s.heatShield) {
-      b.setColor(COL.blued[0], COL.blued[1], COL.blued[2]);
+      b.setColor(G.blued[0], G.blued[1], G.blued[2]);
       tubeZ(b, 0, barrelY, zFront - 0.03, zFront - bl * 0.62, br * 1.9, 8);
-      b.setColor(COL.blued[0], COL.blued[1], COL.blued[2]);
+      b.setColor(G.blued[0], G.blued[1], G.blued[2]);
     }
 
     // --- foregrip / handguard ---------------------------------------------
     if (s.fore === 'wood') {
-      b.setColor(COL.wood[0], COL.wood[1], COL.wood[2]);
+      b.setColor(G.wood[0], G.wood[1], G.wood[2]);
       b.box([-rw * 0.95, -rh * 0.55, zFront - bl * 0.68], [rw * 0.95, rh * 0.30, zFront + 0.01], { uvScale: 3 });
-      b.setColor(COL.blued[0], COL.blued[1], COL.blued[2]);
+      b.setColor(G.blued[0], G.blued[1], G.blued[2]);
     } else if (s.fore === 'grip') {
-      b.setColor(COL.metalDark[0], COL.metalDark[1], COL.metalDark[2]);
+      b.setColor(G.metalDark[0], G.metalDark[1], G.metalDark[2]);
       b.obox(0, -rh * 0.55 - 0.05, zFront - bl * 0.35, rw * 0.5, 0.055, 0.022, 0, 0.18, 0, { uvScale: 4 });
-      b.setColor(COL.blued[0], COL.blued[1], COL.blued[2]);
+      b.setColor(G.blued[0], G.blued[1], G.blued[2]);
     } else if (s.fore === 'pump') {
-      b.setColor(COL.wood[0], COL.wood[1], COL.wood[2]);
+      b.setColor(G.wood[0], G.wood[1], G.wood[2]);
       b.box([-rw * 0.9, -rh * 0.75, zFront - bl * 0.60], [rw * 0.9, -rh * 0.10, zFront - bl * 0.22], { uvScale: 4 });
-      b.setColor(COL.blued[0], COL.blued[1], COL.blued[2]);
+      b.setColor(G.blued[0], G.blued[1], G.blued[2]);
     }
     if (s.foreVertical) {
-      b.setColor(COL.wood[0], COL.wood[1], COL.wood[2]);
+      b.setColor(G.wood[0], G.wood[1], G.wood[2]);
       b.box([-rw * 0.7, -rh * 0.55 - 0.10, zFront - bl * 0.42], [rw * 0.7, -rh * 0.45, zFront - bl * 0.22], { uvScale: 4 });
-      b.setColor(COL.blued[0], COL.blued[1], COL.blued[2]);
+      b.setColor(G.blued[0], G.blued[1], G.blued[2]);
     }
 
     // --- grip -------------------------------------------------------------
     b.setColor(s.stock === 'rifle' ? 0.55 : 0.28, s.stock === 'rifle' ? 0.36 : 0.28, s.stock === 'rifle' ? 0.20 : 0.30);
     b.obox(0, -rh * 0.45 - 0.055, zBack - 0.035, rw * 0.72, 0.062, 0.026, 0, -0.34, 0, { uvScale: 4 });
-    b.setColor(COL.blued[0], COL.blued[1], COL.blued[2]);
+    b.setColor(G.blued[0], G.blued[1], G.blued[2]);
 
     // --- stock ------------------------------------------------------------
     if (s.stock === 'rifle') {
-      b.setColor(COL.wood[0], COL.wood[1], COL.wood[2]);
+      b.setColor(G.wood[0], G.wood[1], G.wood[2]);
       b.box([-rw * 0.85, -rh * 0.75, zBack], [rw * 0.85, rh * 0.45, zBack + 0.20], { uvScale: 3 });
       b.obox(0, -rh * 0.30, zBack + 0.28, rw * 0.85, 0.055, 0.085, 0, 0.10, 0, { uvScale: 3 });
-      b.setColor(COL.blued[0], COL.blued[1], COL.blued[2]);
+      b.setColor(G.blued[0], G.blued[1], G.blued[2]);
     } else if (s.stock === 'folding') {
       // the MP40's underfolder — thin steel struts, unmistakable in silhouette
-      b.setColor(COL.metal[0], COL.metal[1], COL.metal[2]);
+      b.setColor(G.metal[0], G.metal[1], G.metal[2]);
       b.box([-rw * 0.75, -rh * 0.9, zBack], [-rw * 0.55, -rh * 0.72, zBack + 0.20], { uvScale: 5 });
       b.box([rw * 0.55, -rh * 0.9, zBack], [rw * 0.75, -rh * 0.72, zBack + 0.20], { uvScale: 5 });
       b.box([-rw * 0.8, -rh * 1.0, zBack + 0.20], [rw * 0.8, -rh * 0.66, zBack + 0.24], { uvScale: 5 });
-      b.setColor(COL.blued[0], COL.blued[1], COL.blued[2]);
+      b.setColor(G.blued[0], G.blued[1], G.blued[2]);
     } else if (s.stock === 'wire') {
-      b.setColor(COL.metal[0], COL.metal[1], COL.metal[2]);
+      b.setColor(G.metal[0], G.metal[1], G.metal[2]);
       b.box([-rw * 0.7, -rh * 0.2, zBack], [-rw * 0.5, 0, zBack + 0.22], { uvScale: 5 });
       b.box([rw * 0.5, -rh * 0.2, zBack], [rw * 0.7, 0, zBack + 0.22], { uvScale: 5 });
-      b.setColor(COL.blued[0], COL.blued[1], COL.blued[2]);
+      b.setColor(G.blued[0], G.blued[1], G.blued[2]);
     } else if (s.stock === 'grip') {
-      b.setColor(COL.blued[0], COL.blued[1], COL.blued[2]);
+      b.setColor(G.blued[0], G.blued[1], G.blued[2]);
       b.obox(0, -rh * 0.45 - 0.05, zBack + 0.06, rw * 0.6, 0.055, 0.024, 0, -0.30, 0, { uvScale: 4 });
-      b.setColor(COL.blued[0], COL.blued[1], COL.blued[2]);
+      b.setColor(G.blued[0], G.blued[1], G.blued[2]);
     }
 
     // --- magazine ---------------------------------------------------------
     const magZ = zFront + rl * 0.35;
     const magTop = -rh * 0.42;
     if (s.mag === 'stick') {
-      b.setColor(COL.metalDark[0], COL.metalDark[1], COL.metalDark[2]);
+      b.setColor(G.metalDark[0], G.metalDark[1], G.metalDark[2]);
       b.box([-rw * 0.42, magTop - s.ml, magZ - 0.028], [rw * 0.42, magTop, magZ + 0.028], { uvScale: 4 });
     } else if (s.mag === 'curved') {
-      b.setColor(COL.metalDark[0], COL.metalDark[1], COL.metalDark[2]);
+      b.setColor(G.metalDark[0], G.metalDark[1], G.metalDark[2]);
       // approximate the banana curve with three tilted segments
       for (let i = 0; i < 3; i++) {
         const f = i / 3;
@@ -1127,47 +1151,47 @@
           rw * 0.40, s.ml * 0.19, 0.026, 0, 0, 0, { uvScale: 4 });
       }
     } else if (s.mag === 'drum') {
-      b.setColor(COL.metalDark[0], COL.metalDark[1], COL.metalDark[2]);
+      b.setColor(G.metalDark[0], G.metalDark[1], G.metalDark[2]);
       // Thompson drum — a fat disc under the receiver, the whole silhouette
       b.cyl(0, magZ, 0.085, 0.085, magTop - 0.17, magTop - 0.01, 12, { uvScale: 4, caps: true });
     } else if (s.mag === 'box') {
-      b.setColor(COL.metalDark[0], COL.metalDark[1], COL.metalDark[2]);
+      b.setColor(G.metalDark[0], G.metalDark[1], G.metalDark[2]);
       b.box([-rw * 0.55, magTop - s.ml, magZ - 0.040], [rw * 0.55, magTop, magZ + 0.040], { uvScale: 4 });
     } else if (s.mag === 'side') {
-      b.setColor(COL.metalDark[0], COL.metalDark[1], COL.metalDark[2]);
+      b.setColor(G.metalDark[0], G.metalDark[1], G.metalDark[2]);
       b.box([-rw - s.ml * 0.8, -rh * 0.15, magZ - 0.035], [-rw * 0.6, rh * 0.25, magZ + 0.035], { uvScale: 4 });
     } else if (s.mag === 'pistol') {
-      b.setColor(COL.blued[0], COL.blued[1], COL.blued[2]);
+      b.setColor(G.blued[0], G.blued[1], G.blued[2]);
       b.obox(0, -rh * 0.45 - 0.055, zBack - 0.035, rw * 0.55, 0.058, 0.020, 0, -0.34, 0, { uvScale: 5 });
     } else if (s.mag === 'tube') {
-      b.setColor(COL.metalDark[0], COL.metalDark[1], COL.metalDark[2]);
+      b.setColor(G.metalDark[0], G.metalDark[1], G.metalDark[2]);
       tubeZ(b, 0, -rh * 0.55, zFront - 0.02, zFront - s.ml, br * 1.15, 7);
     }
-    b.setColor(COL.blued[0], COL.blued[1], COL.blued[2]);
+    b.setColor(G.blued[0], G.blued[1], G.blued[2]);
 
     // --- distinctive extras ------------------------------------------------
     if (s.bolt) {
       // Kar98k turned-down bolt handle — reads instantly
-      b.setColor(COL.blued[0], COL.blued[1], COL.blued[2]);
+      b.setColor(G.blued[0], G.blued[1], G.blued[2]);
       b.box([rw, rh * 0.05, zBack - 0.10], [rw + 0.055, rh * 0.20, zBack - 0.065], { uvScale: 5 });
       b.obox(rw + 0.055, rh * 0.02, zBack - 0.083, 0.018, 0.018, 0.018, 0, 0, 0, { uvScale: 5 });
     }
     if (s.slide) {
-      b.setColor(COL.metalDark[0], COL.metalDark[1], COL.metalDark[2]);
+      b.setColor(G.metalDark[0], G.metalDark[1], G.metalDark[2]);
       b.box([-rw * 1.06, rh * 0.10, zFront - 0.02], [rw * 1.06, rh * 0.62, zBack], { uvScale: 5 });
     }
     if (s.cylinder) {
-      b.setColor(COL.blued[0], COL.blued[1], COL.blued[2]);
+      b.setColor(G.blued[0], G.blued[1], G.blued[2]);
       b.cyl(0, zFront + rl * 0.42, 0.030, 0.030, -rh * 0.18, rh * 0.30, 8, { uvScale: 5 });
     }
     if (s.bipod) {
-      b.setColor(COL.metalDark[0], COL.metalDark[1], COL.metalDark[2]);
+      b.setColor(G.metalDark[0], G.metalDark[1], G.metalDark[2]);
       const bz = zFront - bl * 0.80;
       b.obox(-0.035, -rh * 0.55 - 0.07, bz, 0.008, 0.075, 0.008, 0, 0, 0.30, { uvScale: 6 });
       b.obox(0.035, -rh * 0.55 - 0.07, bz, 0.008, 0.075, 0.008, 0, 0, -0.30, { uvScale: 6 });
     }
     if (s.belt) {
-      b.setColor(COL.brass[0], COL.brass[1], COL.brass[2]);
+      b.setColor(G.brass[0], G.brass[1], G.brass[2]);
       b.box([-rw * 1.4, -rh * 0.5, zFront + rl * 0.3], [-rw * 0.9, -rh * 0.1, zFront + rl * 0.6], { uvScale: 5 });
     }
     if (s.shield) {
@@ -1181,7 +1205,7 @@
       b.cyl(0.05, zBack + 0.16, 0.055, 0.055, -0.06, 0.16, 9, { uvScale: 4 });
     }
     if (s.rocket) {
-      b.setColor(COL.woodDark[0], COL.woodDark[1], COL.woodDark[2]);
+      b.setColor(G.woodDark[0], G.woodDark[1], G.woodDark[2]);
       b.cyl(0, muzzleZ + 0.10, 0.038, 0.020, -0.02, 0.02, 8, { uvScale: 4 });
       b.setColor(0.168, 0.176, 0.160);
       tubeZ(b, 0, barrelY, zFront, muzzleZ, br, 10);
@@ -1202,15 +1226,15 @@
       b.setColor(COL.glowGreen[0], COL.glowGreen[1], COL.glowGreen[2]);
       b.cyl(0, zFront - 0.02, 0.026, 0.026, -0.012, 0.012, 8, { uvScale: 3 });
       b.setEmissive(0);
-      b.setColor(COL.blued[0], COL.blued[1], COL.blued[2]);
+      b.setColor(G.blued[0], G.blued[1], G.blued[2]);
     }
     if (s.sights !== 'none') {
-      b.setColor(COL.metal[0], COL.metal[1], COL.metal[2]);
+      b.setColor(G.metal[0], G.metal[1], G.metal[2]);
       b.box([-0.006, rh * 0.55, zFront - bl * 0.94], [0.006, rh * 0.55 + 0.016, zFront - bl * 0.90], { uvScale: 6 });
       b.box([-0.016, rh * 0.55, zBack - 0.055], [0.016, rh * 0.55 + 0.014, zBack - 0.035], { uvScale: 6 });
     }
     if (s.scope) {
-      b.setColor(COL.metalDark[0], COL.metalDark[1], COL.metalDark[2]);
+      b.setColor(G.metalDark[0], G.metalDark[1], G.metalDark[2]);
       b.cyl(0, zFront + rl * 0.35, 0.024, 0.024, rh * 0.55, rh * 0.55, 9, { uvScale: 4 });
       tubeZ(b, 0, rh * 0.62, zFront + rl * 0.55, zFront + rl * 0.05, 0.024, 9);
     }
@@ -1259,21 +1283,21 @@
     // right forearm coming in from the lower right toward the grip
     let m = Z.M.m4.create();
     Z.M.m4.compose(m, 0.075, -0.20, 0.16, 0.30, -0.95, 0, 1, 1, 1);
-    b.setColor(COL.sleeve[0], COL.sleeve[1], COL.sleeve[2]);
+    b.setColor(G.sleeve[0], G.sleeve[1], G.sleeve[2]);
     b.setTransform(m);
     b.limb(0.30, 0.048, 0.038, { sides: 7 });
     b.setTransform(null);
     // right hand
-    b.setColor(COL.glove[0], COL.glove[1], COL.glove[2]);
+    b.setColor(G.glove[0], G.glove[1], G.glove[2]);
     b.obox(0.028, -0.083, -0.010, 0.036, 0.028, 0.052, 0.10, -0.15, 0, { uvScale: 4 });
     // left forearm reaching across to the foregrip
     m = Z.M.m4.create();
     Z.M.m4.compose(m, -0.13, -0.22, 0.02, -0.42, -0.80, 0, 1, 1, 1);
-    b.setColor(COL.sleeve[0], COL.sleeve[1], COL.sleeve[2]);
+    b.setColor(G.sleeve[0], G.sleeve[1], G.sleeve[2]);
     b.setTransform(m);
     b.limb(0.32, 0.046, 0.036, { sides: 7 });
     b.setTransform(null);
-    b.setColor(COL.glove[0], COL.glove[1], COL.glove[2]);
+    b.setColor(G.glove[0], G.glove[1], G.glove[2]);
     b.obox(-0.030, -0.088, -0.175, 0.034, 0.026, 0.050, -0.12, 0.10, 0, { uvScale: 4 });
     b.shadeBy((x, y) => 0.68 + 0.32 * Z.M.clamp01((y + 0.30) / 0.35));
     return b.finish('hands');

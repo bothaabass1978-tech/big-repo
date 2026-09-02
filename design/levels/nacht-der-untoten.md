@@ -85,6 +85,7 @@ hanging in mid-air with no navigation node beneath it.
 | BAR | 1800 | west wall upper, z −5.6 | help |
 | Thompson | 1200 | west wall, catwalk, z 2.4 | catwalk |
 | Sawed-Off Shotgun | 1200 | east wall upper, z −3.2 | east_up |
+| Trench Gun | 1500 | north wall upper, x 5.8 | east_up |
 | **Debris — west stair** | **1000** | south end of the west wall | main |
 | **Debris — east stair** | **1000** | north end of the east wall | ne |
 

@@ -31,7 +31,7 @@ they keep moving. Two numbers do almost all of the emotional work:
 - **The 2-hit rule**: an un-perked player survives exactly two zombie hits.
   This is what makes the opening rounds tense despite zombies being slow —
   panic and bad positioning kill you, not raw stats.
-- **The 5.6 vs 4.6 m/s gap**: the player's sprint is *always* faster than the
+- **The 4.63 vs 4.35 m/s gap**: the speed a player can *sustain* is always faster than the
   fastest zombie, at every round, forever. This is what makes "training"
   (running an endless kiting loop around the map) a permanently valid
   strategy rather than something that stops working past round 20 — the
@@ -53,7 +53,7 @@ over body shots (100 and 130 vs 60).
   be alive/chasing at once regardless of how many are still queued to spawn.
 - Zombie movement speed rises in four discrete-but-interpolated tiers
   (shamble -> walk -> jog -> sprint) and is **permanently capped** at
-  4.6 m/s from round 13 onward — always below the player's 5.6 m/s sprint.
+  4.35 m/s from round 13 onward — always below the 4.63 m/s a player can sustain.
 - Spawn delay (time between individual zombie spawns) shrinks from 2.0s to a
   0.2s floor by round 20, and holds there.
 
@@ -68,7 +68,7 @@ over body shots (100 and 130 vs 60).
 - Start with 500 points and an M1911 (no dedicated wall buy for it in Nacht
   — ammo comes from Max Ammo or the box).
 - Wall guns: Kar98k 200, M1A1 Carbine 600, Gewehr 43 600, Double-Barrelled
-  Shotgun 1200, Sawed-Off 1200, Thompson 1200, BAR 1800.
+  Shotgun 1200, Sawed-Off 1200, Thompson 1200, Trench Gun 1500, BAR 1800.
 - Stielhandgranate (grenade refill): 250, capped at 4 carried.
 - Ammo-only wall buy = half the weapon's wall cost, rounded.
 - Mystery Box: 950/spin, flat for the entire game (no escalation).
@@ -149,13 +149,13 @@ Four tiers, each linearly interpolated across its own round span:
 | shamble | 1-4 | 1.0 -> 1.4 |
 | walk | 5-8 | 1.9 -> 2.6 |
 | jog | 9-12 | 3.2 -> 3.9 |
-| sprint | 13+ | 4.6 (flat) |
+| sprint | 13+ | 4.35 (flat) |
 
 ```
 pos(r, tier) = clamp01((r - tier.from) / (tier.to - tier.from - 1))
 speed(r)     = lerp(tier.v0, tier.v1, pos(r, tier))
 ```
-**The sprint cap (4.6 m/s) is a hard, permanent ceiling — it never rises
+**The sprint cap (4.35 m/s) is a hard, permanent ceiling — it never rises
 past round 13.** This is deliberately, permanently below
 `B.PLAYER.speedSprint` (5.6 m/s). That 1.0 m/s gap is what the entire "kite
 forever" promise of the game is built on: no matter how far into a run a
@@ -163,7 +163,8 @@ player gets, sustained sprinting in a straight line always outpaces the
 fastest zombie. `B.validate()` asserts this gap exists on every call.
 `B.zombieSpeedSpread` (0.85-1.15x, sampled per-zombie at spawn) keeps a
 horde looking ragged instead of a single marching wall, without threatening
-the cap (max effective individual speed is 4.6 * 1.15 = 5.29 m/s, *still*
+the cap (the sprint tier uses the downward-only band, so max effective
+individual speed is 4.35 * 1.0 = 4.35 m/s, *still*
 below 5.6 — see Edge Cases).
 
 ### Points — `B.awardForDamage(dmg, killed, hitZone, weaponClass)`
@@ -203,11 +204,11 @@ hits. See the full table below.
   silently stop working past round 1.
 - **Zombie speed spread vs. the sprint cap.** At round 13+, an individual
   zombie's speed can be boosted by up to `zombieSpeedSpread.max` (1.15x),
-  giving a worst-case instantaneous speed of 4.6 * 1.15 = 5.29 m/s — still
+  giving a worst-case instantaneous speed of 4.35 * 1.0 = 4.35 m/s — still
   under the player's 5.6 m/s sprint, but only by ~0.3 m/s. Any future change
   to either the sprint cap, the spread range, or player sprint speed MUST
   re-verify this margin; `B.validate()` currently only checks the
-  unmodified 4.6 m/s tier speed, not the worst-case spread. Flagged as a
+  unmodified 4.35 m/s tier speed, not the worst-case spread. Flagged as a
   balance risk below.
 - **Bolt-action rifles crossing over *later* than the most expensive wall
   gun.** The Kar98k (200 pts) has a longer one-shot-headshot window (round
@@ -259,7 +260,7 @@ hits. See the full table below.
 | `HEALTH_R9` / the `*1.1` compounding rate | `roundHealth` | Shifts every weapon's crossover round earlier (harder) or later (easier) |
 | `ROUND_COUNT_TABLE` (r1-10) + the `9n + 0.15n²` ramp | `roundZombieCount` | Round length / horde pressure |
 | `SPAWN_DELAY_START` / `SPAWN_DELAY_FLOOR` / `SPAWN_DELAY_ROUNDS` | `spawnDelay` | How fast the game escalates from a slow trickle to a firehose |
-| `ZOMBIE_SPEED_TIERS` (esp. the 4.6 sprint cap) | `zombieSpeedTier` | **Load-bearing** — any increase toward or past 5.6 breaks kiting as a strategy at high rounds |
+| `ZOMBIE_SPEED_TIERS` (esp. the 4.35 sprint cap) | `zombieSpeedTier` | **Load-bearing** — any increase toward or past 4.63 breaks kiting as a strategy at high rounds |
 | `zombieSpeedSpread` | horde raggedness | Wider spread = more readable individual threats but risks the sprint-cap margin (see Edge Cases) |
 | Per-weapon `damage` / `headshotMult` | `WEAPONS` | Directly moves that weapon's crossover round; re-run `oneShotCrossoverRound` after any change |
 | `B.BOX.weights` | Mystery Box | Pull odds per weapon; keep Ray Gun rare (currently ~0.5%) |
@@ -323,14 +324,14 @@ report for the full 1-30 table and derivation notes.
 | 10 | 1045 | 33 | 3.43 | 0.672 |
 | 11 | 1150 | 42 | 3.67 | 0.595 |
 | 12 | 1265 | 52 | 3.90 | 0.527 |
-| 13 | 1392 | 61 | 4.60 | 0.467 |
-| 14 | 1531 | 71 | 4.60 | 0.414 |
-| 15 | 1684 | 82 | 4.60 | 0.367 |
-| 16 | 1852 | 92 | 4.60 | 0.325 |
-| 17 | 2037 | 103 | 4.60 | 0.288 |
-| 18 | 2241 | 115 | 4.60 | 0.255 |
-| 19 | 2465 | 126 | 4.60 | 0.226 |
-| 20 | 2712 | 138 | 4.60 | 0.200 |
+| 13 | 1392 | 61 | 4.35 | 0.467 |
+| 14 | 1531 | 71 | 4.35 | 0.414 |
+| 15 | 1684 | 82 | 4.35 | 0.367 |
+| 16 | 1852 | 92 | 4.35 | 0.325 |
+| 17 | 2037 | 103 | 4.35 | 0.288 |
+| 18 | 2241 | 115 | 4.35 | 0.255 |
+| 19 | 2465 | 126 | 4.35 | 0.226 |
+| 20 | 2712 | 138 | 4.35 | 0.200 |
 
 ### Reference: weapon one-shot-headshot crossover rounds
 
@@ -349,7 +350,7 @@ report for the full 1-30 table and derivation notes.
 | STG-44 | — | yes | 180 | 1 |
 | FG42 | — | yes | 220 | 1 |
 | Browning M1919 | — | yes | 260 | 2 |
-| Trench Gun | — | yes | 880 | 8 |
+| Trench Gun | 1500 | yes | 880 | 8 |
 | .357 Magnum | — | yes | 300 | 2 |
 | Springfield | — | yes | 1950 | 16 |
 | PTRS-41 | — | yes | 4500 | 25 |

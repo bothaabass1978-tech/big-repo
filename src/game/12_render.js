@@ -761,10 +761,17 @@
       m4.xformPoint(p, vmView, L.pos);
       vmLights.push({ pos: p, col: L.col, radius: L.radius, intensity: L.intensity });
     }
-    // A dedicated soft key light so the weapon is always legible.
-    // Deliberately dim: the weapon must stay legible without becoming the
-    // brightest thing on screen in a map lit by two failing bulbs.
-    vmLights.push({ pos: [0.42, 0.50, 0.30], col: [0.40, 0.44, 0.55], radius: 3.2, intensity: 0.42 });
+    // Dedicated viewmodel lighting. Two things were wrong with the single dim
+    // key this replaces: it sat at z=+0.30, behind the camera, so it raked the
+    // BACK of a weapon that lives at z=-0.36 and lit almost none of the
+    // surfaces you actually see; and its 0.42 intensity was set when the gun's
+    // albedo was a flat 0.46 grey with a broken specular wash sitting on top
+    // of it. Both of those are fixed, so the intensity is only modestly up.
+    // Key: forward, above and to the gun side, so it rakes across the receiver.
+    vmLights.push({ pos: [0.52, 0.44, -0.60], col: [0.64, 0.62, 0.58], radius: 2.6, intensity: 0.78 });
+    // Cool fill from the opposite side so the far face is separated rather
+    // than merging into the background.
+    vmLights.push({ pos: [-0.46, 0.08, -0.28], col: [0.34, 0.36, 0.42], radius: 2.1, intensity: 0.26 });
     vmSavePos = R.camera.pos;
     R.camera.pos = ORIGIN;
     frameLightsSave = frameLights.slice();
