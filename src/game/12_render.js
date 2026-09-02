@@ -505,8 +505,10 @@
   };
 
   // Transient light for this frame only (muzzle flash, explosion, ray gun).
-  R.addLight = function (pos, col, radius, intensity) {
-    frameLights.push({ pos, col, radius, intensity });
+  // `tag` is optional and lets a light be excluded from a later pass — see the
+  // viewmodel, which must not inherit the camera-anchored fill.
+  R.addLight = function (pos, col, radius, intensity, tag) {
+    frameLights.push({ pos, col, radius, intensity, tag });
   };
 
   const scored = [];
@@ -568,13 +570,26 @@
     const emis = (over && over.emissive !== undefined) ? over.emissive : (mat ? (mat.emissive || 0) : 0);
     gl.uniform1f(prog.u.uEmissive, emis);
     const spec = (over && over.spec !== undefined) ? over.spec : ((mat && mat.spec) || 0);
-    const gloss = (mat && mat.gloss) || 24;
-    gl.uniform2f(prog.u.uSpec, spec, gloss);
+    gl.uniform2f(prog.u.uSpec, spec, specExponent(mat));
     gl.uniform1f(prog.u.uAlphaTest,
       (over && over.alphaTest !== undefined) ? over.alphaTest : ((mat && mat.alphaTest) || 0.0));
     gl.uniform1f(prog.u.uOpacity, (over && over.opacity !== undefined) ? over.opacity : 1);
   }
   const WHITE3 = [1, 1, 1];
+
+  // The shader raises dot(N,H) to this power, so it needs a Phong exponent.
+  // Every material authors `gloss` as a 0..1 glossiness instead — and feeding
+  // 0.14 in as an exponent makes pow(x, 0.14) ~= 1 across the whole surface,
+  // so the specular term stopped being a highlight and became a flat wash
+  // added on top of albedo. That is why dark objects still rendered as pale
+  // slabs no matter how far their vertex colours were pulled down. Map the
+  // authored 0..1 range onto a real exponent; treat anything above 1 as an
+  // exponent already, so a material can still specify one directly.
+  function specExponent(mat) {
+    const g = mat && mat.gloss;
+    if (g === undefined || g === null) return 24;
+    return g > 1 ? g : Math.pow(2, 2 + g * 8);
+  }
 
   R.beginScene = function () {
     Z.GL.bindFbo(sceneFbo);
@@ -737,6 +752,11 @@
     const vmView = m4.view(tmpM, R.camera.pos[0], R.camera.pos[1], R.camera.pos[2],
       R.camera.yaw, R.camera.pitch, R.camera.roll);
     for (const L of frameLights) {
+      // The camera fill light lives AT the camera, which is the origin of
+      // viewmodel space — it would sit inside the weapon at zero distance and
+      // light it at full intensity, washing the gun out to a pale slab. It is
+      // there for nearby world geometry; the viewmodel has its own key below.
+      if (L.tag === 'camfill') continue;
       const p = [0, 0, 0];
       m4.xformPoint(p, vmView, L.pos);
       vmLights.push({ pos: p, col: L.col, radius: L.radius, intensity: L.intensity });

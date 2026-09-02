@@ -504,7 +504,7 @@
     // low intensity so it reads as eye adaptation, not a flashlight.
     const vcam = Z.Render.camera;
     Z.Render.addLight([vcam.pos[0], vcam.pos[1] - 0.10, vcam.pos[2]],
-      [0.62, 0.58, 0.52], 5.4, 0.62);
+      [0.62, 0.58, 0.52], 5.4, 0.62, 'camfill');
 
     Z.Render.beginScene();
     Z.Render.drawWorld();

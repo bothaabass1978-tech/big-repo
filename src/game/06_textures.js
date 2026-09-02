@@ -288,6 +288,14 @@
     opts = opts || {};
     const st = rng(seedN + 8000);
     const count = opts.count === undefined ? 3 : opts.count;
+    // Optional grain-aligned stretch: worn floorboards lighten in a streak
+    // that runs WITH the plank, not as a free-floating round glow. axis
+    // picks the long direction ('u' = horizontal boards, 'v' = vertical);
+    // stretch is the long:short axis ratio (1 = old circular dab, exactly
+    // the previous behaviour, unchanged for every caller that doesn't
+    // opt in -- gun_metal, brick etc. still get round handling wear).
+    const stretch = opts.stretch || 1;
+    const rot = opts.axis === 'v' ? M.TAU * 0.25 : 0;
     ctx.save();
     ctx.globalCompositeOperation = 'screen';
     for (let i = 0; i < count; i++) {
@@ -296,7 +304,16 @@
       const r = size * st.range(0.05, 0.14);
       const a = st.range(0.04, 0.1) * (opts.amount === undefined ? 1 : opts.amount);
       const c = opts.color || [200, 190, 165];
-      dab(ctx, x, y, r, (al) => `rgba(${c[0]},${c[1]},${c[2]},${(al * a).toFixed(3)})`, 'screen');
+      if (stretch === 1) {
+        dab(ctx, x, y, r, (al) => `rgba(${c[0]},${c[1]},${c[2]},${(al * a).toFixed(3)})`, 'screen');
+      } else {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(rot + st.sym(0.15));
+        ctx.scale(stretch, 1 / Math.sqrt(stretch));
+        dab(ctx, 0, 0, r, (al) => `rgba(${c[0]},${c[1]},${c[2]},${(al * a).toFixed(3)})`, 'screen');
+        ctx.restore();
+      }
     }
     ctx.restore();
   }
@@ -402,11 +419,20 @@
       const bh = RNG.hash2(i, seedN);
       const tone = 0.25 + bh * 0.65;
       const rgb = ramp(tone, stops);
-      const jitterAlpha = opts.newness !== undefined ? opts.newness : 1;
+      // "newness" gates how much of the pre-baked warped base layer shows
+      // through the flat per-board fill: 1 = solid opaque board (old
+      // behaviour), lower = weathered wood where the base layer's own
+      // mottling reads through as grain/tonal drift instead of the board
+      // being a dead-flat stripe. Every tileWood() caller gets a little of
+      // this for free now.
+      const newness = opts.newness === undefined ? 0.86 : opts.newness;
+      ctx.save();
+      ctx.globalAlpha = newness;
       ctx.fillStyle = `rgb(${rgb[0] | 0},${rgb[1] | 0},${rgb[2] | 0})`;
       const a0 = i * cross, a1 = (i + 1) * cross;
       if (axis === 'u') ctx.fillRect(0, a0, size, cross);
       else ctx.fillRect(a0, 0, cross, size);
+      ctx.restore();
       // per-board length streaks (grain running along the board's long axis)
       ctx.save();
       ctx.globalCompositeOperation = 'multiply';
@@ -442,21 +468,34 @@
         dab(ctx, rx, ry, cross * st.range(0.8, 1.6), (al) => `rgba(8,7,6,${(al * 0.4).toFixed(3)})`, 'multiply');
       }
     }
-    // gap lines
-    ctx.strokeStyle = gapDark;
-    ctx.lineWidth = opts.gapWidth || 2;
+    // gap lines: dark seam + a thin offset highlight, so each seam reads
+    // as a physical bevel (and gives the Sobel normal map, derived from
+    // this same albedo, an actual edge to bump instead of a flat line).
+    const wob = opts.wobble === undefined ? 1.5 : opts.wobble;
+    const steps = 12;
+    const gw = opts.gapWidth || 2;
     for (let i = 1; i < count; i++) {
       const p = i * cross;
-      ctx.beginPath();
-      const wob = opts.wobble === undefined ? 1.5 : opts.wobble;
-      const steps = 12;
+      const pts = [];
       for (let s = 0; s <= steps; s++) {
         const t = s / steps;
         const w = Math.sin(t * M.TAU * 2 + i) * wob + (RNG.hash2(i * 97 + s, seedN) - 0.5) * wob;
-        if (axis === 'u') { const x = t * size; if (s === 0) ctx.moveTo(x, p + w); else ctx.lineTo(x, p + w); }
-        else { const y = t * size; if (s === 0) ctx.moveTo(p + w, y); else ctx.lineTo(p + w, y); }
+        pts.push(axis === 'u' ? [t * size, p + w] : [p + w, t * size]);
       }
-      ctx.stroke();
+      const strokePath = (offX, offY) => {
+        ctx.beginPath();
+        pts.forEach(([x, y], s) => { if (s === 0) ctx.moveTo(x + offX, y + offY); else ctx.lineTo(x + offX, y + offY); });
+        ctx.stroke();
+      };
+      ctx.strokeStyle = gapDark;
+      ctx.lineWidth = gw;
+      strokePath(0, 0);
+      ctx.save();
+      ctx.globalCompositeOperation = 'screen';
+      ctx.strokeStyle = 'rgba(180,165,140,0.10)';
+      ctx.lineWidth = gw * 0.6;
+      strokePath(axis === 'u' ? 0 : gw * 0.9, axis === 'u' ? gw * 0.9 : 0);
+      ctx.restore();
     }
     // nails: two neat rows per board near each end, dark pinprick + tiny highlight
     if (opts.nails) {
@@ -551,12 +590,14 @@
   function chalkLine(ctx, st, x0, y0, x1, y1, w) {
     ctx.save();
     ctx.globalCompositeOperation = 'lighten';
-    ctx.strokeStyle = 'rgba(225,222,210,0.8)';
+    // Dustier and lower-contrast than a first pass: real chalk on a dark
+    // wall is a soft, thin smudge, not thick white paint.
+    ctx.strokeStyle = 'rgba(210,205,192,0.6)';
     ctx.lineCap = 'round';
     const passes = 3;
     for (let p = 0; p < passes; p++) {
-      ctx.lineWidth = (w || 3) * (0.6 + p * 0.25);
-      ctx.globalAlpha = 0.28 - p * 0.06;
+      ctx.lineWidth = (w || 3) * (0.5 + p * 0.2);
+      ctx.globalAlpha = 0.20 - p * 0.05;
       ctx.beginPath();
       const jx = st.sym(1.2), jy = st.sym(1.2);
       ctx.moveTo(x0 + jx, y0 + jy);
@@ -593,8 +634,8 @@
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
     for (const p of P) { minX = Math.min(minX, p[0]); maxX = Math.max(maxX, p[0]); minY = Math.min(minY, p[1]); maxY = Math.max(maxY, p[1]); }
     const hatches = Math.max(4, Math.round((maxX - minX) / (s * 0.14)));
-    ctx.strokeStyle = 'rgba(210,206,195,0.15)';
-    ctx.lineWidth = s * 0.03;
+    ctx.strokeStyle = 'rgba(200,196,185,0.09)';
+    ctx.lineWidth = s * 0.025;
     for (let i = 0; i < hatches; i++) {
       const t = (i + 0.5) / hatches;
       const x = minX + t * (maxX - minX) + st.sym(s * 0.02);
@@ -614,10 +655,10 @@
   const stopsWoodNew = [[0, [30, 22, 14]], [0.4, [78, 60, 40]], [0.75, [130, 104, 72]], [1, [168, 138, 98]]];
   const stopsPlaster = [[0, [26, 20, 15]], [0.30, [64, 52, 40]], [0.55, [104, 86, 66]], [0.78, [148, 126, 98]], [1, [196, 172, 138]]];
   const stopsBrick = [[0, [18, 12, 10]], [0.3, [58, 28, 20]], [0.6, [104, 52, 36]], [0.85, [130, 68, 46]], [1, [148, 84, 56]]];
-  const stopsConcrete = [[0, [16, 16, 18]], [0.4, [58, 58, 62]], [0.7, [96, 96, 100]], [1, [140, 140, 142]]];
+  const stopsConcrete = [[0, [17, 16, 15]], [0.4, [62, 58, 54]], [0.7, [100, 94, 86]], [1, [146, 138, 126]]];
   const stopsDirt = [[0, [10, 8, 6]], [0.3, [28, 22, 15]], [0.6, [52, 40, 26]], [0.85, [74, 58, 38]], [1, [96, 78, 52]]];
   const stopsRust = [[0, [12, 10, 9]], [0.3, [40, 24, 14]], [0.55, [96, 52, 20]], [0.8, [140, 78, 30]], [1, [172, 104, 42]]];
-  const stopsMetal = [[0, [8, 8, 9]], [0.5, [28, 29, 32]], [0.8, [52, 54, 58]], [1, [78, 80, 84]]];
+  const stopsMetal = [[0, [9, 8, 8]], [0.5, [30, 28, 27]], [0.8, [55, 52, 49]], [1, [82, 78, 73]]];
 
   function tileWood(seedN, size, opts) {
     const c = mkCanvas(size);
@@ -631,7 +672,13 @@
     boards(ctx, size, seedN, opts);
     if (opts.stainAmt) stains(ctx, size, seedN, { count: opts.stainCount || 3, color: [12, 11, 10], alpha: opts.stainAmt });
     scratches(ctx, size, seedN, opts.scratchCount === undefined ? 10 : opts.scratchCount, { maxLen: 0.15 });
-    edgeWear(ctx, size, seedN, { count: 4, color: [190, 172, 140], amount: opts.wear === undefined ? 1 : opts.wear });
+    edgeWear(ctx, size, seedN, {
+      count: opts.wearCount === undefined ? 4 : opts.wearCount,
+      color: [190, 172, 140],
+      amount: opts.wear === undefined ? 1 : opts.wear,
+      axis: opts.axis,
+      stretch: opts.wearStretch || 1,
+    });
     if (opts.ao !== false) dirtAO(ctx, size, { strength: 0.14 });
     grime(ctx, size, seedN, opts.grime === undefined ? 1 : opts.grime);
     forceSeamEdges(c);
@@ -641,7 +688,15 @@
   function makeWoodFloor() {
     const c = tileWood(1, HERO, {
       axis: 'u', count: 8, freq: 2.4, stops: stopsWood, knots: true, rot: true, nails: true,
-      gapColor: 'rgba(4,3,3,0.92)', gapWidth: 2.2, stainAmt: 0.25, stainCount: 4, scratchCount: 14, wear: 1.3, grime: 1,
+      gapColor: 'rgba(4,3,3,0.92)', gapWidth: 2.2, stainAmt: 0.22, stainCount: 4, scratchCount: 16,
+      // The old wear pass was 4 round screen-blend glows dropped anywhere on
+      // the tile -- against a bright base wood at amount 1.3 that IS the
+      // "spilled paper / snow" blotch the brief called out. Stretched hard
+      // along the board axis and toned way down, the same primitive reads
+      // as a walked-in sheen running WITH the grain instead of floating on
+      // top of it.
+      wear: 0.55, wearStretch: 4, wearCount: 5,
+      newness: 0.80, grime: 1,
     });
     return { canvas: c, size: HERO, tile: [true, true], spec: 0.06, gloss: 0.18, emissive: 0, normal: sobelNormal(c, HERO / 2), tint: [1, 1, 1] };
   }
@@ -889,14 +944,21 @@
 
     stains(ctx, size, seedN, { count: 4, color: [40, 32, 22], alpha: 0.22 });
     grime(ctx, size, seedN, 1.1);
-    // baseboard grime: the bottom edge always collects the worst of it
+    // baseboard grime: the bottom edge always collects the worst of it, but
+    // unevenly -- a single flat gradient band read as a smear, not a
+    // wainscot line or damp stain, so vary the rise per column instead.
     ctx.save();
     ctx.globalCompositeOperation = 'multiply';
-    const kick = ctx.createLinearGradient(0, size, 0, size * 0.82);
-    kick.addColorStop(0, 'rgba(10,8,6,0.4)');
-    kick.addColorStop(1, 'rgba(10,8,6,0)');
-    ctx.fillStyle = kick;
-    ctx.fillRect(0, size * 0.82, size, size * 0.18);
+    const kickCols = 40;
+    for (let i = 0; i < kickCols; i++) {
+      const x0 = (i / kickCols) * size, cw = size / kickCols + 1;
+      const h = size * (0.07 + RNG.hash2(i, seedN + 4800) * 0.15);
+      const grad = ctx.createLinearGradient(0, size, 0, size - h);
+      grad.addColorStop(0, 'rgba(10,8,6,0.32)');
+      grad.addColorStop(1, 'rgba(10,8,6,0)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(x0, size - h, cw, h);
+    }
     ctx.restore();
     dirtAO(ctx, size, { strength: 0.14 });
     forceSeamEdges(c);
@@ -1616,70 +1678,17 @@
     forceSeamEdges(c);
     return { canvas: c, size, tile: [true, true], spec: 0.12, gloss: 0.15, emissive: 0, normal: null, tint: [0.66, 0.72, 0.58] };
   }
-  function makeZombieCloth() {
-    const size = PROP, seedN = 35;
-    const c = mkCanvas(size);
-    const ctx = ctx2d(c);
-    const base = baseLayer(size, 48, seedN, { octaves: 4, freq: 4, warpAmt: 0.3, warpFreq: 3, stops: [[0, [22, 24, 20]], [0.5, [48, 52, 42]], [1, [72, 76, 62]] ] });
-    ctx.drawImage(base, 0, 0);
-    // weave
-    ctx.save(); ctx.globalCompositeOperation = 'multiply'; ctx.strokeStyle = 'rgba(15,16,13,0.2)'; ctx.lineWidth = 1;
-    for (let i = 0; i < size; i += 4) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, size); ctx.stroke(); }
-    ctx.restore();
-    // tears: jagged dark slashes with frayed edge marks
-    const st = rng(seedN + 200);
-    for (let i = 0; i < 5; i++) {
-      const x0 = st.f() * size, y0 = st.f() * size, ang = st.f() * M.TAU, len = size * st.range(0.1, 0.25);
-      ctx.save();
-      ctx.strokeStyle = 'rgba(8,8,7,0.7)'; ctx.lineWidth = size * 0.02; ctx.lineCap = 'round';
-      ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x0 + Math.cos(ang) * len, y0 + Math.sin(ang) * len); ctx.stroke();
-      ctx.restore();
-    }
-    // bloodstains
-    stains(ctx, size, seedN, { count: 4, color: [55, 8, 8], alpha: 0.45, minR: 0.05, maxR: 0.15 });
-    grime(ctx, size, seedN, 1.2);
-    forceSeamEdges(c);
-    return { canvas: c, size, tile: [true, true], spec: 0.02, gloss: 0.05, emissive: 0, normal: null, tint: [0.58, 0.60, 0.50] };
-  }
-  function makeZombieFace() {
-    const size = PROP, seedN = 36;
-    const c = mkCanvas(size);
-    const ctx = ctx2d(c);
-    const base = baseLayer(size, 48, seedN, { octaves: 5, freq: 3.5, warpAmt: 0.5, warpFreq: 3, stops: [[0, [26, 30, 22]], [0.4, [55, 62, 46]], [0.7, [80, 86, 64]], [1, [98, 104, 78]]] });
-    ctx.drawImage(base, 0, 0);
-    // layout assumes a simple planar UV: eyes at ~0.35/0.65 x, 0.4 y; mouth ~0.5 y 0.62
-    const st = rng(seedN + 200);
-    ctx.save();
-    for (const ex of [size * 0.35, size * 0.65]) {
-      const grad = ctx.createRadialGradient(ex, size * 0.4, 0, ex, size * 0.4, size * 0.12);
-      grad.addColorStop(0, 'rgba(3,3,3,0.95)');
-      grad.addColorStop(0.6, 'rgba(10,8,8,0.7)');
-      grad.addColorStop(1, 'rgba(10,8,8,0)');
-      ctx.globalCompositeOperation = 'multiply';
-      ctx.fillStyle = grad;
-      ctx.beginPath(); ctx.ellipse(ex, size * 0.4, size * 0.1, size * 0.075, 0, 0, M.TAU); ctx.fill();
-    }
-    ctx.restore();
-    // torn cheek exposing dark red + hint of teeth
-    ctx.save();
-    ctx.fillStyle = 'rgba(60,12,12,0.85)';
-    ctx.beginPath(); ctx.ellipse(size * 0.72, size * 0.6, size * 0.11, size * 0.08, 0.4, 0, M.TAU); ctx.fill();
-    ctx.restore();
-    // jaw / exposed teeth: a row of pale rectangles in the lower mouth region
-    ctx.save();
-    ctx.fillStyle = 'rgba(200,190,160,0.85)';
-    const my = size * 0.62, mw = size * 0.32;
-    for (let i = 0; i < 8; i++) {
-      const tx = size * 0.5 - mw / 2 + i * (mw / 8);
-      ctx.fillRect(tx, my - size * 0.02, mw / 8 - 1, size * 0.05 + (i % 2) * size * 0.015);
-    }
-    ctx.fillStyle = 'rgba(15,5,5,0.85)';
-    ctx.fillRect(size * 0.5 - mw / 2, my + size * 0.03, mw, size * 0.02);
-    ctx.restore();
-    stains(ctx, size, seedN, { count: 3, color: [45, 40, 30], alpha: 0.25 });
-    grime(ctx, size, seedN, 1);
-    return { canvas: c, size, tile: [false, false], spec: 0.12, gloss: 0.15, emissive: 0, normal: null, tint: [0.70, 0.74, 0.62] };
-  }
+  // zombie_cloth and zombie_face removed 2026-09-02: both were fully
+  // generated and registered but never referenced anywhere (repo-wide grep
+  // confirmed zero call sites outside their own definitions) -- pure dead
+  // weight in the atlas and the build. The zombie mesh deliberately uses a
+  // single material ('zombie_skin') for the WHOLE body so a horde stays one
+  // draw call per instance (see 13_models.js, buildZombieMesh's doc
+  // comment) -- wiring these back in as separate per-part materials would
+  // break that batching. If face/cloth detail is wanted later, the right
+  // shape is to fold it INTO zombie_skin as distinct UV regions of one
+  // atlas (coordinate with whoever owns the zombie mesh's UVs), not as
+  // stand-alone materials.
   function makeGunMetal() {
     const size = PROP, seedN = 37;
     const c = mkCanvas(size);
@@ -1921,8 +1930,6 @@
     for (const key of Object.keys(CHALK_GUNS)) { M_['chalk_' + key] = makeChalkGun(key, ci++); }
 
     M_.zombie_skin = makeZombieSkin();
-    M_.zombie_cloth = makeZombieCloth();
-    M_.zombie_face = makeZombieFace();
     M_.gun_metal = makeGunMetal();
     M_.gun_wood = makeGunWood();
     M_.hands = makeHands();

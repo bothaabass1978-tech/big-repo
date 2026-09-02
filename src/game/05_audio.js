@@ -273,16 +273,30 @@
       go(s, t0, t0 + 0.04);
     }
 
-    // (2) resonant body bands
+    // (2) resonant body bands — FIX: a driven resonant bandpass (Q 3-6) takes
+    // several cycles to build to full amplitude no matter how fast the *gain
+    // downstream of it* opens, because the filter itself was being fed
+    // continuous noise for its whole lifetime. Measured: 9.8-12.2 ms average
+    // time-to-peak across the roster, 31-34 ms on the Kar98k/BAR specifically
+    // — both guns' loudest band is simultaneously their lowest frequency and
+    // highest Q, i.e. the slowest possible to ring up — and by the time it
+    // finally did, its resonant overshoot out-peaked the transient click
+    // layer entirely, so the buffer's true peak landed tens of ms in instead
+    // of at the click. Exciting the filter with a hard, brief hit instead of
+    // a sustained tone makes it ring the way a struck resonance actually
+    // does — down from an instant peak — instead of ringing up to one.
     for (let i = 0; i < p.body.length; i++) {
       const b = p.body[i];
       const s = nsrc(c, b.dec + 0.08, 90 + i * 13 + r.i(400));
       const f = filt(c, 'bandpass', b.f, b.q === undefined ? 5 : b.q);
       sweep(f.frequency, t0, b.f * (b.up === undefined ? 1.55 : b.up) * r.range(0.97, 1.03),
             b.f * (b.down === undefined ? 0.72 : b.down), b.dec);
+      const eg = gain(c, 0);
+      s.connect(eg); eg.connect(f);
+      ad(eg.gain, t0 + (b.pre || 0), 0.0003, Math.min(0.006, Math.max(0.002, b.dec * 0.25)), 1.0);
       const g = gain(c, 0);
-      s.connect(f); f.connect(g); g.connect(inp);
-      ad(g.gain, t0 + (b.pre || 0), b.atk || 0.0009, b.dec, b.amt * r.range(0.93, 1.07));
+      f.connect(g); g.connect(inp);
+      ad(g.gain, t0 + (b.pre || 0), 0.0004, b.dec, b.amt * r.range(0.93, 1.07));
       go(s, t0, t0 + b.dec + (b.pre || 0) + 0.1);
     }
 
@@ -594,13 +608,17 @@
     });
   }
 
-  // .45 ACP pistol — sharp, mid, snappy. Small charge, lots of click.
-  gunDef('gun_m1911', 0.55, 0.80, 0.30, {
-    lvl: 0.62, dist: 2.2, preDist: 1.15, clickF: 6100, clickHp: 2900, clickAmt: 0.9,
-    body: [{ f: 860, q: 4.0, dec: 0.075, amt: 0.85 }, { f: 1950, q: 3.2, dec: 0.042, amt: 0.48 }],
-    thump: { f0: 262, f1: 92, dec: 0.062, amt: 0.34 },
-    tail: { lp: 2500, dec: 0.22, amt: 0.24, pre: 0.013 },
-    mech: { t: 0.045, f: 3100, dec: 0.02, amt: 0.16 },
+  // .45 ACP pistol — low, dry, short. Small charge, over almost as soon as
+  // it starts. FIX: measured centroid was within 5.6% of the MP40 and level
+  // within 0.6 dB — a reskin, not a different gun. Pulled the body down and
+  // shortened everything so it reads as the smallest, driest gun in the box
+  // instead of a duller SMG.
+  gunDef('gun_m1911', 0.46, 0.78, 0.24, {
+    lvl: 0.60, dist: 1.9, preDist: 1.05, clickF: 5000, clickHp: 2400, clickAmt: 0.8,
+    body: [{ f: 660, q: 3.4, dec: 0.052, amt: 0.85 }, { f: 1500, q: 2.8, dec: 0.030, amt: 0.38 }],
+    thump: { f0: 220, f1: 80, dec: 0.048, amt: 0.36 },
+    tail: { lp: 1750, dec: 0.14, amt: 0.18, pre: 0.011 },
+    mech: { t: 0.045, f: 2800, dec: 0.017, amt: 0.15 },
   });
 
   // Kar98k — the loudest thing in the building. Deep, huge, long dark tail.
@@ -641,13 +659,17 @@
   });
 
   // MP40 — snappier, higher, tinnier than the Thompson. Stamped steel.
-  gunDef('gun_mp40', 0.52, 0.78, 0.30, {
-    lvl: 0.58, dist: 2.4, clickF: 7100, clickHp: 3400, clickAmt: 0.9,
-    body: [{ f: 1160, q: 5.0, dec: 0.05, amt: 0.85 }, { f: 2650, q: 3.8, dec: 0.028, amt: 0.5 },
-           { f: 620, q: 3.0, dec: 0.055, amt: 0.4 }],
-    thump: { f0: 232, f1: 88, dec: 0.065, amt: 0.44 },
-    tail: { lp: 3000, dec: 0.19, amt: 0.26, pre: 0.010 },
-    mech: { t: 0.024, f: 3600, dec: 0.02, amt: 0.30 },
+  // FIX: pushed further from the M1911 (was measuring as a near-reskin of
+  // it): higher dominant body band, tighter decays throughout, brighter
+  // click, shorter tail — faster and tighter where the M1911 is now lower
+  // and dry.
+  gunDef('gun_mp40', 0.44, 0.80, 0.30, {
+    lvl: 0.58, dist: 2.7, clickF: 7900, clickHp: 3900, clickAmt: 0.98,
+    body: [{ f: 1420, q: 5.6, dec: 0.034, amt: 0.85 }, { f: 3000, q: 4.2, dec: 0.018, amt: 0.52 },
+           { f: 720, q: 3.4, dec: 0.038, amt: 0.32 }],
+    thump: { f0: 250, f1: 100, dec: 0.048, amt: 0.40 },
+    tail: { lp: 3600, dec: 0.13, amt: 0.22, pre: 0.008 },
+    mech: { t: 0.022, f: 3900, dec: 0.015, amt: 0.32 },
   });
 
   // BAR — heavy, slow, authoritative. The most "shoulder" of the automatics.
@@ -1790,40 +1812,47 @@
   });
 
   def('perk_buy', {
-    dur: 1.20, gain: 0.85, rev: 0.28, bus: 'ui', prio: 0.9,
+    // FIX: measured RMS was 27.5 dB under round_end — spending points on a
+    // perk must read clearly over a firefight, not disappear under one.
+    // Raised the def gain and every internal stage, not just the outer one.
+    dur: 1.20, gain: 1.15, rev: 0.28, bus: 'ui', prio: 0.9,
     build: function (c, out, t0, r) {
-      const mst = gain(c, 0.75);
+      const mst = gain(c, 0.95);
       mst.connect(out);
       // coin drop into the machine, mechanism, can released
       for (let i = 0; i < 3; i++) {
-        clack(c, mst, t0 + i * 0.075, { lvl: 0.22, hp: 2400, lp: 12000, dec: 0.01, amt: 0.85,
-                                        ring: [[r.range(3200, 5200), 0.06, 0.3]] }, r);
+        clack(c, mst, t0 + i * 0.075, { lvl: 0.32, hp: 2400, lp: 12000, dec: 0.01, amt: 0.9,
+                                        ring: [[r.range(3200, 5200), 0.06, 0.42]] }, r);
       }
       const n = nsrc(c, 0.5, 10400 + r.i(200));
       const bp = filt(c, 'bandpass', 1200, 1.8);
       const g = gain(c, 0);
       n.connect(bp); bp.connect(g); g.connect(mst);
-      ad(g.gain, t0 + 0.24, 0.02, 0.28, 0.2);
+      ad(g.gain, t0 + 0.24, 0.02, 0.28, 0.28);
       sweep(bp.frequency, t0 + 0.24, 900, 1900, 0.3);
       go(n, t0 + 0.22, t0 + 0.75);
-      clack(c, mst, t0 + 0.62, { lvl: 0.55, hp: 500, lp: 6000, dec: 0.02, amt: 0.9,
-                                 ring: [[840, 0.14, 0.26], [1580, 0.08, 0.14]], body: [130, 0.12, 0.24] }, r);
+      clack(c, mst, t0 + 0.62, { lvl: 0.8, hp: 500, lp: 6000, dec: 0.02, amt: 1.0,
+                                 ring: [[840, 0.14, 0.36], [1580, 0.08, 0.20]], body: [130, 0.12, 0.34] }, r);
     },
   });
 
   def('perk_drink', {
-    dur: 2.40, gain: 0.9, rev: 0.24, bus: 'ui', prio: 0.9,
+    // FIX: measured RMS was 27.5 dB under round_end — three sparse gulps and
+    // a fizz across 2.4 s read as inaudible next to anything else in the
+    // mix. Raised every stage (tab pop, fizz, gulps, can drops), not just
+    // the outer gain, so both peak and RMS move.
+    dur: 2.40, gain: 1.2, rev: 0.24, bus: 'ui', prio: 0.9,
     build: function (c, out, t0, r) {
-      const mst = gain(c, 0.8);
+      const mst = gain(c, 1.0);
       mst.connect(out);
       // pop the tab
-      clack(c, mst, t0, { lvl: 0.4, hp: 3000, lp: 14000, dec: 0.006, amt: 0.9,
-                          ring: [[5400, 0.04, 0.24]] }, r);
+      clack(c, mst, t0, { lvl: 0.55, hp: 3000, lp: 14000, dec: 0.006, amt: 1.0,
+                          ring: [[5400, 0.04, 0.34]] }, r);
       const fizz = nsrc(c, 1.2, 10500 + r.i(200));
       const hp = filt(c, 'highpass', 4200, 0.7);
       const fg = gain(c, 0);
       fizz.connect(hp); hp.connect(fg); fg.connect(mst);
-      ad(fg.gain, t0 + 0.02, 0.03, 1.0, 0.12);
+      ad(fg.gain, t0 + 0.02, 0.03, 1.0, 0.18);
       go(fizz, t0, t0 + 1.3);
       // three gulps — resonant swept blips, throat-shaped
       for (let i = 0; i < 3; i++) {
@@ -1834,13 +1863,13 @@
         sweep(bp.frequency, t, 900, 380, 0.16);
         const g = gain(c, 0);
         o.connect(bp); bp.connect(g); g.connect(mst);
-        ad(g.gain, t, 0.012, 0.15, 0.5);
+        ad(g.gain, t, 0.012, 0.15, 0.68);
         go(o, t, t + 0.24);
         const n = nsrc(c, 0.2, 10510 + i * 5 + r.i(100));
         const b2 = filt(c, 'bandpass', 1400, 1.4);
         const g2 = gain(c, 0);
         n.connect(b2); b2.connect(g2); g2.connect(mst);
-        ad(g2.gain, t, 0.008, 0.12, 0.16);
+        ad(g2.gain, t, 0.008, 0.12, 0.24);
         go(n, t, t + 0.2);
       }
       // can dropped on the floorboards
@@ -1848,9 +1877,9 @@
       for (let i = 0; i < 4; i++) {
         const t = tc + i * r.range(0.06, 0.15);
         clack(c, mst, t, {
-          lvl: r.range(0.12, 0.3) * (1 - i * 0.18), hp: 1200, lp: 9000, dec: 0.01, amt: 0.85,
-          ring: [[r.range(1600, 2600), 0.07, 0.3], [r.range(3600, 5200), 0.03, 0.14]],
-          body: [r.range(180, 260), 0.05, 0.12],
+          lvl: r.range(0.18, 0.42) * (1 - i * 0.18), hp: 1200, lp: 9000, dec: 0.01, amt: 0.95,
+          ring: [[r.range(1600, 2600), 0.07, 0.4], [r.range(3600, 5200), 0.03, 0.20]],
+          body: [r.range(180, 260), 0.05, 0.18],
         }, r);
       }
     },
@@ -3198,6 +3227,11 @@
   A.setOcclusion = function (handle, amount) {
     if (handle && typeof handle._occl === 'function') handle._occl(amount);
   };
+  // Read-only lookup into the def table — lets measurement tooling (and
+  // gameplay code that wants to check e.g. variant counts) inspect a sound
+  // without duplicating its numbers by hand. Not part of the documented
+  // contract beyond that.
+  A.defOf = function (name) { return DEFS[name] || null; };
   A.suspend = function () { if (ctx && ctx.state === 'running') { try { ctx.suspend(); } catch (e) { /* ignore */ } } };
   A.resume = function () { if (ctx && ctx.state !== 'closed') { try { ctx.resume(); } catch (e) { /* ignore */ } } };
   A.stopAll = function () {

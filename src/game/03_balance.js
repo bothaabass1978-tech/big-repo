@@ -55,8 +55,20 @@
     zombieAttackRange: 1.72,
     // Minimum spacing between two hits landing on the player. Without it a
     // pair of zombies can strike on the same tick and take you from full
-    // health to downed with no chance to react at all.
-    damageCooldown: 0.32,        // metres
+    // health to downed with no chance to react at all. See
+    // Z.Player.attackersNear/P.damage (16_player.js): the actual gap
+    // shrinks as more zombies crowd in, down to damageCooldownMin below.
+    damageCooldown: 0.32,        // seconds
+    // Floor on that spacing once a crowd is on the player (16_player.js:
+    // Math.max(damageCooldownMin, damageCooldown - (crowd - 1) * 0.035)).
+    // 0.176s = 0.55 * damageCooldown: fast enough that a real swarm is
+    // dangerous, slow enough that every individual hit is still reactable
+    // (roughly in line with typical human visual-reaction-time floors).
+    // This makes that ratio an explicit, named, designer-tunable balance
+    // constant instead of a magic 0.55 living only in 16_player.js's
+    // fallback expression — no behavioural change from what was already
+    // running there.
+    damageCooldownMin: 0.176,    // seconds
     meleeRate: 1.35,        // seconds between swings
     downedHealth: 1,        // hp while downed/crawling
     bleedoutTime: 45,       // seconds before permadeath while downed and un-revived
@@ -833,6 +845,12 @@
     if (!jugg) problems.push('juggernog perk missing');
     else if (B.ZOMBIE.meleeDamage * 5 !== jugg.effect.maxHealth) {
       problems.push('zombie meleeDamage * 5 (' + (B.ZOMBIE.meleeDamage * 5) + ') != juggernog maxHealth (' + jugg.effect.maxHealth + ')');
+    }
+
+    // --- crowd damage-cooldown floor (16_player.js P.damage) ---
+    if (!(B.PLAYER.damageCooldownMin > 0) || B.PLAYER.damageCooldownMin > B.PLAYER.damageCooldown) {
+      problems.push('PLAYER.damageCooldownMin (' + B.PLAYER.damageCooldownMin
+        + ') must be > 0 and <= damageCooldown (' + B.PLAYER.damageCooldown + ')');
     }
 
     // --- points totals ---
