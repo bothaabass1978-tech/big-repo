@@ -2,11 +2,14 @@
 // 06_textures.js — Z.Tex: all game textures, generated to <canvas> at runtime.
 // No image assets. Everything below is procedural. Owner: technical-artist.
 //
-// Look target: a bombed-out German farmhouse at night (Nacht der Untoten).
-// Palette is desaturated browns / cold grey-blues / near-black shadow, with a
-// single sickly amber practical light. Colour grading toward amber is a
-// LIGHTING concern (Z.Render), not baked into albedo here — these textures
-// stay neutral-desaturated so they respond correctly under any light colour.
+// Look target: a pitch-black wooden farmhouse lit by bare tungsten bulbs
+// (Nacht der Untoten, WaW 2008). Warm dirty browns and dirty tan plaster,
+// desaturated but never blue-grey. The renderer's fragment shader is a flat
+// multiplier — albedo = texel.rgb * uTint * vCol, then * light — with no
+// colour-grading pass, so warmth cannot be recovered downstream of a
+// neutral or cool canvas: a cold texture stays cold under any tint or light
+// colour. Warmth AND structural detail (board seams, lath, cracks, stains)
+// must be baked into the canvas here, not left to lighting.
 // Every material gets a mandatory final grunge pass. Nothing ships clean.
 //
 // Material record shape (see docs/architecture/MODULE-CONTRACTS.md):
@@ -29,6 +32,13 @@
 //     tint      — [r,g,b] 0..1 multiplier, default [1,1,1]. Reserved for
 //                 renderer-side recolouring; textures already bake final
 //                 colour so this is normally left at identity.
+//   Optional: alphaTest — scalar 0..1, default 0 (off). World geometry
+//     renders opaque (gl.BLEND disabled, see 12_render.js R.beginScene) with
+//     only a `texel.a < uAlphaTest -> discard` cutout, so a transparent-bg
+//     decal (chalk marks, blood) MUST set this (~0.04) or its empty canvas
+//     renders as solid black instead of showing the surface behind it.
+//     NOT YET reflected in docs/architecture/MODULE-CONTRACTS.md -- flagging
+//     for whoever owns that doc.
 // ---------------------------------------------------------------------------
 (function () {
   const T = {};
@@ -355,6 +365,27 @@
   }
 
   // ===========================================================================
+  // Jittered rectangle, returned as a Path2D so a caller can clip() it and
+  // later stroke() the *exact same* broken silhouette (no re-jitter drift)
+  // to sell "hole broken in plaster", not "sticker pasted on wall".
+  // ===========================================================================
+  function jaggedRectPath(cx, cy, hw, hh, st, segs) {
+    const j = Math.min(hw, hh) * 0.12;
+    const p = new Path2D();
+    let first = true;
+    const pt = (x, y) => {
+      x += st.sym(j); y += st.sym(j);
+      if (first) { p.moveTo(x, y); first = false; } else p.lineTo(x, y);
+    };
+    for (let s = 0; s <= segs; s++) pt(M.lerp(cx - hw, cx + hw, s / segs), cy - hh);
+    for (let s = 0; s <= segs; s++) pt(cx + hw, M.lerp(cy - hh, cy + hh, s / segs));
+    for (let s = 0; s <= segs; s++) pt(M.lerp(cx + hw, cx - hw, s / segs), cy + hh);
+    for (let s = 0; s <= segs; s++) pt(cx - hw, M.lerp(cy + hh, cy - hh, s / segs));
+    p.closePath();
+    return p;
+  }
+
+  // ===========================================================================
   // Board/plank primitive — shared by every wooden material.
   // axis: 'u' boards run left-right (gap lines are ~horizontal, floor-style);
   //       'v' boards run top-bottom (gap lines are ~vertical, wall-style).
@@ -537,6 +568,43 @@
   function chalkPoly(ctx, st, pts, w) {
     for (let i = 0; i < pts.length - 1; i++) chalkLine(ctx, st, pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1], w);
   }
+  // Rough hand-chalked CLOSED silhouette: `pts` is an array of [x,y] in units
+  // of `s` around (cx,cy), traced clockwise. Outlines every edge with the
+  // same multi-pass wobble as chalkLine (one shared visual language for all
+  // chalk marks), jittering per-VERTEX (not per-segment) so adjoining edges
+  // still meet, then scribbles light interior hatching so the shape reads as
+  // a solid tracing at a glance instead of a thin wireframe nobody can parse
+  // from across a room.
+  function chalkSilhouette(ctx, st, pts, cx, cy, s, opts) {
+    opts = opts || {};
+    const n = pts.length;
+    const P = pts.map((p) => [cx + p[0] * s + st.sym(s * 0.012), cy + p[1] * s + st.sym(s * 0.012)]);
+    for (let i = 0; i < n; i++) {
+      const a = P[i], b = P[(i + 1) % n];
+      chalkLine(ctx, st, a[0], a[1], b[0], b[1], opts.w || s * 0.045);
+    }
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(P[0][0], P[0][1]);
+    for (let i = 1; i < n; i++) ctx.lineTo(P[i][0], P[i][1]);
+    ctx.closePath();
+    ctx.clip();
+    ctx.globalCompositeOperation = 'lighten';
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for (const p of P) { minX = Math.min(minX, p[0]); maxX = Math.max(maxX, p[0]); minY = Math.min(minY, p[1]); maxY = Math.max(maxY, p[1]); }
+    const hatches = Math.max(4, Math.round((maxX - minX) / (s * 0.14)));
+    ctx.strokeStyle = 'rgba(210,206,195,0.15)';
+    ctx.lineWidth = s * 0.03;
+    for (let i = 0; i < hatches; i++) {
+      const t = (i + 0.5) / hatches;
+      const x = minX + t * (maxX - minX) + st.sym(s * 0.02);
+      ctx.beginPath();
+      ctx.moveTo(x, minY - s * 0.1);
+      ctx.lineTo(x + st.sym(s * 0.05), maxY + s * 0.1);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
 
   // ===========================================================================
   // Material builders
@@ -544,7 +612,7 @@
   const stopsWood = [[0, [14, 10, 7]], [0.3, [40, 30, 20]], [0.6, [78, 60, 40]], [0.85, [115, 90, 60]], [1, [140, 112, 78]]];
   const stopsWoodDark = [[0, [10, 7, 5]], [0.35, [28, 20, 13]], [0.7, [50, 38, 25]], [1, [70, 54, 36]]];
   const stopsWoodNew = [[0, [30, 22, 14]], [0.4, [78, 60, 40]], [0.75, [130, 104, 72]], [1, [168, 138, 98]]];
-  const stopsPlaster = [[0, [22, 21, 22]], [0.35, [58, 56, 54]], [0.65, [110, 106, 98]], [0.85, [155, 150, 138]], [1, [190, 184, 168]]];
+  const stopsPlaster = [[0, [26, 20, 15]], [0.30, [64, 52, 40]], [0.55, [104, 86, 66]], [0.78, [148, 126, 98]], [1, [196, 172, 138]]];
   const stopsBrick = [[0, [18, 12, 10]], [0.3, [58, 28, 20]], [0.6, [104, 52, 36]], [0.85, [130, 68, 46]], [1, [148, 84, 56]]];
   const stopsConcrete = [[0, [16, 16, 18]], [0.4, [58, 58, 62]], [0.7, [96, 96, 100]], [1, [140, 140, 142]]];
   const stopsDirt = [[0, [10, 8, 6]], [0.3, [28, 22, 15]], [0.6, [52, 40, 26]], [0.85, [74, 58, 38]], [1, [96, 78, 52]]];
@@ -701,57 +769,138 @@
   }
 
   function makePlasterWall() {
-    const size = HERO, n = 3 + 0; // seed index 3 already used for wood_plank props scope offset; use dedicated index
-    const seedN = 3;
+    const size = HERO, seedN = 3;
     const c = mkCanvas(size);
     const ctx = ctx2d(c);
-    // Fine, high-frequency mottling. Big low-frequency blobs are what make a
-    // tiled wall read as a repeating pattern instead of as a wall.
-    const base = baseLayer(size, 64, 3 + 500, { octaves: 5, freq: 8.0, warpAmt: 0.28, warpFreq: 3.5, gain: 0.46, lac: 2.1, stops: stopsPlaster });
+
+    // Base coat. The old version sampled fbm at 64x64 for an 8x upscale to
+    // 512 -- with nothing else in the function providing a hard edge, that
+    // upscale blur WAS the whole texture, which is why it read as smoke
+    // instead of plaster. Sampling at 128x128 (a 4x upscale) keeps real
+    // texel-scale variation alive; the grain pass right after finishes the
+    // job of reading as a troweled surface instead of a soft-focus photo.
+    const base = baseLayer(size, 128, seedN + 500, {
+      octaves: 5, freq: 6.5, warpAmt: 0.3, warpFreq: 3.2, gain: 0.48, lac: 2.15,
+      stops: stopsPlaster,
+    });
     ctx.drawImage(base, 0, 0);
-    // spalled patches revealing lath/brick beneath
-    // Many small spall patches read as damage; a few big ones read as wallpaper.
-    const voro = voronoiField(40, 3, 54);
-    const img = ctx.getImageData(0, 0, size, size);
-    const d = img.data;
-    for (let y = 0; y < size; y++) {
-      for (let x = 0; x < size; x++) {
-        const fx = (x / size) * voro.res, fy = (y / size) * voro.res;
-        const idx = (fy | 0) * voro.res + (fx | 0);
-        const spalled = RNG.hash2(voro.cellId[idx] * 7 + 3, 3) > 0.88;
-        if (spalled) {
-          const i = (y * size + x) * 4;
-          const lathY = (Math.sin(y * 0.6) * 0.5 + 0.5) > 0.5 ? 1 : 0;
-          const brickTone = 60 + RNG.hash2(x >> 2, y >> 2) * 35;
-          const lathTone = lathY ? 30 + RNG.hash2(x >> 4, y >> 4) * 20 : brickTone;
-          const soft = (1 - voro.edge[idx] * 0.7) * 0.65;
-          d[i] = M.lerp(d[i], lathTone * 1.1, soft);
-          d[i + 1] = M.lerp(d[i + 1], lathTone * 0.85, soft);
-          d[i + 2] = M.lerp(d[i + 2], lathTone * 0.6, soft);
-        }
+    drawGrain(ctx, size, seedN, 0.16, 'multiply');
+    drawGrain(ctx, size, seedN + 1, 0.10, 'overlay');
+
+    // Exposed lath: real horizontal wood strips behind a broken-edged
+    // plaster-loss patch, not a colour-swapped pixel blend. Kept off the
+    // tile border so forceSeamEdges below never has to cut through one.
+    const stL = rng(seedN + 4400);
+    for (let n = 0; n < 4; n++) {
+      const pw = size * stL.range(0.10, 0.20), ph = size * stL.range(0.08, 0.15);
+      const px = pw * 1.2 + stL.f() * (size - pw * 2.4);
+      const py = ph * 1.2 + stL.f() * (size - ph * 2.4);
+      const path = jaggedRectPath(px, py, pw, ph, stL, 10);
+      ctx.save();
+      ctx.clip(path);
+      ctx.fillStyle = 'rgba(18,14,11,0.55)';
+      ctx.fillRect(px - pw, py - ph, pw * 2, ph * 2);
+      const laths = 6, lh = (ph * 2) / laths;
+      for (let l = 0; l < laths; l++) {
+        const ly = py - ph + l * lh;
+        const rgb = ramp(0.2 + RNG.hash2(n * 13 + l, seedN) * 0.5, stopsWoodDark);
+        ctx.fillStyle = `rgba(${rgb[0] | 0},${rgb[1] | 0},${rgb[2] | 0},0.92)`;
+        ctx.fillRect(px - pw, ly + lh * 0.12, pw * 2, lh * 0.72);
       }
+      ctx.strokeStyle = 'rgba(8,6,5,0.55)';
+      ctx.lineWidth = 1.3;
+      for (let sp = 1; sp < 3; sp++) {
+        const gx = px - pw + sp * (pw * 2 / 3);
+        ctx.beginPath(); ctx.moveTo(gx, py - ph); ctx.lineTo(gx + stL.sym(3), py + ph); ctx.stroke();
+      }
+      ctx.restore();
+      ctx.save();
+      ctx.strokeStyle = 'rgba(10,8,7,0.4)';
+      ctx.lineWidth = size * 0.01;
+      ctx.stroke(path);
+      ctx.restore();
     }
-    ctx.putImageData(img, 0, 0);
-    crackNetwork(ctx, size, 3, { count: 6, depth: 5, width: 1.1, maxLen: 0.4, color: 'rgba(15,14,14,0.5)' });
-    // soot streaks running upward from the (implied) floor line
-    const st = rng(3 + 4000);
+
+    // One larger exposed stud per tile: vertical timber behind the plaster,
+    // the "studs" half of "lath and studs". Also kept edge-safe.
+    {
+      const stS = rng(seedN + 4600);
+      const sw = size * stS.range(0.055, 0.08), sh = size * stS.range(0.3, 0.44);
+      const sx = sw * 1.2 + stS.f() * (size - sw * 2.4);
+      const sy = sh * 1.2 + stS.f() * (size - sh * 2.4);
+      const path = jaggedRectPath(sx, sy, sw, sh, stS, 8);
+      ctx.save();
+      ctx.clip(path);
+      ctx.fillStyle = 'rgba(16,12,9,0.5)';
+      ctx.fillRect(sx - sw, sy - sh, sw * 2, sh * 2);
+      const wc = ramp(0.4, stopsWoodDark);
+      ctx.fillStyle = `rgb(${wc[0] | 0},${wc[1] | 0},${wc[2] | 0})`;
+      ctx.fillRect(sx - sw * 0.85, sy - sh, sw * 1.7, sh * 2);
+      ctx.save();
+      ctx.globalCompositeOperation = 'multiply';
+      for (let g = 0; g < 6; g++) {
+        const gx = sx - sw * 0.7 + g * sw * 0.24 + stS.sym(sw * 0.04);
+        ctx.fillStyle = `rgba(20,14,9,${(0.08 + stS.f() * 0.1).toFixed(3)})`;
+        ctx.fillRect(gx, sy - sh, sw * 0.05, sh * 2);
+      }
+      ctx.restore();
+      ctx.fillStyle = 'rgba(140,120,95,0.35)';
+      for (let nn = 0; nn < 3; nn++) {
+        ctx.beginPath(); ctx.arc(sx, sy - sh * 0.6 + nn * sh * 0.6, 2.2, 0, M.TAU); ctx.fill();
+      }
+      ctx.restore();
+      ctx.save();
+      ctx.strokeStyle = 'rgba(10,8,7,0.45)';
+      ctx.lineWidth = size * 0.012;
+      ctx.stroke(path);
+      ctx.restore();
+    }
+
+    // Cracks: more numerous and higher-contrast -- the old network was
+    // getting lost entirely against the blurred base.
+    crackNetwork(ctx, size, seedN, { count: 9, depth: 5, width: 1.4, maxLen: 0.42, color: 'rgba(12,10,9,0.6)' });
+
+    // Water stains: warm dirty drips, not neutral-grey soot. Dark damp
+    // streaks plus a few pale chalky lime-leach streaks, both running down
+    // from near the top -- the long-neglected-plaster tell.
+    const stW = rng(seedN + 4000);
     ctx.save();
     ctx.globalCompositeOperation = 'multiply';
-    for (let i = 0; i < 5; i++) {
-      const x = st.f() * size;
-      const h = size * st.range(0.3, 0.8);
-      const grad = ctx.createLinearGradient(x, size, x, size - h);
-      grad.addColorStop(0, 'rgba(8,8,9,0.4)');
-      grad.addColorStop(1, 'rgba(8,8,9,0)');
+    for (let i = 0; i < 6; i++) {
+      const x = stW.f() * size, y0 = size * stW.range(0, 0.15), h = size * stW.range(0.25, 0.75);
+      const grad = ctx.createLinearGradient(x, y0, x, y0 + h);
+      grad.addColorStop(0, 'rgba(28,20,13,0.38)');
+      grad.addColorStop(1, 'rgba(28,20,13,0)');
       ctx.fillStyle = grad;
-      ctx.fillRect(x - size * st.range(0.02, 0.05), size - h, size * st.range(0.04, 0.1), h);
+      ctx.fillRect(x - size * stW.range(0.015, 0.04), y0, size * stW.range(0.03, 0.08), h);
     }
     ctx.restore();
-    stains(ctx, size, 3, { count: 4, color: [30, 32, 34], alpha: 0.22 });
-    grime(ctx, size, 3, 1);
-    dirtAO(ctx, size, { strength: 0.1 });
+    ctx.save();
+    ctx.globalCompositeOperation = 'screen';
+    for (let i = 0; i < 4; i++) {
+      const x = stW.f() * size, y0 = size * stW.range(0, 0.2), h = size * stW.range(0.2, 0.5);
+      const grad = ctx.createLinearGradient(x, y0, x, y0 + h);
+      grad.addColorStop(0, 'rgba(180,160,120,0.12)');
+      grad.addColorStop(1, 'rgba(180,160,120,0)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(x - size * 0.012, y0, size * 0.024, h);
+    }
+    ctx.restore();
+
+    stains(ctx, size, seedN, { count: 4, color: [40, 32, 22], alpha: 0.22 });
+    grime(ctx, size, seedN, 1.1);
+    // baseboard grime: the bottom edge always collects the worst of it
+    ctx.save();
+    ctx.globalCompositeOperation = 'multiply';
+    const kick = ctx.createLinearGradient(0, size, 0, size * 0.82);
+    kick.addColorStop(0, 'rgba(10,8,6,0.4)');
+    kick.addColorStop(1, 'rgba(10,8,6,0)');
+    ctx.fillStyle = kick;
+    ctx.fillRect(0, size * 0.82, size, size * 0.18);
+    ctx.restore();
+    dirtAO(ctx, size, { strength: 0.14 });
     forceSeamEdges(c);
-    return { canvas: c, size, tile: [true, true], spec: 0.08, gloss: 0.12, emissive: 0, normal: sobelNormal(c, size / 2), tint: [0.60, 0.55, 0.48] };
+    return { canvas: c, size, tile: [true, true], spec: 0.07, gloss: 0.10, emissive: 0, normal: sobelNormal(c, size / 2), tint: [0.92, 0.86, 0.78] };
   }
 
   function makeBrick() {
@@ -1058,7 +1207,7 @@
       }
     }
     grime(ctx, size, seedN, 0.3);
-    return { canvas: c, size, tile: [false, false], spec: 0.4, gloss: 0.55, emissive: 0, normal: null, tint: [0.55, 0.50, 0.48] };
+    return { canvas: c, size, tile: [false, false], spec: 0.4, gloss: 0.55, emissive: 0, normal: null, tint: [0.55, 0.50, 0.48], alphaTest: 0.04 };
   }
 
   function makeCrateWood() {
@@ -1342,37 +1491,49 @@
 
   // Chalk wall-buy silhouettes. `draw(ctx,st,cx,cy,s)` draws the gun in a
   // roughly (-s..s) box centred at (cx,cy) using chalkLine/chalkPoly.
+  // Closed side-profile silhouettes in units of `s`, +x = toward the muzzle,
+  // +y = down. Built as a "bottom edge left-to-right is negative, wraps to a
+  // top edge" so the two edges (thin barrel vs. tall stock) never cross --
+  // guaranteed simple polygons. Every entry below shares one of these four
+  // bodies so rifle / SMG / shotgun / grenade stay a family, the way real
+  // wall-buy chalk does, while price/addons still tell the guns apart.
+  const RIFLE_LONG = [[1.00, 0.04], [0.15, 0.06], [0.08, 0.14], [-0.02, 0.22], [-0.12, 0.16], [-0.20, 0.18], [-0.55, 0.24], [-0.92, 0.28], [-0.97, 0.28], [-0.97, -0.08], [-0.75, -0.10], [-0.40, -0.08], [-0.20, -0.02], [-0.08, -0.05], [0.15, -0.06], [0.45, -0.055]];
+  const RIFLE_SHORT = [[0.78, 0.04], [0.12, 0.06], [0.06, 0.13], [-0.02, 0.19], [-0.10, 0.14], [-0.16, 0.16], [-0.42, 0.20], [-0.72, 0.22], [-0.76, 0.22], [-0.76, -0.07], [-0.55, -0.09], [-0.28, -0.07], [-0.14, -0.02], [-0.05, -0.05], [0.12, -0.06], [0.35, -0.05]];
+  const SMG_SIL = [[0.62, 0.05], [0.30, 0.07], [0.15, 0.20], [0.02, 0.34], [-0.10, 0.30], [-0.15, 0.16], [-0.45, 0.20], [-0.68, 0.22], [-0.68, -0.10], [-0.45, -0.09], [-0.15, -0.06], [0.05, -0.09], [0.30, -0.065]];
+  const SHOTGUN_SIL = [[0.55, 0.10], [0.10, 0.11], [0.00, 0.20], [-0.10, 0.24], [-0.40, 0.28], [-0.62, 0.26], [-0.62, -0.06], [-0.40, -0.08], [-0.10, -0.05], [0.00, -0.08], [0.10, -0.09]];
+  const SAWNOFF_SIL = [[0.32, 0.10], [0.05, 0.11], [-0.02, 0.20], [-0.10, 0.26], [-0.20, 0.22], [-0.20, -0.02], [-0.10, -0.04], [0.00, -0.08], [0.05, -0.09]];
+
   const CHALK_GUNS = {
     kar98k: { price: 200, draw: (ctx, st, cx, cy, s) => {
-      chalkPoly(ctx, st, [[cx - s, cy + s * 0.15], [cx + s * 0.7, cy - s * 0.05], [cx + s, cy - s * 0.1]], s * 0.05);
-      chalkPoly(ctx, st, [[cx - s * 0.55, cy + s * 0.25], [cx - s * 0.25, cy - s * 0.15]], s * 0.06); // stock drop
-      chalkLine(ctx, st, cx + s * 0.2, cy - s * 0.02, cx + s * 0.2, cy + s * 0.25, s * 0.04); // bolt
+      chalkSilhouette(ctx, st, RIFLE_LONG, cx, cy, s);
+      chalkLine(ctx, st, cx + s * 0.18, cy - s * 0.10, cx + s * 0.30, cy - s * 0.24, s * 0.035); // bolt handle
     } },
     carbine: { price: 600, draw: (ctx, st, cx, cy, s) => {
-      chalkPoly(ctx, st, [[cx - s * 0.9, cy + s * 0.1], [cx + s * 0.75, cy - s * 0.08], [cx + s, cy - s * 0.1]], s * 0.045);
-      chalkPoly(ctx, st, [[cx - s * 0.5, cy + s * 0.2], [cx - s * 0.2, cy - s * 0.12]], s * 0.05);
+      chalkSilhouette(ctx, st, RIFLE_SHORT, cx, cy, s);
+      chalkPoly(ctx, st, [[cx + s * 0.04, cy + s * 0.08], [cx - s * 0.02, cy + s * 0.28], [cx - s * 0.09, cy + s * 0.30], [cx - s * 0.07, cy + s * 0.08]], s * 0.035); // box magazine
     } },
     gewehr43: { price: 600, draw: (ctx, st, cx, cy, s) => {
-      chalkPoly(ctx, st, [[cx - s, cy + s * 0.15], [cx + s * 0.6, cy - s * 0.08], [cx + s, cy - s * 0.12]], s * 0.05);
-      chalkLine(ctx, st, cx + s * 0.1, cy - s * 0.2, cx + s * 0.1, cy - s * 0.55, s * 0.05); // magazine up top
+      chalkSilhouette(ctx, st, RIFLE_LONG, cx, cy, s);
+      chalkPoly(ctx, st, [[cx + s * 0.02, cy + s * 0.07], [cx - s * 0.03, cy + s * 0.24], [cx - s * 0.11, cy + s * 0.26], [cx - s * 0.08, cy + s * 0.07]], s * 0.035); // box magazine
     } },
     thompson: { price: 1200, draw: (ctx, st, cx, cy, s) => {
-      chalkPoly(ctx, st, [[cx - s * 0.9, cy + s * 0.2], [cx + s * 0.5, cy - s * 0.05], [cx + s * 0.85, cy - s * 0.05]], s * 0.06);
+      chalkSilhouette(ctx, st, SMG_SIL, cx, cy, s);
       ctx.save(); ctx.globalCompositeOperation = 'lighten'; ctx.strokeStyle = 'rgba(225,222,210,0.6)';
-      ctx.beginPath(); ctx.arc(cx - s * 0.15, cy + s * 0.35, s * 0.22, 0, M.TAU); ctx.lineWidth = s * 0.05; ctx.stroke(); ctx.restore(); // drum mag
+      ctx.beginPath(); ctx.arc(cx - s * 0.02, cy + s * 0.46, s * 0.15, 0, M.TAU); ctx.lineWidth = s * 0.04; ctx.stroke(); ctx.restore(); // drum mag
     } },
     bar: { price: 1800, draw: (ctx, st, cx, cy, s) => {
-      chalkPoly(ctx, st, [[cx - s, cy + s * 0.12], [cx + s * 0.6, cy - s * 0.1], [cx + s, cy - s * 0.12]], s * 0.05);
-      chalkLine(ctx, st, cx, cy + s * 0.1, cx, cy + s * 0.5, s * 0.045); // bipod
-      chalkLine(ctx, st, cx - s * 0.15, cy + s * 0.5, cx + s * 0.15, cy + s * 0.5, s * 0.04);
+      chalkSilhouette(ctx, st, RIFLE_LONG, cx, cy, s);
+      chalkPoly(ctx, st, [[cx + s * 0.05, cy + s * 0.07], [cx - s * 0.02, cy + s * 0.32], [cx - s * 0.10, cy + s * 0.34], [cx - s * 0.07, cy + s * 0.07]], s * 0.035); // long box magazine
+      chalkLine(ctx, st, cx + s * 0.55, cy + s * 0.06, cx + s * 0.42, cy + s * 0.36, s * 0.03); // bipod leg
+      chalkLine(ctx, st, cx + s * 0.55, cy + s * 0.06, cx + s * 0.68, cy + s * 0.36, s * 0.03); // bipod leg
     } },
     dbshotgun: { price: 1200, draw: (ctx, st, cx, cy, s) => {
-      chalkLine(ctx, st, cx - s * 0.9, cy + s * 0.15, cx + s * 0.8, cy - s * 0.05, s * 0.09);
-      chalkPoly(ctx, st, [[cx - s * 0.4, cy + s * 0.25], [cx - s * 0.1, cy - s * 0.1]], s * 0.07);
+      chalkSilhouette(ctx, st, SHOTGUN_SIL, cx, cy, s);
+      chalkLine(ctx, st, cx + s * 0.08, cy - s * 0.14, cx + s * 0.52, cy - s * 0.14, s * 0.025); // second (over/under) barrel
     } },
     sawnoff: { price: 1200, draw: (ctx, st, cx, cy, s) => {
-      chalkLine(ctx, st, cx - s * 0.5, cy + s * 0.12, cx + s * 0.55, cy - s * 0.02, s * 0.1);
-      chalkPoly(ctx, st, [[cx - s * 0.2, cy + s * 0.22], [cx + s * 0.05, cy - s * 0.08]], s * 0.07);
+      chalkSilhouette(ctx, st, SAWNOFF_SIL, cx, cy, s);
+      chalkLine(ctx, st, cx + s * 0.05, cy - s * 0.14, cx + s * 0.28, cy - s * 0.14, s * 0.025); // second barrel, both cut short
     } },
     grenade: { price: 250, draw: (ctx, st, cx, cy, s) => {
       chalkLine(ctx, st, cx, cy - s * 0.3, cx, cy - s * 0.5, s * 0.05);
@@ -1395,12 +1556,15 @@
     return { canvas: c, size, tile: [false, false], spec: 0.05, gloss: 0.1, emissive: 0, normal: null, tint: [1, 1, 1] };
   }
   function makeChalkGun(key, idx) {
+    // No baked backdrop. The old version painted its own independent
+    // plaster patch under the gun -- different noise, different seed than
+    // the actual plaster_wall behind it, so it always showed up as a
+    // visibly lighter rectangle with hard edges no matter how it was
+    // tinted. Fully transparent (same pattern as blood_wall below) lets the
+    // real wall show through and the chalk sits directly on it.
     const size = PROP, seedN = 25 + idx;
     const c = mkCanvas(size);
-    const ctx = ctx2d(c);
-    const base = baseLayer(size, 48, seedN, { octaves: 5, freq: 3.5, warpAmt: 0.5, warpFreq: 2.5, stops: stopsPlaster });
-    ctx.drawImage(base, 0, 0);
-    crackNetwork(ctx, size, seedN, { count: 2, depth: 3, width: 1, maxLen: 0.2, color: 'rgba(14,13,13,0.4)' });
+    const ctx = ctx2d(c); // transparent bg — overlay decal, see makeBloodWall
     const st = rng(seedN + 200);
     const def = CHALK_GUNS[key];
     def.draw(ctx, st, size * 0.48, size * 0.4, size * 0.4);
@@ -1414,11 +1578,7 @@
     ctx.rotate(st.sym(0.03));
     ctx.fillText(String(def.price), 0, 0);
     ctx.restore();
-    drawGrain(ctx, size, seedN, 0.05, 'screen');
-    grime(ctx, size, seedN, 0.7);
-    // Tinted down so the plaster backing sinks into the wall it's painted on
-    // and only the chalk strokes read from across the room.
-    return { canvas: c, size, tile: [false, false], spec: 0.05, gloss: 0.1, emissive: 0, normal: null, tint: [0.78, 0.75, 0.68] };
+    return { canvas: c, size, tile: [false, false], spec: 0.05, gloss: 0.1, emissive: 0, normal: null, tint: [1, 1, 1], alphaTest: 0.04 };
   }
 
   function makeZombieSkin() {

@@ -27,7 +27,7 @@
   const RELOAD_SOUND = {
     pistol: 'reload_pistol', smg: 'reload_smg', rifle: 'reload_rifle',
     lmg: 'reload_lmg', shotgun: 'reload_shotgun', launcher: 'reload_rocket',
-    wonder: 'reload_raygun', melee: null,
+    wonder: 'reload_raygun', flamethrower: 'reload_rocket', melee: null,
   };
 
   const byId = Object.create(null);
@@ -170,6 +170,14 @@
     }
     if (!held || w.mag <= 0) return;
     if (w.boltCycle > 0) return;
+
+    // Continuous damage-over-time weapons (currently only the M2
+    // Flamethrower) have no discrete "round" and must never reach the
+    // rpm/cooldown math below: `rpm` is null for them by design (see
+    // B.validate()'s dot/melee rpm exemption), and 60 / null is Infinity —
+    // that Infinity cooldown is what jammed the gun after exactly one shot
+    // when this used to fall through to the generic path below.
+    if (d.dot) { fireContinuous(w, ctx); return; }
 
     const semi = d.fireMode === 'semi';
     if (semi && w.triggerWasHeld) return;   // one shot per pull
@@ -346,6 +354,88 @@
   W.impactKind = impactKind;
 
   // -------------------------------------------------------------------------
+  // Continuous fire — M2 Flamethrower (damage-over-time, no discrete rounds)
+  // -------------------------------------------------------------------------
+  // Ticks accumulate in w.fireAccum exactly like a classic frame-independent
+  // accumulator — that field already existed for this (see W.make), it was
+  // just never wired up, which is how rpm:null + the generic cooldown math
+  // ended up dividing by zero. Each tick burns exactly one unit of `mag`
+  // (fuel, not rounds: 200 fuel / 10 ticks/sec = 20s of continuous fire per
+  // tank) and applies Z.B damage to every zombie caught in a short cone, out
+  // to rangeFalloff.end. B.dps() already returns the correct 250 dps for
+  // this weapon (damage * ticksPerSec) — that figure only holds if a single
+  // target is never damaged more than once per tick, which the dedupe below
+  // guarantees.
+  const FLAME_CONE_DEG = 14; // half-angle of the flame cone, in degrees
+  const FLAME_SAMPLE_DIRS = (function () {
+    const pts = [[0, 0]]; // dead centre, sampled first
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2;
+      pts.push([Math.cos(a), Math.sin(a)]);
+    }
+    return pts;
+  }());
+  const _flameHitThisTick = Object.create(null); // dedupe scratch, keyed by zombie id
+
+  function fireContinuous(w, ctx) {
+    const d = w.def;
+    const tick = 1 / (d.ticksPerSec || 10);
+    w.fireAccum += ctx.dt;
+    let ticked = false;
+    while (w.fireAccum >= tick && w.mag > 0) {
+      w.fireAccum -= tick;
+      w.mag--;
+      flameTick(w, ctx);
+      ticked = true;
+    }
+    // Ran dry mid-stream: don't bank a partial tick into the next tank, and
+    // let the normal auto-reload branch (earlier in W.update, next frame)
+    // pick it up exactly like any other weapon running empty.
+    if (w.mag <= 0) w.fireAccum = 0;
+    if (ticked) w.lastFireTime = ctx.time || 0;
+  }
+
+  function flameTick(w, ctx) {
+    const d = w.def;
+    const range = (d.rangeFalloff && d.rangeFalloff.end) || 6;
+    const hits = [];
+    if (Z.Zombies && Z.Zombies.rayHit) {
+      let closest = null, closestT = Infinity;
+      for (let i = 0; i < FLAME_SAMPLE_DIRS.length; i++) {
+        const off = FLAME_SAMPLE_DIRS[i];
+        const deg = FLAME_CONE_DEG * Math.hypot(off[0], off[1]);
+        const dir = spreadDir(ctx.dir, deg, false);
+        const zh = Z.Zombies.rayHit(ctx.origin, dir, range, null);
+        if (!zh || _flameHitThisTick[zh.zombie.id]) continue;
+        _flameHitThisTick[zh.zombie.id] = true;
+        // Z.Zombies.rayHit reuses one mutable return object across calls, so
+        // copy the point out now — the next sample in this same loop will
+        // overwrite it.
+        const point = [zh.point[0], zh.point[1], zh.point[2]];
+        const dist = M.dist3(ctx.origin, point);
+        let dmg = d.damage * rangeMult(d, dist);
+        if (zh.zone === 'head') dmg *= (d.headshotMult || 1);
+        else if (zh.zone === 'limb') dmg *= 0.85;
+        const res = Z.Zombies.damage(zh.zombie, dmg, {
+          zone: zh.zone, dir, point, weapon: w, source: 'flame',
+        });
+        hits.push({ zone: zh.zone, zombie: zh.zombie, killed: res.killed, dmg, point });
+        if (dist < closestT) { closestT = dist; closest = point; }
+      }
+      for (const k in _flameHitThisTick) delete _flameHitThisTick[k];
+      if (closest) Z.FX.blood(closest, ctx.dir, 0.6, false);
+    }
+    Z.Render.addLight(muzzleWorld(ctx), [1.0, 0.55, 0.15], 5.0, 1.4);
+    const snd = SOUND[w.id] || 'gun_m1911';
+    if (Z.Audio && Z.Audio.ready) {
+      Z.Audio.play(snd, { pos: ctx.origin, vol: 0.7, rate: rng.range(0.97, 1.03) });
+    }
+    w.flashT = 0.045;
+    w.flashSeed = rng.f();
+    if (ctx.onShot) ctx.onShot({ weapon: w, hits, spread: FLAME_CONE_DEG });
+  }
+
+  // -------------------------------------------------------------------------
   // Projectiles — Ray Gun bolts and Panzerschreck rockets
   // -------------------------------------------------------------------------
   W.projectiles = [];
@@ -361,7 +451,7 @@
       damage: d.damage,
       splash: isRay ? 3.0 : (d.splashRadius || 4.2),
       splashDamage: isRay ? d.damage * 0.6 : d.damage,
-      selfDamage: true,
+      selfDamage: !!d.selfDamageClose,
       kind: isRay ? 'ray' : 'rocket',
       owner: 'player',
       weapon: w,
@@ -417,6 +507,27 @@
     }
     if (Z.Zombies && Z.Zombies.splash) {
       Z.Zombies.splash(point, p.splash, p.splashDamage, directZombie);
+    }
+    // selfDamageClose (Panzerschreck, Ray Gun): the balancing cost of the
+    // two strongest wonder weapons. Same falloff shape as the player's own
+    // grenade (see Z.Player.updateGrenades in 16_player.js, not edited here)
+    // — linear to 0 at the blast radius — scaled by each weapon's own
+    // selfDamageFraction (Z.B.WEAPONS), so it's a real, per-weapon-tunable
+    // number instead of the declared-but-dead flag it used to be.
+    // p.selfDamage is resolved once at spawn time from
+    // weapon.def.selfDamageClose (see spawnProjectile above).
+    if (p.selfDamage && p.owner === 'player' && Z.Player) {
+      const plr = Z.Game && Z.Game.player;
+      if (plr && !plr.dead) {
+        const frac = (p.weapon && p.weapon.def.selfDamageFraction) || 0;
+        if (frac > 0) {
+          const dist = M.dist3(point, [plr.pos[0], plr.pos[1] + 0.9, plr.pos[2]]);
+          if (dist < p.splash) {
+            const dmg = Math.round(p.splashDamage * frac * (1 - dist / p.splash));
+            if (dmg > 0) Z.Player.damage(plr, dmg, point, 'explosive');
+          }
+        }
+      }
     }
     if (W.onExplosion) W.onExplosion(point, p);
   }

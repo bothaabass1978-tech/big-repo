@@ -159,9 +159,20 @@
   const ZOMBIE_SPEED_TIERS = [
     { from: 1, to: 5, name: 'shamble', v0: 1.0, v1: 1.4 },        // R1-4: slow shamble
     { from: 5, to: 9, name: 'walk', v0: 1.9, v1: 2.6 },           // R5-8: brisk walk
-    { from: 9, to: 13, name: 'jog', v0: 3.2, v1: 3.9 },           // R9-12: jog
+    { from: 9, to: 13, name: 'jog', v0: 3.2, v1: 3.8 },           // R9-12: jog
     { from: 13, to: Infinity, name: 'sprint', v0: 4.35, v1: 4.35 }, // R13+: capped sprint
   ];
+  // jog.v1 was 3.9 until this pass. Only the SPRINT tier gets the
+  // downward-only zombieSpeedSpreadTop band (see S.spawn in 17_zombie.js,
+  // owned by another agent) — every earlier tier, including jog, still rolls
+  // the wide symmetric zombieSpeedSpread (0.85-1.15) at runtime. At 3.9, an
+  // unlucky 1.15x roll on a round-12 zombie hit 4.485 m/s against a 4.6256
+  // m/s sustained player speed: a 0.14 m/s margin, under this project's own
+  // 0.15 m/s bar, and nothing checked it (B.fastestZombieSpeed() only ever
+  // looked at the last tier). 3.8 * 1.15 = 4.37, a 0.256 m/s margin — close
+  // to the sprint tier's own 0.276 m/s margin, for a 2.6% peak-speed cut
+  // (3.9 -> 3.8) at rounds 9-12. See B.fastestZombieSpeed() and the per-tier
+  // check in B.validate() below.
   B.ZOMBIE_SPEED_TIERS = ZOMBIE_SPEED_TIERS;
 
   /** { name, speed } — the movement tier and interpolated base speed (m/s) at `round`. */
@@ -195,10 +206,22 @@
     const f = 1 / (1 + B.PLAYER.sprintRegenRatio);
     return f * B.PLAYER.speedSprint + (1 - f) * B.PLAYER.speedWalk;
   };
-  /** The fastest a single zombie can ever actually move. */
+  /**
+   * The fastest a single zombie can ever actually move, at ANY round. Must
+   * scan every tier, not just the last one: only the 'sprint' tier gets the
+   * downward-only zombieSpeedSpreadTop band (see S.spawn in 17_zombie.js) —
+   * every earlier tier still rolls the wide symmetric zombieSpeedSpread, so
+   * an earlier tier's peak * 1.15 can exceed the capped tier's own worst
+   * case. (It did, for the 'jog' tier, until this pass — see B.validate().)
+   */
   B.fastestZombieSpeed = function () {
-    const cap = ZOMBIE_SPEED_TIERS[ZOMBIE_SPEED_TIERS.length - 1].v1;
-    return cap * B.zombieSpeedSpreadTop.max;
+    let fastest = 0;
+    for (const t of ZOMBIE_SPEED_TIERS) {
+      const peak = Math.max(t.v0, t.v1);
+      const band = t.name === 'sprint' ? B.zombieSpeedSpreadTop : B.zombieSpeedSpread;
+      fastest = Math.max(fastest, peak * band.max);
+    }
+    return fastest;
   };
 
   // ===========================================================================
@@ -320,6 +343,17 @@
       rangeFalloff: { start: 28, end: 60, minMult: 0.75 },
       penetration: 0, sprintOutTime: 0.24, swapTime: 0.5,
       wallCost: 600, boxOnly: false, weight: 3.0,
+      // NOTE: the Gewehr 43 is NOT on the real Nacht der Untoten wall roster
+      // (that list is exactly: M1A1 Carbine, Kar98k, Double-Barrelled
+      // Shotgun, Thompson, BAR, M1897 Trench Gun, Sawed-Off,
+      // Stielhandgranate). It is kept here as a deliberate scope addition —
+      // same rule as B.PERKS below (loot-table/economy additions must state
+      // their rationale): it fills the semi-auto-rifle wall-buy gap between
+      // the Carbine and the box-only STG-44/FG42, giving the ground floor a
+      // second rifle path before anyone has to gamble on the box. If the
+      // goal becomes a byte-for-byte reproduction of the real wall roster,
+      // cut this entry AND its wall location + chalk decal in 09_level.js
+      // (owned by another agent) — nothing else in this file depends on it.
     },
     // --- wall shotguns ---------------------------------------------------------
     {
@@ -456,7 +490,17 @@
       recoil: { vert: 3.4, horiz: 0.8, recovery: 6 },
       pellets: 8, rangeFalloff: { start: 4, end: 10, minMult: 0.2 },
       penetration: 0, sprintOutTime: 0.3, swapTime: 0.6,
-      wallCost: null, boxOnly: true, weight: 3.8,
+      wallCost: 1500, boxOnly: false, weight: 3.8,
+      // M1897 Trench Gun IS a real Nacht der Untoten wall buy, at the real
+      // 1500-point price — it was wrongly box-only. It stays in the box
+      // pool too (B.BOX.weights below): every wall gun in this data set is
+      // also box-eligible, matching the source game.
+      // STILL NEEDS A LEVEL LOCATION: 09_level.js (owned by another agent)
+      // has no addBuy({kind:'weapon', id:'trench_gun', ...}) entry or chalk
+      // decal yet — see the other wall guns there for the pattern. The data
+      // here is correct and live (price, box weight, ammo-refill math all
+      // derive from wallCost/boxOnly automatically), but a player cannot
+      // actually buy it off a wall until that physical spot is added.
     },
     // --- box-only: launchers / wonder / special -----------------------------
     {
@@ -466,12 +510,18 @@
       spreadHip: 1.0, spreadAds: 0.2, spreadMoveMult: 1.2,
       recoil: { vert: 6.0, horiz: 1.0, recovery: 3 },
       rangeFalloff: { start: 0, end: 999, minMult: 1 }, // splash damage does not fall off with range
-      splashRadius: 3.5, selfDamageClose: true,
+      splashRadius: 3.5, selfDamageClose: true, selfDamageFraction: 0.35,
       penetration: 0, sprintOutTime: 0.5, swapTime: 0.9,
       wallCost: null, boxOnly: true, weight: 9.5,
       // Rocket splash guarantees the kill in its radius, but with only 4
       // rockets total and a heavy reload it's a panic button, not a main gun.
-      // selfDamageClose is real: firing too close hurts the player too.
+      // selfDamageClose is real and enforced: Z.W.detonate() (15_weapons.js)
+      // checks the player's distance to the blast and calls Z.Player.damage
+      // with splashDamage * selfDamageFraction, falling off linearly to 0 at
+      // splashRadius — the same falloff shape as the player's own grenade
+      // (see Z.Player.updateGrenades). 0.35 matches that existing constant
+      // so a rocket at your own feet is exactly as punishing, proportionally,
+      // as a grenade would be, scaled by the rocket's much larger damage.
     },
     {
       id: 'raygun', name: 'Ray Gun', class: 'wonder', damage: 1000, headshotMult: 1.0,
@@ -480,15 +530,16 @@
       spreadHip: 1.0, spreadAds: 0.1, spreadMoveMult: 1.1,
       recoil: { vert: 0.6, horiz: 0.1, recovery: 14 },
       rangeFalloff: { start: 0, end: 999, minMult: 1 },
-      splashRadius: 2.5, selfDamageClose: true,
+      splashRadius: 2.5, selfDamageClose: true, selfDamageFraction: 0.35,
       penetration: 1, sprintOutTime: 0.2, swapTime: 0.5,
       wallCost: null, boxOnly: true, weight: 3.0,
       // The signature wonder weapon. 1000 direct + splash keeps it relevant
       // far longer than any wall gun (see crossover table). Classic risk:
-      // splash damage close range can hurt the shooter (selfDamageClose).
+      // splash damage close range can hurt the shooter — enforced in
+      // Z.W.detonate() (15_weapons.js), same mechanism as Panzerschreck.
     },
     {
-      id: 'm2_flamethrower', name: 'M2 Flamethrower', class: 'launcher', damage: 25, headshotMult: 1.0,
+      id: 'm2_flamethrower', name: 'M2 Flamethrower', class: 'flamethrower', damage: 25, headshotMult: 1.0,
       magSize: 200, startReserve: 200, maxReserve: 400, rpm: null, fireMode: 'auto',
       dot: true, ticksPerSec: 10, // continuous damage-over-time; magSize is fuel, not rounds
       reloadTime: 4.0, reloadEmptyTime: 4.0, adsTime: 0.3,
@@ -499,6 +550,13 @@
       wallCost: null, boxOnly: true, weight: 7.0,
       // `damage` is per-tick (10 ticks/sec = 250 effective dps), not per-shot.
       // Use B.dps(weapon) rather than B.oneShotCrossoverRound for this one.
+      // `rpm: null` is intentional and enforced by B.validate()'s dot/melee
+      // exemption below — a continuous stream has no discrete "round", and
+      // treating it as one (60 / null = Infinity) is what jammed the gun
+      // forever after one shot. `class: 'flamethrower'` (NOT 'launcher') is
+      // load-bearing too: it is what keeps this weapon out of Z.W's
+      // physical-projectile fire path (spawnProjectile) — see the `d.dot`
+      // branch in Z.W.update and Z.W's fireContinuous()/flameTick().
     },
     {
       id: 'magnum357', name: '.357 Magnum', class: 'pistol', damage: 120, headshotMult: 2.5,
@@ -741,6 +799,23 @@
     if (sustained - fastestZ < 0.15) {
       problems.push('kiting margin is only ' + (sustained - fastestZ).toFixed(2) + ' m/s — too tight');
     }
+    // Per-tier, named: the aggregate check above only ever reports the worst
+    // offender across all tiers combined, which IS mathematically enough to
+    // prove "every tier clears the bar" (a max-of-peaks that passes means
+    // every individual peak passes) — but it gives no clue WHICH tier broke
+    // it. Keep this as an independent, specific check so a future retune of
+    // a single tier fails loudly and legibly instead of a generic "kiting
+    // margin too tight".
+    ZOMBIE_SPEED_TIERS.forEach(function (t) {
+      const peak = Math.max(t.v0, t.v1);
+      const band = t.name === 'sprint' ? B.zombieSpeedSpreadTop : B.zombieSpeedSpread;
+      const worst = peak * band.max;
+      const margin = sustained - worst;
+      if (margin < 0.15) {
+        problems.push('zombie speed tier "' + t.name + '" kiting margin is only ' + margin.toFixed(3)
+          + ' m/s (worst-case ' + worst.toFixed(3) + ' m/s vs sustained ' + sustained.toFixed(3) + ' m/s)');
+      }
+    });
     const sprintCap = B.zombieSpeedTier(13).speed;
     if (sprintCap >= B.PLAYER.speedSprint) {
       problems.push('zombie sprint cap (' + sprintCap + ') is not below B.PLAYER.speedSprint (' + B.PLAYER.speedSprint + ') — kiting breaks');
@@ -775,13 +850,40 @@
       if (!w.id || !w.name || !w.class) problems.push('weapon missing id/name/class: ' + JSON.stringify(w));
       if (seenIds[w.id]) problems.push('duplicate weapon id: ' + w.id);
       seenIds[w.id] = true;
-      const validClasses = ['pistol', 'rifle', 'smg', 'lmg', 'shotgun', 'launcher', 'wonder', 'melee'];
+      const validClasses = ['pistol', 'rifle', 'smg', 'lmg', 'shotgun', 'launcher', 'wonder', 'flamethrower', 'melee'];
       if (validClasses.indexOf(w.class) === -1) problems.push('weapon ' + w.id + ' has invalid class: ' + w.class);
       numericFields.forEach(function (f) {
         if (typeof w[f] !== 'number' || Number.isNaN(w[f])) {
           problems.push('weapon ' + w.id + ' field "' + f + '" is not a number: ' + w[f]);
         }
       });
+      // `rpm` is checked separately from numericFields above: it is the one
+      // field where `null` is sometimes CORRECT (a continuous DoT stream or
+      // a melee swing has no discrete "round"), so it can't be a blanket
+      // require-a-number rule — but it still needs to be an explicit,
+      // deliberate exemption rather than a silent gap. An ungated null rpm
+      // is exactly how the M2 Flamethrower's fire loop ended up computing
+      // 60 / null = Infinity and jamming forever after one shot. Every
+      // weapon that is NOT a DoT/melee weapon must have a real, positive
+      // rate of fire.
+      const rpmExempt = w.dot === true || w.class === 'melee';
+      if (rpmExempt) {
+        if (w.rpm !== null && (typeof w.rpm !== 'number' || Number.isNaN(w.rpm) || w.rpm <= 0)) {
+          problems.push('weapon ' + w.id + ' field "rpm" should be null (dot/melee) or a positive number, got: ' + w.rpm);
+        }
+      } else if (typeof w.rpm !== 'number' || Number.isNaN(w.rpm) || w.rpm <= 0) {
+        problems.push('weapon ' + w.id + ' field "rpm" is not a positive number: ' + w.rpm);
+      }
+      // The exact combination that caused the original bug: a DoT weapon
+      // routed through the physical-projectile launcher class. A continuous
+      // stream and a single ballistic projectile are mutually exclusive fire
+      // models — see the `d.dot` branch in Z.W.update vs. spawnProjectile's
+      // class-based routing (15_weapons.js).
+      if (w.dot === true && w.class === 'launcher') {
+        problems.push('weapon ' + w.id + ' is dot:true but class is "launcher" — a continuous-damage '
+          + 'weapon must not be routed through the projectile/launcher fire path (this is exactly how '
+          + 'the M2 Flamethrower jammed after one shot)');
+      }
       if (w.class !== 'melee' && (w.wallCost === undefined || w.boxOnly === undefined)) {
         problems.push('weapon ' + w.id + ' missing wallCost/boxOnly');
       }
@@ -796,6 +898,18 @@
       }
       if (!w.recoil || typeof w.recoil.vert !== 'number') {
         problems.push('weapon ' + w.id + ' missing recoil');
+      }
+      // selfDamageClose is a promise, not a comment: every weapon that sets
+      // it must also carry a real fraction for Z.W.detonate() to apply, or
+      // the flag silently does nothing — exactly the defect the project's
+      // design review flagged (selfDamageClose declared, never read).
+      if (w.selfDamageClose) {
+        if (typeof w.selfDamageFraction !== 'number' || w.selfDamageFraction <= 0 || w.selfDamageFraction > 1) {
+          problems.push('weapon ' + w.id + ' has selfDamageClose but selfDamageFraction is not in (0,1]: ' + w.selfDamageFraction);
+        }
+        if (typeof w.splashRadius !== 'number' || w.splashRadius <= 0) {
+          problems.push('weapon ' + w.id + ' has selfDamageClose but no positive splashRadius');
+        }
       }
       // Every weapon must eventually stop one-shotting (guards against a
       // silently-infinite or zero damage value slipping through).
