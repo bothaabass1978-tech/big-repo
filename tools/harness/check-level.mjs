@@ -106,6 +106,11 @@ function near(seen, p, tol) {
 const t0 = Date.now();
 let reach = flood([ps[0], 0, ps[2]]);
 console.log('reachable nodes before debris:', reach.size, '(' + (Date.now() - t0) + 'ms)');
+if (process.env.DUMP_BBOX) {
+  let a = [1e9, 1e9, 1e9], b = [-1e9, -1e9, -1e9];
+  for (const q of reach.values()) for (let k = 0; k < 3; k++) { a[k] = Math.min(a[k], q[k]); b[k] = Math.max(b[k], q[k]); }
+  console.log('  bbox', JSON.stringify(a.map((v) => +v.toFixed(1))), JSON.stringify(b.map((v) => +v.toFixed(1))));
+}
 
 const UPY = Z.Level.DIMS.UP;
 if (near(reach, [-6, UPY, -5])) bad('HELP room reachable BEFORE clearing debris');

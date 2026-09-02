@@ -579,6 +579,206 @@
     clutter([-3.1, UP, -2.52], [-2.78, UP + 0.9, -2.2], 'barrel_metal', { uvScale: 1.4 });
     clutter([-2.2, UP, -2.5], [-1.7, UP + 0.34, -2.1], 'rubble', { uvScale: 0.9 });
 
+    // =====================================================================
+    // Baseline dressing, seeded along every wall in the house.
+    //
+    // Every prop above this line is hand-placed, and every one of them sits
+    // beside something the player has a reason to walk to: a wall gun, the
+    // box, the HELP scrawl, a window. That is exactly why the same map reads
+    // as a dressed farmhouse in one frame and as a greybox in the next — the
+    // wall footage nobody had a reason to decorate stayed bare plaster from
+    // skirting to lintel. This pass gives that footage the same vocabulary,
+    // spread procedurally the way the sconces were.
+    //
+    // Candidates are tested against the geometry that actually exists rather
+    // than against a table of room extents — writing positions off extents is
+    // what put three sconces on top of windows. A prop is kept only if it
+    // stands on a floor, has wall behind it at knee height (so doorways and
+    // stair mouths reject themselves), and clears everything already emitted.
+    // Gameplay footprints are handled afterwards by emitClutter().
+    // =====================================================================
+    function clearOf(min, max) {
+      for (const b of brushes) {
+        if (b.solid === false) continue;
+        if (aabbHit(min, max, b)) return false;
+      }
+      for (const c of pendingClutter) if (aabbHit(min, max, c)) return false;
+      return true;
+    }
+    // A floor whose top face is level with y, directly under this point.
+    function standsOn(cx, cz, y) {
+      for (const b of brushes) {
+        if (b.solid === false) continue;
+        if (cx <= b.min[0] || cx >= b.max[0]) continue;
+        if (cz <= b.min[2] || cz >= b.max[2]) continue;
+        if (Math.abs(b.max[1] - y) < 0.03) return true;
+      }
+      return false;
+    }
+
+    // Wall runs to dress: [floorY, normalAxis, faceCoord, inward, from, to].
+    // `inward` points into the room, so the wall body is on the other side.
+    // Upper runs stop where floor2 stops; the standsOn test would reject the
+    // rest anyway, but naming the extent keeps the sampling honest.
+    const DRESS_RUNS = [
+      [0, 2, Z0, 1, X0, X1],              // north, ground
+      [0, 2, Z1, -1, X0, X1],             // south, ground
+      [0, 0, X0, 1, Z0, Z1],              // west, ground
+      [0, 0, X1, -1, Z0, Z1],             // east, ground
+      [0, 0, DIV, -1, Z0, Z1],            // divider, main-hall face
+      [0, 0, DIV + WALL, 1, Z0, Z1],      // divider, east face
+      [UP, 2, Z0, 1, X0, X1],             // north, upper
+      [UP, 0, X0, 1, Z0, 3],              // west, upper (HELP + catwalk)
+      [UP, 0, X1, -1, Z0, 2],             // east, upper
+      [UP, 0, DIV, -1, Z0, 0.8],          // divider, catwalk face
+      [UP, 0, DIV + WALL, 1, Z0, 0.8],    // divider, east-upper face
+    ];
+
+    // Each maker returns the boxes for one prop, given the point on the wall
+    // face and the inward direction. `w` runs along the wall, `d` away from
+    // it. Depth is deliberately capped near 0.6 m: the east rooms' kiting
+    // circles are only 1.8-1.9 m to begin with, and check-level fails the
+    // build below 1.26 m.
+    function dressProp(kind, u, floorY, ax, face, inward) {
+      const out = [];
+      // Convert (along, depth, height) into a world AABB.
+      const put = (u0, u1, d0, d1, y0, y1, mat, opts) => {
+        // Hard depth ceiling. Dressing is allowed to make a room feel lived in;
+        // it is not allowed to make one unkitable. The east ground rooms only
+        // have a 1.8 m circle to begin with and check-level fails below 1.26,
+        // so every prop stays inside a shallow band against the wall.
+        d1 = Math.min(d1, 0.60);
+        const c0 = face + inward * d0, c1 = face + inward * d1;
+        const min = [], max = [];
+        min[1] = floorY + y0; max[1] = floorY + y1;
+        min[ax] = Math.min(c0, c1); max[ax] = Math.max(c0, c1);
+        const al = ax === 0 ? 2 : 0;
+        min[al] = u + u0; max[al] = u + u1;
+        out.push({ min, max, mat, opts });
+      };
+      if (kind === 'crates') {
+        // A stack, not a cube: varied sizes with each course inset and nudged
+        // off-centre is what reads as stacked cargo instead of a placeholder.
+        const n = 1 + (rng.range(0, 1) < 0.55 ? 1 : 0) + (rng.range(0, 1) < 0.25 ? 1 : 0);
+        let y = 0, hw = rng.range(0.26, 0.46), off = 0;
+        for (let i = 0; i < n; i++) {
+          const h = rng.range(0.34, 0.52);
+          put(off - hw, off + hw, 0.06, 0.06 + hw * 1.5, y, y + h, 'crate_wood',
+            { uvScale: rng.range(1.05, 1.5), lowProfile: i === 0 && n === 1 && h <= 0.44 });
+          y += h; hw *= rng.range(0.72, 0.9); off += rng.range(-0.1, 0.1);
+        }
+      } else if (kind === 'sandbags') {
+        const rows = 2 + (rng.range(0, 1) < 0.4 ? 1 : 0);
+        const half = rng.range(0.6, 0.9);
+        for (let i = 0; i < rows; i++) {
+          const s = i * 0.07 * (i % 2 ? 1 : -1);
+          put(-half + s + i * 0.05, half + s - i * 0.05,
+            0.05, 0.05 + 0.40 - i * 0.04, i * 0.19, i * 0.19 + 0.19,
+            'sandbag', { uvScale: 1.3, lowProfile: rows === 2 && i === 0 });
+        }
+      } else if (kind === 'barrel') {
+        const r = rng.range(0.26, 0.33);
+        put(-r, r, 0.08, 0.08 + r * 2, 0, rng.range(0.82, 0.98), 'barrel_metal',
+          { uvScale: 1.4 });
+        if (rng.range(0, 1) < 0.35) {              // one tipped on its side beside it
+          put(r + 0.1, r + 0.98, 0.08, 0.08 + 0.52, 0, 0.52, 'barrel_metal',
+            { uvScale: 1.5 });
+        }
+      } else if (kind === 'debris') {
+        const n = 2 + (rng.range(0, 1) < 0.5 ? 1 : 0);
+        for (let i = 0; i < n; i++) {
+          const c = rng.range(-0.5, 0.5), hw = rng.range(0.24, 0.52);
+          put(c - hw, c + hw, 0.02, rng.range(0.4, 0.75),
+            0, rng.range(0.11, 0.34), 'rubble', { uvScale: 0.9, lowProfile: true });
+        }
+      } else if (kind === 'planks') {
+        // Boards leaning against the wall, and one dropped flat at their foot.
+        const n = 2 + (rng.range(0, 1) < 0.5 ? 1 : 0);
+        for (let i = 0; i < n; i++) {
+          const c = rng.range(-0.34, 0.34), hw = rng.range(0.07, 0.13);
+          put(c - hw, c + hw, 0.03, rng.range(0.2, 0.34),
+            0, rng.range(1.05, 1.75), 'wood_plank', { uvScale: rng.range(1.4, 2.0) });
+        }
+        put(-0.55, 0.55, 0.06, 0.52, 0, 0.09, 'wood_plank',
+          { uvScale: 1.3, lowProfile: true });
+      }
+      return out;
+    }
+
+    // Every piece has to pass: a stack whose top course clips a lintel is worse
+    // than no stack at all. Then the foot has to stand on a floor, and there
+    // has to be wall behind it at knee height — that knee probe is what makes
+    // doorways, window openings at sill level and the two stair mouths reject
+    // themselves, with none of them named here.
+    function fits(parts, u, floorY, ax, face, inward) {
+      for (const p of parts) if (!clearOf(p.min, p.max)) return false;
+      const foot = parts[0];
+      const cx = (foot.min[0] + foot.max[0]) / 2, cz = (foot.min[2] + foot.max[2]) / 2;
+      if (!standsOn(cx, cz, floorY)) return false;
+      const pmin = [], pmax = [];
+      pmin[1] = floorY + 0.25; pmax[1] = floorY + 0.55;
+      pmin[ax] = face - (inward > 0 ? 0.16 : 0.02);
+      pmax[ax] = face + (inward > 0 ? 0.02 : 0.16);
+      const al = ax === 0 ? 2 : 0;
+      pmin[al] = u - 0.12; pmax[al] = u + 0.12;
+      return !clearOf(pmin, pmax);            // clear behind means it is an opening
+    }
+
+    // Weighted so crates and debris carry the room and the louder props stay
+    // occasional — a wall of barrels reads as a warehouse, not a farmhouse.
+    const DRESS_KINDS = ['crates', 'crates', 'crates', 'debris', 'debris',
+      'sandbags', 'planks', 'barrel'];
+    let dressed = 0;
+    for (const [floorY, ax, face, inward, from, to] of DRESS_RUNS) {
+      for (let u = from + 0.5; u < to - 0.5; u += rng.range(0.95, 1.9)) {
+        if (rng.range(0, 1) < 0.16) continue;         // leave the wall breathing room
+        let kind = DRESS_KINDS[(rng.range(0, DRESS_KINDS.length)) | 0];
+        let parts = dressProp(kind, u, floorY, ax, face, inward);
+        // A tall stack that will not fit is not a reason to leave the wall
+        // bare: retry once as a debris drift, which is low enough to sit under
+        // a window frame or beside a doorway jamb where a crate cannot.
+        if (parts.length && !fits(parts, u, floorY, ax, face, inward)) {
+          kind = 'debris';
+          parts = dressProp(kind, u, floorY, ax, face, inward);
+        }
+        if (!parts.length) continue;
+        if (!fits(parts, u, floorY, ax, face, inward)) continue;
+        for (const p of parts) clutter(p.min, p.max, p.mat, p.opts);
+        dressed++;
+      }
+    }
+
+    // Overhead: conduit runs and hanging chains. The ceiling had joists and
+    // nothing else, so every upward glance in the house was identical. These
+    // are non-solid and hang no lower than 2.05 m, so they cost the player
+    // nothing and never enter the navigation grid. metal_rusty was authored
+    // and then used by nothing in the map at all.
+    for (const [cy, x0, x1, cz] of [
+      [C1 - 0.30, X0 + 0.4, DIV - 0.3, -6.8], [C1 - 0.30, X0 + 0.4, DIV - 0.3, 2.6],
+      [C1 - 0.30, DIV + 0.6, X1 - 0.4, -3.2],
+      [C2 - 0.32, X0 + 0.4, DIV - 0.3, -4.4], [C2 - 0.32, DIV + 0.6, X1 - 0.4, -1.0],
+    ]) {
+      box([x0, cy - 0.11, cz - 0.055], [x1, cy, cz + 0.055], 'metal_rusty',
+        { uvScale: 1.6, solid: false });
+      // brackets, so the run is fixed to something
+      for (let x = x0 + 0.9; x < x1 - 0.4; x += rng.range(2.0, 3.2)) {
+        box([x, cy - 0.04, cz - 0.09], [x + 0.09, cy + 0.02, cz + 0.09], 'metal_rusty',
+          { uvScale: 3, solid: false });
+      }
+    }
+    for (const [hy, hx, hz] of [
+      [C1, -2.4, -3.6], [C1, 1.4, 4.8], [C1, 6.6, 1.2], [C1, 8.4, -4.6],
+      [C2, -7.2, -5.2], [C2, -1.2, -0.4], [C2, 6.0, -6.2],
+    ]) {
+      const drop = rng.range(0.55, 1.15);
+      for (let i = 0; i < 5; i++) {
+        const t = i / 5, s = 0.024 + (i % 2) * 0.008;
+        box([hx - s, hy - drop * (t + 0.2), hz - s], [hx + s, hy - drop * t, hz + s],
+          'metal_rusty', { uvScale: 6, solid: false });
+      }
+    }
+    L._dressed = dressed;
+
     // The chalk outlines are what tell the player a wall gun is even there.
     // They're real geometry rather than decals so they light and fog with the
     // wall they're drawn on.
