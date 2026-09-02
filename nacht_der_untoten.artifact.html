@@ -5145,7 +5145,7 @@ Z.assert = function (cond, msg) {
 }());
 
 
-/* ============================ 06_textures.js (2006 lines) ============================ */
+/* ============================ 06_textures.js (2035 lines) ============================ */
 // ---------------------------------------------------------------------------
 // 06_textures.js — Z.Tex: all game textures, generated to <canvas> at runtime.
 // No image assets. Everything below is procedural. Owner: technical-artist.
@@ -6811,6 +6811,34 @@ Z.assert = function (cond, msg) {
     return { canvas: c, size, tile: [false, false], spec: 0.05, gloss: 0.1, emissive: 0, normal: null, tint: [1, 1, 1], alphaTest: 0.04 };
   }
 
+  // The glass of a bare hanging bulb. Self-lit, because the point light that
+  // does the actual illuminating has no geometry of its own — without this the
+  // room has pools of amber coming from nowhere, and the hanging bulb is one
+  // of the most recognisable things in the real map.
+  function makeBulbGlass() {
+    const size = 64;
+    const c = mkCanvas(size);
+    const ctx = ctx2d(c);
+    const g = ctx.createRadialGradient(size * 0.5, size * 0.42, size * 0.05,
+      size * 0.5, size * 0.5, size * 0.55);
+    g.addColorStop(0, '#fff6d8');
+    g.addColorStop(0.45, '#ffcf72');
+    g.addColorStop(1, '#c8801e');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, size, size);
+    // filament: a couple of hot strokes so the glass is not a flat disc
+    ctx.strokeStyle = 'rgba(255,255,240,0.9)';
+    ctx.lineWidth = Math.max(1, size * 0.03);
+    ctx.beginPath();
+    ctx.moveTo(size * 0.38, size * 0.58);
+    ctx.lineTo(size * 0.47, size * 0.36);
+    ctx.lineTo(size * 0.55, size * 0.58);
+    ctx.lineTo(size * 0.63, size * 0.38);
+    ctx.stroke();
+    return { canvas: c, size, tile: [true, true], spec: 0.5, gloss: 0.75,
+      emissive: 1.0, normal: null, tint: [1, 1, 1] };
+  }
+
   function makeZombieSkin() {
     const size = PROP, seedN = 34;
     const c = mkCanvas(size);
@@ -7100,6 +7128,7 @@ Z.assert = function (cond, msg) {
     let ci = 0;
     for (const key of Object.keys(CHALK_GUNS)) { M_['chalk_' + key] = makeChalkGun(key, ci++); }
 
+    M_.bulb_glass = makeBulbGlass();
     M_.zombie_skin = makeZombieSkin();
     M_.gun_metal = makeGunMetal();
     M_.gun_wood = makeGunWood();
@@ -7782,7 +7811,7 @@ Z.assert = function (cond, msg) {
 }());
 
 
-/* ============================ 09_level.js (659 lines) ============================ */
+/* ============================ 09_level.js (707 lines) ============================ */
 // ---------------------------------------------------------------------------
 // 09_level.js — Nacht der Untoten.
 //
@@ -8098,10 +8127,24 @@ Z.assert = function (cond, msg) {
     box([DIV, C1, Z0], [8.2, UP, 2], 'wood_floor', { uvScale: 0.45, group: 'floor2' });
     box([8.2, C1, -2], [X1, UP, 2], 'wood_floor', { uvScale: 0.45, group: 'floor2' });
 
-    // exposed joists under the open edges, purely to sell the broken floor
+    // Exposed joists across the whole main-hall ceiling. Two short strips at
+    // the broken floor edges left the largest surface in the room — the thing
+    // directly above the player for the entire game — as blank planking. A
+    // farmhouse of this age carries its structure on the inside, and the beams
+    // are what give the ceiling depth under the swinging bulb.
     for (let x = X0 + 0.6; x < DIV; x += 1.15) {
-      box([x, C1 - 0.22, -2.55], [x + 0.16, C1, -2.0], 'ceiling_wood', { uvScale: 1.2, solid: false });
-      box([x, C1 - 0.22, 3.0], [x + 0.16, C1, 3.55], 'ceiling_wood', { uvScale: 1.2, solid: false });
+      box([x, C1 - 0.20, Z0 + 0.1], [x + 0.16, C1, Z1 - 0.1], 'ceiling_wood',
+        { uvScale: 1.2, solid: false });
+    }
+    // Deeper cross-beams the joists sit on, running the other way.
+    for (const cz of [-5.2, -0.6, 4.4]) {
+      box([X0 + 0.1, C1 - 0.32, cz], [DIV - 0.1, C1 - 0.20, cz + 0.26], 'ceiling_wood',
+        { uvScale: 1.0, solid: false });
+    }
+    // The east rooms get the same treatment under their own ceiling.
+    for (let x = DIV + 0.5; x < X1 - 0.4; x += 1.2) {
+      box([x, C1 - 0.20, Z0 + 0.1], [x + 0.15, C1, Z1 - 0.1], 'ceiling_wood',
+        { uvScale: 1.2, solid: false });
     }
 
     // ---- interior dividing wall, upper floor ------------------------------
@@ -8188,6 +8231,23 @@ Z.assert = function (cond, msg) {
     for (const c of crates) {
       clutter([c[0], c[1], c[2]], [c[0] + c[3], c[1] + c[4], c[2] + c[5]], 'crate_wood', { uvScale: 1.1 });
     }
+    // A dresser with its doors hanging off, against the west wall.
+    clutter([X0 + 0.15, 0, -1.9], [X0 + 0.75, 1.35, -0.4], 'wood_plank', { uvScale: 1.1 });
+    clutter([X0 + 0.72, 0.35, -1.85], [X0 + 0.86, 1.15, -1.15], 'wood_plank', { uvScale: 1.6 });
+    // Bed frame, stripped, shoved against the north wall.
+    clutter([-8.9, 0, Z0 + 0.2], [-7.1, 0.14, Z0 + 2.1], 'wood_plank', { uvScale: 1.3 });
+    clutter([-8.9, 0.14, Z0 + 0.2], [-8.72, 0.86, Z0 + 2.1], 'wood_plank', { uvScale: 1.5 });
+    clutter([-7.28, 0.14, Z0 + 0.2], [-7.1, 0.62, Z0 + 2.1], 'wood_plank', { uvScale: 1.5 });
+    // Two chairs, one on its side.
+    clutter([-2.6, 0, -2.4], [-2.1, 0.46, -1.9], 'wood_plank', { uvScale: 1.8 });
+    clutter([-2.6, 0.46, -2.4], [-2.5, 1.06, -1.9], 'wood_plank', { uvScale: 2.0 });
+    clutter([5.4, 0, 2.2], [6.1, 0.12, 2.7], 'wood_plank', { uvScale: 1.8 });
+    clutter([5.4, 0.12, 2.6], [6.1, 0.62, 2.7], 'wood_plank', { uvScale: 2.0 });
+    // A shelf unit in the north-east room.
+    clutter([2.2, 0, Z0 + 0.15], [3.9, 1.65, Z0 + 0.5], 'wood_plank', { uvScale: 1.2 });
+    clutter([2.2, 0.55, Z0 + 0.15], [3.9, 0.66, Z0 + 0.86], 'wood_plank', { uvScale: 1.4 });
+    clutter([2.2, 1.12, Z0 + 0.15], [3.9, 1.23, Z0 + 0.86], 'wood_plank', { uvScale: 1.4 });
+
     // rusted barrels
     for (const b of [[-3.0, 0, -6.9], [8.6, 0, 5.6], [0.4, UP, -6.4]]) {
       clutter([b[0] - 0.32, b[1], b[2] - 0.32], [b[0] + 0.32, b[1] + 0.92, b[2] + 0.32],
@@ -8300,14 +8360,14 @@ Z.assert = function (cond, msg) {
     boxSpots.push({ pos: [6.2, UP, -0.6], yaw: 1.2, room: 'east_up' });
     boxSpots.push({ pos: [5.4, 0, 5.4], yaw: -1.1, room: 'se' });
 
-    lights.push({ pos: [-3.2, 2.95, 0.4], color: [1.00, 0.70, 0.34], radius: 8.6,
-      intensity: 1.70, flicker: 0.28, sway: 0.07, name: 'main_bulb' });
+    lights.push({ pos: [-3.2, 2.95, 0.4], color: [1.00, 0.70, 0.34], radius: 10.4,
+      intensity: 1.95, flicker: 0.28, sway: 0.07, name: 'main_bulb' });
     lights.push({ pos: [8.4, 1.05, 5.9], color: [1.00, 0.48, 0.16], radius: 6.6,
       intensity: 1.55, flicker: 0.45, name: 'fire_barrel' });
-    lights.push({ pos: [6.4, UP + 2.55, -4.2], color: [1.00, 0.74, 0.40], radius: 7.2,
-      intensity: 1.30, flicker: 0.35, sway: 0.04, name: 'east_bulb' });
-    lights.push({ pos: [-5.6, UP + 2.6, -5.0], color: [1.00, 0.68, 0.32], radius: 6.2,
-      intensity: 0.95, flicker: 0.62, name: 'help_bulb' });
+    lights.push({ pos: [6.4, UP + 2.55, -4.2], color: [1.00, 0.74, 0.40], radius: 8.6,
+      intensity: 1.52, flicker: 0.35, sway: 0.04, name: 'east_bulb' });
+    lights.push({ pos: [-5.6, UP + 2.6, -5.0], color: [1.00, 0.68, 0.32], radius: 7.6,
+      intensity: 1.16, flicker: 0.62, name: 'help_bulb' });
     lights.push({ pos: [-2.8, 4.4, 5.2], color: [0.40, 0.54, 0.90], radius: 8.4,
       intensity: 0.80, flicker: 0, name: 'moon_shaft_s' });
     lights.push({ pos: [6.0, UP + 2.4, -5.2], color: [0.38, 0.50, 0.88], radius: 6.4,
@@ -8315,14 +8375,31 @@ Z.assert = function (cond, msg) {
     // Four bulbs left the north-east ground room, the west wall and the
     // catwalk outside every radius, so a third of the playable floor — and
     // anything standing on it — resolved to flat black. One emitter per room.
-    lights.push({ pos: [6.2, 2.90, -5.0], color: [1.00, 0.66, 0.30], radius: 8.0,
-      intensity: 1.45, flicker: 0.32, sway: 0.06, name: 'ne_bulb' });
-    lights.push({ pos: [-7.6, 2.85, -4.2], color: [1.00, 0.72, 0.38], radius: 7.4,
-      intensity: 1.20, flicker: 0.24, sway: 0.05, name: 'west_bulb' });
+    lights.push({ pos: [6.2, 2.90, -5.0], color: [1.00, 0.66, 0.30], radius: 9.6,
+      intensity: 1.70, flicker: 0.32, sway: 0.06, name: 'ne_bulb' });
+    lights.push({ pos: [-7.6, 2.85, -4.2], color: [1.00, 0.72, 0.38], radius: 9.0,
+      intensity: 1.42, flicker: 0.24, sway: 0.05, name: 'west_bulb' });
     lights.push({ pos: [-7.0, 0.80, 5.8], color: [1.00, 0.45, 0.14], radius: 6.0,
       intensity: 1.15, flicker: 0.52, name: 'sw_embers' });
     lights.push({ pos: [0.8, UP + 2.45, -2.2], color: [1.00, 0.70, 0.36], radius: 7.0,
       intensity: 1.05, flicker: 0.40, sway: 0.05, name: 'catwalk_bulb' });
+
+    // Every warm emitter was a bare point light with no geometry, so the rooms
+    // had pools of amber coming from nowhere. The hanging bulb on its cord is
+    // one of the most recognisable things in this map; give each ceiling light
+    // a cord, a socket and a lit glass. The glass uses an emissive material so
+    // it reads as the source rather than as a small pale object near it.
+    for (const L of lights) {
+      if (!/_bulb$/.test(L.name)) continue;         // barrels and moon shafts are not bulbs
+      const [bx, by, bz] = L.pos;
+      const ceil = by > UP ? C2 : C1;
+      box([bx - 0.012, by + 0.115, bz - 0.012], [bx + 0.012, ceil, bz + 0.012],
+        'barrel_metal', { uvScale: 6, solid: false });
+      box([bx - 0.030, by + 0.045, bz - 0.030], [bx + 0.030, by + 0.125, bz + 0.030],
+        'barrel_metal', { uvScale: 5, solid: false });
+      box([bx - 0.052, by - 0.062, bz - 0.052], [bx + 0.052, by + 0.050, bz + 0.052],
+        'bulb_glass', { uvScale: 1, solid: false });
+    }
 
     // =====================================================================
     // Nav seeds + zombie spawn zones
@@ -9398,7 +9475,7 @@ Z.assert = function (cond, msg) {
 }());
 
 
-/* ============================ 12_render.js (855 lines) ============================ */
+/* ============================ 12_render.js (860 lines) ============================ */
 // ---------------------------------------------------------------------------
 // 12_render.js — forward renderer.
 //
@@ -9429,14 +9506,19 @@ Z.assert = function (cond, msg) {
   const tmpM = m4.create();
 
   R.env = {
-    ambTop: [0.082, 0.084, 0.104],   // cold moonlight from above
+    // Moonlight from above stays cool, but only just — this is an interior
+    // whose fill comes from tungsten bulbs bouncing off bare boards, so a
+    // strongly blue ambient made every surface outside a bulb's radius read
+    // as cold grey. The map is lit amber and pooled, not blue and even.
+    ambTop: [0.086, 0.082, 0.090],
     // Not literally black. At 0.018 every vertical face outside a bulb's
     // radius crushed to 0,0,0 in the tonemap, so crates, walls and zombies
     // alike became flat silhouettes. This is the floor that keeps a shape
-    // readable without lifting the room out of darkness.
-    ambBot: [0.034, 0.034, 0.042],
+    // readable without lifting the room out of darkness — and it is warm,
+    // because what little bounce there is comes off wood.
+    ambBot: [0.050, 0.041, 0.031],
     sunDir: [0.35, -0.82, 0.45],
-    sunCol: [0.055, 0.062, 0.090],
+    sunCol: [0.046, 0.052, 0.074],
     fogCol: Z.C.FOG_COLOR.slice(),
     fogNear: Z.C.FOG_NEAR,
     fogFar: Z.C.FOG_FAR,
@@ -10327,22 +10409,22 @@ Z.assert = function (cond, msg) {
   // =========================================================================
   const COL = {
     // --- zombie ---
-    cloth: [0.536, 0.563, 0.466],      // feldgrau greatcoat, filthy
-    clothDark: [0.315, 0.336, 0.284],
-    clothWorn: [0.693, 0.693, 0.550],
+    cloth: [0.470, 0.494, 0.409],      // feldgrau greatcoat, filthy
+    clothDark: [0.284, 0.302, 0.256],
+    clothWorn: [0.575, 0.575, 0.457],
     clothMud: [0.205, 0.190, 0.150],
-    trouser: [0.462, 0.452, 0.389],
+    trouser: [0.406, 0.397, 0.342],
     trouserDark: [0.294, 0.290, 0.248],
     leather: [0.210, 0.172, 0.139],    // belt, boots, straps
     leatherHi: [0.336, 0.277, 0.218],
-    skin: [0.997, 1.050, 0.830],       // grey-green dead flesh
-    skinPale: [1.176, 1.208, 0.987],
-    skinDark: [0.389, 0.416, 0.353],
+    skin: [0.700, 0.735, 0.600],       // grey-green dead flesh
+    skinPale: [0.830, 0.855, 0.700],
+    skinDark: [0.300, 0.320, 0.272],
     flesh: [0.756, 0.252, 0.231],      // stumps / open wounds
     fleshDark: [0.357, 0.109, 0.105],
     fleshWet: [0.966, 0.168, 0.158],
-    bone: [1.470, 1.439, 1.208],
-    teeth: [1.596, 1.533, 1.281],
+    bone: [0.980, 0.960, 0.806],
+    teeth: [1.060, 1.018, 0.851],
     eye: [0.03, 0.03, 0.03],
     // The signature read: two amber points that stay legible across a black
     // room. Emissive, so they survive the lighting falloff entirely.

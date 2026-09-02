@@ -96,8 +96,16 @@ await shot('ev-08-helproom.png', `
 
 // --- a horde mid-round, close quarters -------------------------------------
 await shot('ev-09-horde.png', `
+  // ev-08 leaves the player teleported into the HELP room, a metre or so from
+  // the mystery box, so this shot framed the box instead of the horde it is
+  // supposed to evidence. Put the player back in the main hall first.
+  G.debug.heal();
+  G.debug.teleport(-5.0, 0, 1.0);
   G.debug.setRound(8);
-  G.debug.sim(26);
+  // Long enough for a full wave to be through the windows and closing, short
+  // enough that they are still at a range you can read as a group. At 26 s
+  // they are all inside melee reach and the frame is just heads.
+  G.debug.sim(18);
   // Look at the densest group 5-14 m out, not whatever is closest — a zombie
   // pressed against the lens tells you nothing about how a horde reads.
   let best = null, bestScore = -1;
@@ -110,6 +118,9 @@ await shot('ev-09-horde.png', `
     const score = n - d * 0.1;
     if (score > bestScore) { bestScore = score; best = z; }
   }
+  // Fall back to whatever is nearest rather than leaving the camera pointed
+  // wherever the previous shot left it — an empty room is not evidence.
+  if (!best) best = Z.Zombies.nearestTo(G.player.pos, 40);
   if (best) {
     G.player.yaw = Math.atan2(-(best.pos[0] - G.player.pos[0]), -(best.pos[2] - G.player.pos[2]));
     G.player.pitch = -0.02;

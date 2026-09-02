@@ -1663,6 +1663,34 @@
     return { canvas: c, size, tile: [false, false], spec: 0.05, gloss: 0.1, emissive: 0, normal: null, tint: [1, 1, 1], alphaTest: 0.04 };
   }
 
+  // The glass of a bare hanging bulb. Self-lit, because the point light that
+  // does the actual illuminating has no geometry of its own — without this the
+  // room has pools of amber coming from nowhere, and the hanging bulb is one
+  // of the most recognisable things in the real map.
+  function makeBulbGlass() {
+    const size = 64;
+    const c = mkCanvas(size);
+    const ctx = ctx2d(c);
+    const g = ctx.createRadialGradient(size * 0.5, size * 0.42, size * 0.05,
+      size * 0.5, size * 0.5, size * 0.55);
+    g.addColorStop(0, '#fff6d8');
+    g.addColorStop(0.45, '#ffcf72');
+    g.addColorStop(1, '#c8801e');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, size, size);
+    // filament: a couple of hot strokes so the glass is not a flat disc
+    ctx.strokeStyle = 'rgba(255,255,240,0.9)';
+    ctx.lineWidth = Math.max(1, size * 0.03);
+    ctx.beginPath();
+    ctx.moveTo(size * 0.38, size * 0.58);
+    ctx.lineTo(size * 0.47, size * 0.36);
+    ctx.lineTo(size * 0.55, size * 0.58);
+    ctx.lineTo(size * 0.63, size * 0.38);
+    ctx.stroke();
+    return { canvas: c, size, tile: [true, true], spec: 0.5, gloss: 0.75,
+      emissive: 1.0, normal: null, tint: [1, 1, 1] };
+  }
+
   function makeZombieSkin() {
     const size = PROP, seedN = 34;
     const c = mkCanvas(size);
@@ -1952,6 +1980,7 @@
     let ci = 0;
     for (const key of Object.keys(CHALK_GUNS)) { M_['chalk_' + key] = makeChalkGun(key, ci++); }
 
+    M_.bulb_glass = makeBulbGlass();
     M_.zombie_skin = makeZombieSkin();
     M_.gun_metal = makeGunMetal();
     M_.gun_wood = makeGunWood();

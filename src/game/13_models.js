@@ -69,22 +69,22 @@
   // =========================================================================
   const COL = {
     // --- zombie ---
-    cloth: [0.536, 0.563, 0.466],      // feldgrau greatcoat, filthy
-    clothDark: [0.315, 0.336, 0.284],
-    clothWorn: [0.693, 0.693, 0.550],
+    cloth: [0.470, 0.494, 0.409],      // feldgrau greatcoat, filthy
+    clothDark: [0.284, 0.302, 0.256],
+    clothWorn: [0.575, 0.575, 0.457],
     clothMud: [0.205, 0.190, 0.150],
-    trouser: [0.462, 0.452, 0.389],
+    trouser: [0.406, 0.397, 0.342],
     trouserDark: [0.294, 0.290, 0.248],
     leather: [0.210, 0.172, 0.139],    // belt, boots, straps
     leatherHi: [0.336, 0.277, 0.218],
-    skin: [0.997, 1.050, 0.830],       // grey-green dead flesh
-    skinPale: [1.176, 1.208, 0.987],
-    skinDark: [0.389, 0.416, 0.353],
+    skin: [0.700, 0.735, 0.600],       // grey-green dead flesh
+    skinPale: [0.830, 0.855, 0.700],
+    skinDark: [0.300, 0.320, 0.272],
     flesh: [0.756, 0.252, 0.231],      // stumps / open wounds
     fleshDark: [0.357, 0.109, 0.105],
     fleshWet: [0.966, 0.168, 0.158],
-    bone: [1.470, 1.439, 1.208],
-    teeth: [1.596, 1.533, 1.281],
+    bone: [0.980, 0.960, 0.806],
+    teeth: [1.060, 1.018, 0.851],
     eye: [0.03, 0.03, 0.03],
     // The signature read: two amber points that stay legible across a black
     // room. Emissive, so they survive the lighting falloff entirely.

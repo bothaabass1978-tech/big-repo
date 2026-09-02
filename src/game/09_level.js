@@ -313,10 +313,24 @@
     box([DIV, C1, Z0], [8.2, UP, 2], 'wood_floor', { uvScale: 0.45, group: 'floor2' });
     box([8.2, C1, -2], [X1, UP, 2], 'wood_floor', { uvScale: 0.45, group: 'floor2' });
 
-    // exposed joists under the open edges, purely to sell the broken floor
+    // Exposed joists across the whole main-hall ceiling. Two short strips at
+    // the broken floor edges left the largest surface in the room — the thing
+    // directly above the player for the entire game — as blank planking. A
+    // farmhouse of this age carries its structure on the inside, and the beams
+    // are what give the ceiling depth under the swinging bulb.
     for (let x = X0 + 0.6; x < DIV; x += 1.15) {
-      box([x, C1 - 0.22, -2.55], [x + 0.16, C1, -2.0], 'ceiling_wood', { uvScale: 1.2, solid: false });
-      box([x, C1 - 0.22, 3.0], [x + 0.16, C1, 3.55], 'ceiling_wood', { uvScale: 1.2, solid: false });
+      box([x, C1 - 0.20, Z0 + 0.1], [x + 0.16, C1, Z1 - 0.1], 'ceiling_wood',
+        { uvScale: 1.2, solid: false });
+    }
+    // Deeper cross-beams the joists sit on, running the other way.
+    for (const cz of [-5.2, -0.6, 4.4]) {
+      box([X0 + 0.1, C1 - 0.32, cz], [DIV - 0.1, C1 - 0.20, cz + 0.26], 'ceiling_wood',
+        { uvScale: 1.0, solid: false });
+    }
+    // The east rooms get the same treatment under their own ceiling.
+    for (let x = DIV + 0.5; x < X1 - 0.4; x += 1.2) {
+      box([x, C1 - 0.20, Z0 + 0.1], [x + 0.15, C1, Z1 - 0.1], 'ceiling_wood',
+        { uvScale: 1.2, solid: false });
     }
 
     // ---- interior dividing wall, upper floor ------------------------------
@@ -403,6 +417,23 @@
     for (const c of crates) {
       clutter([c[0], c[1], c[2]], [c[0] + c[3], c[1] + c[4], c[2] + c[5]], 'crate_wood', { uvScale: 1.1 });
     }
+    // A dresser with its doors hanging off, against the west wall.
+    clutter([X0 + 0.15, 0, -1.9], [X0 + 0.75, 1.35, -0.4], 'wood_plank', { uvScale: 1.1 });
+    clutter([X0 + 0.72, 0.35, -1.85], [X0 + 0.86, 1.15, -1.15], 'wood_plank', { uvScale: 1.6 });
+    // Bed frame, stripped, shoved against the north wall.
+    clutter([-8.9, 0, Z0 + 0.2], [-7.1, 0.14, Z0 + 2.1], 'wood_plank', { uvScale: 1.3 });
+    clutter([-8.9, 0.14, Z0 + 0.2], [-8.72, 0.86, Z0 + 2.1], 'wood_plank', { uvScale: 1.5 });
+    clutter([-7.28, 0.14, Z0 + 0.2], [-7.1, 0.62, Z0 + 2.1], 'wood_plank', { uvScale: 1.5 });
+    // Two chairs, one on its side.
+    clutter([-2.6, 0, -2.4], [-2.1, 0.46, -1.9], 'wood_plank', { uvScale: 1.8 });
+    clutter([-2.6, 0.46, -2.4], [-2.5, 1.06, -1.9], 'wood_plank', { uvScale: 2.0 });
+    clutter([5.4, 0, 2.2], [6.1, 0.12, 2.7], 'wood_plank', { uvScale: 1.8 });
+    clutter([5.4, 0.12, 2.6], [6.1, 0.62, 2.7], 'wood_plank', { uvScale: 2.0 });
+    // A shelf unit in the north-east room.
+    clutter([2.2, 0, Z0 + 0.15], [3.9, 1.65, Z0 + 0.5], 'wood_plank', { uvScale: 1.2 });
+    clutter([2.2, 0.55, Z0 + 0.15], [3.9, 0.66, Z0 + 0.86], 'wood_plank', { uvScale: 1.4 });
+    clutter([2.2, 1.12, Z0 + 0.15], [3.9, 1.23, Z0 + 0.86], 'wood_plank', { uvScale: 1.4 });
+
     // rusted barrels
     for (const b of [[-3.0, 0, -6.9], [8.6, 0, 5.6], [0.4, UP, -6.4]]) {
       clutter([b[0] - 0.32, b[1], b[2] - 0.32], [b[0] + 0.32, b[1] + 0.92, b[2] + 0.32],
@@ -515,14 +546,14 @@
     boxSpots.push({ pos: [6.2, UP, -0.6], yaw: 1.2, room: 'east_up' });
     boxSpots.push({ pos: [5.4, 0, 5.4], yaw: -1.1, room: 'se' });
 
-    lights.push({ pos: [-3.2, 2.95, 0.4], color: [1.00, 0.70, 0.34], radius: 8.6,
-      intensity: 1.70, flicker: 0.28, sway: 0.07, name: 'main_bulb' });
+    lights.push({ pos: [-3.2, 2.95, 0.4], color: [1.00, 0.70, 0.34], radius: 10.4,
+      intensity: 1.95, flicker: 0.28, sway: 0.07, name: 'main_bulb' });
     lights.push({ pos: [8.4, 1.05, 5.9], color: [1.00, 0.48, 0.16], radius: 6.6,
       intensity: 1.55, flicker: 0.45, name: 'fire_barrel' });
-    lights.push({ pos: [6.4, UP + 2.55, -4.2], color: [1.00, 0.74, 0.40], radius: 7.2,
-      intensity: 1.30, flicker: 0.35, sway: 0.04, name: 'east_bulb' });
-    lights.push({ pos: [-5.6, UP + 2.6, -5.0], color: [1.00, 0.68, 0.32], radius: 6.2,
-      intensity: 0.95, flicker: 0.62, name: 'help_bulb' });
+    lights.push({ pos: [6.4, UP + 2.55, -4.2], color: [1.00, 0.74, 0.40], radius: 8.6,
+      intensity: 1.52, flicker: 0.35, sway: 0.04, name: 'east_bulb' });
+    lights.push({ pos: [-5.6, UP + 2.6, -5.0], color: [1.00, 0.68, 0.32], radius: 7.6,
+      intensity: 1.16, flicker: 0.62, name: 'help_bulb' });
     lights.push({ pos: [-2.8, 4.4, 5.2], color: [0.40, 0.54, 0.90], radius: 8.4,
       intensity: 0.80, flicker: 0, name: 'moon_shaft_s' });
     lights.push({ pos: [6.0, UP + 2.4, -5.2], color: [0.38, 0.50, 0.88], radius: 6.4,
@@ -530,14 +561,31 @@
     // Four bulbs left the north-east ground room, the west wall and the
     // catwalk outside every radius, so a third of the playable floor — and
     // anything standing on it — resolved to flat black. One emitter per room.
-    lights.push({ pos: [6.2, 2.90, -5.0], color: [1.00, 0.66, 0.30], radius: 8.0,
-      intensity: 1.45, flicker: 0.32, sway: 0.06, name: 'ne_bulb' });
-    lights.push({ pos: [-7.6, 2.85, -4.2], color: [1.00, 0.72, 0.38], radius: 7.4,
-      intensity: 1.20, flicker: 0.24, sway: 0.05, name: 'west_bulb' });
+    lights.push({ pos: [6.2, 2.90, -5.0], color: [1.00, 0.66, 0.30], radius: 9.6,
+      intensity: 1.70, flicker: 0.32, sway: 0.06, name: 'ne_bulb' });
+    lights.push({ pos: [-7.6, 2.85, -4.2], color: [1.00, 0.72, 0.38], radius: 9.0,
+      intensity: 1.42, flicker: 0.24, sway: 0.05, name: 'west_bulb' });
     lights.push({ pos: [-7.0, 0.80, 5.8], color: [1.00, 0.45, 0.14], radius: 6.0,
       intensity: 1.15, flicker: 0.52, name: 'sw_embers' });
     lights.push({ pos: [0.8, UP + 2.45, -2.2], color: [1.00, 0.70, 0.36], radius: 7.0,
       intensity: 1.05, flicker: 0.40, sway: 0.05, name: 'catwalk_bulb' });
+
+    // Every warm emitter was a bare point light with no geometry, so the rooms
+    // had pools of amber coming from nowhere. The hanging bulb on its cord is
+    // one of the most recognisable things in this map; give each ceiling light
+    // a cord, a socket and a lit glass. The glass uses an emissive material so
+    // it reads as the source rather than as a small pale object near it.
+    for (const L of lights) {
+      if (!/_bulb$/.test(L.name)) continue;         // barrels and moon shafts are not bulbs
+      const [bx, by, bz] = L.pos;
+      const ceil = by > UP ? C2 : C1;
+      box([bx - 0.012, by + 0.115, bz - 0.012], [bx + 0.012, ceil, bz + 0.012],
+        'barrel_metal', { uvScale: 6, solid: false });
+      box([bx - 0.030, by + 0.045, bz - 0.030], [bx + 0.030, by + 0.125, bz + 0.030],
+        'barrel_metal', { uvScale: 5, solid: false });
+      box([bx - 0.052, by - 0.062, bz - 0.052], [bx + 0.052, by + 0.050, bz + 0.052],
+        'bulb_glass', { uvScale: 1, solid: false });
+    }
 
     // =====================================================================
     // Nav seeds + zombie spawn zones
