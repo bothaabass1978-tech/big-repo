@@ -7831,7 +7831,7 @@ Z.assert = function (cond, msg) {
 }());
 
 
-/* ============================ 09_level.js (1048 lines) ============================ */
+/* ============================ 09_level.js (1075 lines) ============================ */
 // ---------------------------------------------------------------------------
 // 09_level.js — Nacht der Untoten.
 //
@@ -8475,6 +8475,14 @@ Z.assert = function (cond, msg) {
     // build below 1.26 m.
     function dressProp(kind, u, floorY, ax, face, inward) {
       const out = [];
+      // One tint per prop, not per material. Every crate in the map sharing a
+      // single 256px texture at exactly one brightness is the tell that gives
+      // procedural away instantly: real cargo in a farmhouse is a jumble of
+      // ages and a jumble of shades. loadLevel() already honours a per-brush
+      // tint, so this costs nothing at draw time -- the batching is by
+      // material and the tint rides in the vertex colour.
+      const v = rng.range(0.70, 1.04);
+      const tint = [v * rng.range(0.97, 1.05), v, v * rng.range(0.90, 1.0)];
       // Convert (along, depth, height) into a world AABB.
       const put = (u0, u1, d0, d1, y0, y1, mat, opts) => {
         // Hard depth ceiling. Dressing is allowed to make a room feel lived in;
@@ -8488,6 +8496,7 @@ Z.assert = function (cond, msg) {
         min[ax] = Math.min(c0, c1); max[ax] = Math.max(c0, c1);
         const al = ax === 0 ? 2 : 0;
         min[al] = u + u0; max[al] = u + u1;
+        opts = Object.assign({ tint: tint }, opts);
         out.push({ min, max, mat, opts });
       };
       if (kind === 'crates') {
@@ -8527,6 +8536,11 @@ Z.assert = function (cond, msg) {
         }
       } else if (kind === 'planks') {
         // Boards leaning against the wall, and one dropped flat at their foot.
+        // wood_plank is the palest wood in the map and is shared with the
+        // window boarding, where pale is right -- that timber is meant to look
+        // freshly nailed up. A board that has been lying in a bombed farmhouse
+        // is not, so knock these back rather than dulling the shared texture.
+        for (let i = 0; i < 3; i++) tint[i] *= 0.72;
         const n = 2 + (rng.range(0, 1) < 0.5 ? 1 : 0);
         for (let i = 0; i < n; i++) {
           const c = rng.range(-0.34, 0.34), hw = rng.range(0.07, 0.13);
@@ -8801,6 +8815,19 @@ Z.assert = function (cond, msg) {
     for (const p of perkSpots) reserved.push(reserveAround(p.pos, 1.5, 2.6));
     for (const s of boxSpots) reserved.push(reserveAround(s.pos, 1.5, 2.2));
     reserved.push(reserveAround([-5.5, 0, 3.0], 1.4, 2.2));   // player start
+    // The two debris piles are the only gate in the map, and a crate stacked
+    // beside one is a free staircase over it. check-level caught precisely
+    // that -- "east upper reachable BEFORE clearing debris" -- the moment the
+    // procedural pass reshuffled. Reserve a stride around each pile, read off
+    // the debris brushes themselves rather than off their coordinates, so
+    // nothing climbable is ever within stepping distance of the gate.
+    for (const b of brushes) {
+      if (!b.debrisId) continue;
+      reserved.push({
+        min: [b.min[0] - 1.3, b.min[1] - 0.05, b.min[2] - 1.3],
+        max: [b.max[0] + 1.3, b.max[1] + 0.6, b.max[2] + 1.3],
+      });
+    }
     // keep the stair mouths and the drop-through holes clear
     reserved.push({ min: [X0, 0, 6.2], max: [-7.0, 2.6, Z1] });
     reserved.push({ min: [7.0, 0, Z0], max: [X1, 2.6, -6.2] });
@@ -9390,7 +9417,7 @@ Z.assert = function (cond, msg) {
 }());
 
 
-/* ============================ 11_phys.js (444 lines) ============================ */
+/* ============================ 11_phys.js (489 lines) ============================ */
 // ---------------------------------------------------------------------------
 // 11_phys.js — AABB world collision, axis-resolved movement with step-up,
 // raycasting, and a uniform-grid broadphase.
@@ -9584,23 +9611,68 @@ Z.assert = function (cond, msg) {
     const minz = p[2] - r, maxz = p[2] + r;
     const list = query(minx, minz, maxx, maxz);
     let hit = false;
+
+    // Vertical resolution has to consider every overlapping brush, not stop at
+    // the first one. A body that is horizontally wedged into a wall overlaps
+    // that wall's entire column, so snapping to the first brush's max[1]
+    // teleports it to the TOP of the wall: a player standing on a crate
+    // against the divider was launched 3.3 m onto the ceiling slab and from
+    // there 6.9 m onto the roof, where they could walk off the map entirely.
+    // check-level's reachable-extent assertion is what caught it.
+    //
+    // Only surfaces the body actually crossed during this move are eligible —
+    // for a fall, floors at or below where the feet started; for a rise,
+    // ceilings at or above where the head started. If the body overlaps
+    // something but crossed nothing, it was already inside that brush before
+    // the move: block the vertical motion and leave it where it was rather
+    // than snapping it to any surface at all.
+    if (axis === 1) {
+      const y0 = ent.pos[1] - d;              // feet before this move
+      let best = null, bestB = null;
+      for (let i = 0; i < list.length; i++) {
+        const b = list[i];
+        if (!overlaps(minx, miny, minz, maxx, maxy, maxz, b)) continue;
+        hit = true;
+        if (d > 0) {
+          if (b.min[1] + SKIN < y0 + h) continue;
+          if (best === null || b.min[1] < best) { best = b.min[1]; bestB = b; }
+        } else {
+          if (b.max[1] - SKIN > y0) continue;
+          if (best === null || b.max[1] > best) { best = b.max[1]; bestB = b; }
+        }
+      }
+      if (best !== null) {
+        if (d > 0) ent.pos[1] = best - h - SKIN;
+        else { ent.pos[1] = best + SKIN; ent.groundBrush = bestB; }
+      } else if (hit) {
+        ent.pos[1] = y0;                      // wedged: do not move vertically
+      }
+      return hit;
+    }
+
+    // Horizontal resolution had the same defect, with a worse consequence.
+    // Snapping to the first overlapping brush's far face can move the body
+    // further than this frame's motion, straight through whatever is behind
+    // that brush: a body resting on a knee-high debris drift against the east
+    // wall, walking west, overlapped the drift by two centimetres, was
+    // resolved to the drift's EAST face, and came out the far side of the
+    // building. Take the most restrictive stop among everything we overlap,
+    // and clamp it to this frame's own span — resolution may undo part or all
+    // of a move, never add to it.
+    const start = ent.pos[axis] - d;
+    const lo = Math.min(start, ent.pos[axis]), hi = Math.max(start, ent.pos[axis]);
+    let stop = null;
     for (let i = 0; i < list.length; i++) {
       const b = list[i];
       if (!overlaps(minx, miny, minz, maxx, maxy, maxz, b)) continue;
       hit = true;
-      if (axis === 0) {
-        ent.pos[0] = d > 0 ? b.min[0] - r - SKIN : b.max[0] + r + SKIN;
-        ent.vel[0] = 0;
-        return true;
-      } else if (axis === 2) {
-        ent.pos[2] = d > 0 ? b.min[2] - r - SKIN : b.max[2] + r + SKIN;
-        ent.vel[2] = 0;
-        return true;
-      } else {
-        if (d > 0) ent.pos[1] = b.min[1] - h - SKIN;
-        else { ent.pos[1] = b.max[1] + SKIN; ent.groundBrush = b; }
-        return true;
-      }
+      const s = d > 0 ? b.min[axis] - r - SKIN : b.max[axis] + r + SKIN;
+      if (stop === null) stop = s;
+      else stop = d > 0 ? Math.min(stop, s) : Math.max(stop, s);
+    }
+    if (hit) {
+      ent.pos[axis] = stop < lo ? lo : (stop > hi ? hi : stop);
+      ent.vel[axis] = 0;
     }
     return hit;
   }
@@ -18059,7 +18131,7 @@ Z.assert = function (cond, msg) {
 }());
 
 
-/* ============================ 22_game.js (745 lines) ============================ */
+/* ============================ 22_game.js (768 lines) ============================ */
 // ---------------------------------------------------------------------------
 // 22_game.js — state machine, fixed-timestep loop, render order, HUD feed.
 // ---------------------------------------------------------------------------
@@ -18298,6 +18370,28 @@ Z.assert = function (cond, msg) {
   // -------------------------------------------------------------------------
   // Main loop
   // -------------------------------------------------------------------------
+  // Dust hanging in the air. FX.ambientDust() was written for exactly this and
+  // then called from nowhere, so the house had bulbs, moon shafts and boarded
+  // windows -- every ingredient of a dusty interior -- in air that was
+  // perfectly, unnaturally clear. Topped up around the camera rather than
+  // seeded across the map: motes are 4 mm sprites and only read at all within
+  // a few metres, so a map-wide field would cost hundreds of particles to show
+  // the same dozen. On the render loop, because it is atmosphere and should
+  // drift at wall-clock rate whatever the simulation is doing.
+  let dustT = 0;
+  function ambientAir(dt) {
+    dustT -= dt;
+    if (dustT > 0) return;
+    dustT = 0.42;
+    const have = Z.FX.stats().particles;
+    if (have > 220) return;                  // a firefight owns the budget
+    // ambientDust() measures its 0.2-2.9 m spread up from the point it is
+    // given, so hand it the floor the camera is standing on. Passing 0 puts
+    // every mote under the player's feet the moment they climb the stairs.
+    const p = Z.Render.camera.pos;
+    Z.FX.ambientDust([p[0], p[1] - 1.6, p[2]], 5.5, 3);
+  }
+
   function tick() {
     if (!running) return;
     requestAnimationFrame(tick);
@@ -18331,6 +18425,7 @@ Z.assert = function (cond, msg) {
     }
 
     G.time += dt;
+    if (G.mode === 'playing' || G.mode === 'gameover') ambientAir(dt);
     Z.FX.update(dt);
     render(dt);
     Z.Input.postUpdate();

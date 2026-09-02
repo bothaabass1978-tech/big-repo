@@ -106,10 +106,26 @@ function near(seen, p, tol) {
 const t0 = Date.now();
 let reach = flood([ps[0], 0, ps[2]]);
 console.log('reachable nodes before debris:', reach.size, '(' + (Date.now() - t0) + 'ms)');
-if (process.env.DUMP_BBOX) {
+// The player must not be able to leave the house. Set dressing is stacked
+// geometry, and a stack beside a window sill or a debris pile is a staircase
+// out of the map or over the only gate in it -- both of which this harness has
+// actually caught. The reachable set is the honest test: report its extent
+// every run, and fail if any of it is outside the walls.
+{
   let a = [1e9, 1e9, 1e9], b = [-1e9, -1e9, -1e9];
   for (const q of reach.values()) for (let k = 0; k < 3; k++) { a[k] = Math.min(a[k], q[k]); b[k] = Math.max(b[k], q[k]); }
-  console.log('  bbox', JSON.stringify(a.map((v) => +v.toFixed(1))), JSON.stringify(b.map((v) => +v.toFixed(1))));
+  console.log('  reachable extent', JSON.stringify(a.map((v) => +v.toFixed(1))),
+    JSON.stringify(b.map((v) => +v.toFixed(1))));
+  const D = Z.Level.DIMS;
+  // One body radius of slack: a node's recorded position is where the sim
+  // settled, which can be a few centimetres inside a wall it is leaning on.
+  const SLACK = R + 0.2;
+  if (a[0] < D.X0 - SLACK || b[0] > D.X1 + SLACK
+    || a[2] < D.Z0 - SLACK || b[2] > D.Z1 + SLACK) {
+    bad('player can reach outside the building: extent ' + JSON.stringify(a.map((v) => +v.toFixed(1)))
+      + ' .. ' + JSON.stringify(b.map((v) => +v.toFixed(1)))
+      + ' vs interior ' + D.X0 + '..' + D.X1 + ' x ' + D.Z0 + '..' + D.Z1);
+  }
 }
 
 const UPY = Z.Level.DIMS.UP;

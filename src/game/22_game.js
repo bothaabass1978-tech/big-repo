@@ -236,6 +236,28 @@
   // -------------------------------------------------------------------------
   // Main loop
   // -------------------------------------------------------------------------
+  // Dust hanging in the air. FX.ambientDust() was written for exactly this and
+  // then called from nowhere, so the house had bulbs, moon shafts and boarded
+  // windows -- every ingredient of a dusty interior -- in air that was
+  // perfectly, unnaturally clear. Topped up around the camera rather than
+  // seeded across the map: motes are 4 mm sprites and only read at all within
+  // a few metres, so a map-wide field would cost hundreds of particles to show
+  // the same dozen. On the render loop, because it is atmosphere and should
+  // drift at wall-clock rate whatever the simulation is doing.
+  let dustT = 0;
+  function ambientAir(dt) {
+    dustT -= dt;
+    if (dustT > 0) return;
+    dustT = 0.42;
+    const have = Z.FX.stats().particles;
+    if (have > 220) return;                  // a firefight owns the budget
+    // ambientDust() measures its 0.2-2.9 m spread up from the point it is
+    // given, so hand it the floor the camera is standing on. Passing 0 puts
+    // every mote under the player's feet the moment they climb the stairs.
+    const p = Z.Render.camera.pos;
+    Z.FX.ambientDust([p[0], p[1] - 1.6, p[2]], 5.5, 3);
+  }
+
   function tick() {
     if (!running) return;
     requestAnimationFrame(tick);
@@ -269,6 +291,7 @@
     }
 
     G.time += dt;
+    if (G.mode === 'playing' || G.mode === 'gameover') ambientAir(dt);
     Z.FX.update(dt);
     render(dt);
     Z.Input.postUpdate();

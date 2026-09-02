@@ -191,23 +191,68 @@
     const minz = p[2] - r, maxz = p[2] + r;
     const list = query(minx, minz, maxx, maxz);
     let hit = false;
+
+    // Vertical resolution has to consider every overlapping brush, not stop at
+    // the first one. A body that is horizontally wedged into a wall overlaps
+    // that wall's entire column, so snapping to the first brush's max[1]
+    // teleports it to the TOP of the wall: a player standing on a crate
+    // against the divider was launched 3.3 m onto the ceiling slab and from
+    // there 6.9 m onto the roof, where they could walk off the map entirely.
+    // check-level's reachable-extent assertion is what caught it.
+    //
+    // Only surfaces the body actually crossed during this move are eligible —
+    // for a fall, floors at or below where the feet started; for a rise,
+    // ceilings at or above where the head started. If the body overlaps
+    // something but crossed nothing, it was already inside that brush before
+    // the move: block the vertical motion and leave it where it was rather
+    // than snapping it to any surface at all.
+    if (axis === 1) {
+      const y0 = ent.pos[1] - d;              // feet before this move
+      let best = null, bestB = null;
+      for (let i = 0; i < list.length; i++) {
+        const b = list[i];
+        if (!overlaps(minx, miny, minz, maxx, maxy, maxz, b)) continue;
+        hit = true;
+        if (d > 0) {
+          if (b.min[1] + SKIN < y0 + h) continue;
+          if (best === null || b.min[1] < best) { best = b.min[1]; bestB = b; }
+        } else {
+          if (b.max[1] - SKIN > y0) continue;
+          if (best === null || b.max[1] > best) { best = b.max[1]; bestB = b; }
+        }
+      }
+      if (best !== null) {
+        if (d > 0) ent.pos[1] = best - h - SKIN;
+        else { ent.pos[1] = best + SKIN; ent.groundBrush = bestB; }
+      } else if (hit) {
+        ent.pos[1] = y0;                      // wedged: do not move vertically
+      }
+      return hit;
+    }
+
+    // Horizontal resolution had the same defect, with a worse consequence.
+    // Snapping to the first overlapping brush's far face can move the body
+    // further than this frame's motion, straight through whatever is behind
+    // that brush: a body resting on a knee-high debris drift against the east
+    // wall, walking west, overlapped the drift by two centimetres, was
+    // resolved to the drift's EAST face, and came out the far side of the
+    // building. Take the most restrictive stop among everything we overlap,
+    // and clamp it to this frame's own span — resolution may undo part or all
+    // of a move, never add to it.
+    const start = ent.pos[axis] - d;
+    const lo = Math.min(start, ent.pos[axis]), hi = Math.max(start, ent.pos[axis]);
+    let stop = null;
     for (let i = 0; i < list.length; i++) {
       const b = list[i];
       if (!overlaps(minx, miny, minz, maxx, maxy, maxz, b)) continue;
       hit = true;
-      if (axis === 0) {
-        ent.pos[0] = d > 0 ? b.min[0] - r - SKIN : b.max[0] + r + SKIN;
-        ent.vel[0] = 0;
-        return true;
-      } else if (axis === 2) {
-        ent.pos[2] = d > 0 ? b.min[2] - r - SKIN : b.max[2] + r + SKIN;
-        ent.vel[2] = 0;
-        return true;
-      } else {
-        if (d > 0) ent.pos[1] = b.min[1] - h - SKIN;
-        else { ent.pos[1] = b.max[1] + SKIN; ent.groundBrush = b; }
-        return true;
-      }
+      const s = d > 0 ? b.min[axis] - r - SKIN : b.max[axis] + r + SKIN;
+      if (stop === null) stop = s;
+      else stop = d > 0 ? Math.min(stop, s) : Math.max(stop, s);
+    }
+    if (hit) {
+      ent.pos[axis] = stop < lo ? lo : (stop > hi ? hi : stop);
+      ent.vel[axis] = 0;
     }
     return hit;
   }

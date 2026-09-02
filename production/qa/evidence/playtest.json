@@ -7,628 +7,542 @@
       "maxHealth": 100,
       "kills": 6,
       "headshots": 3,
-      "shots": 8,
+      "shots": 11,
       "hits": 5,
-      "accuracy": 0.625,
+      "accuracy": 0.455,
       "downs": 0,
       "weapon": "kar98k",
-      "reserve": 26,
+      "reserve": 21,
       "perks": [],
-      "boards": 70,
+      "boards": 63,
       "maxBoards": 78,
-      "timeAlive": 23.2,
-      "roundSecs": 23.2,
+      "timeAlive": 32.7,
+      "roundSecs": 32.7,
       "zHealth": 150,
       "zSpeed": 1,
       "zCount": 6
     },
     {
       "round": 2,
-      "points": 1460,
+      "points": 340,
       "health": 100,
       "maxHealth": 100,
       "kills": 14,
-      "headshots": 8,
-      "shots": 21,
-      "hits": 13,
-      "accuracy": 0.619,
+      "headshots": 7,
+      "shots": 31,
+      "hits": 15,
+      "accuracy": 0.484,
       "downs": 0,
-      "weapon": "kar98k",
-      "reserve": 13,
-      "perks": [],
-      "boards": 48,
+      "weapon": "m1a1_carbine",
+      "reserve": 45,
+      "perks": [
+        "quickrevive"
+      ],
+      "boards": 43,
       "maxBoards": 78,
-      "timeAlive": 59.3,
-      "roundSecs": 36.1,
+      "timeAlive": 80.2,
+      "roundSecs": 47.5,
       "zHealth": 250,
       "zSpeed": 1.13,
       "zCount": 8
     },
     {
       "round": 3,
-      "points": 1120,
+      "points": 1480,
       "health": 100,
       "maxHealth": 100,
       "kills": 27,
-      "headshots": 16,
-      "shots": 63,
-      "hits": 45,
-      "accuracy": 0.714,
+      "headshots": 17,
+      "shots": 89,
+      "hits": 54,
+      "accuracy": 0.607,
       "downs": 0,
       "weapon": "m1a1_carbine",
-      "reserve": 19,
-      "perks": [],
+      "reserve": 98,
+      "perks": [
+        "quickrevive"
+      ],
       "boards": 36,
       "maxBoards": 78,
-      "timeAlive": 109.7,
-      "roundSecs": 50.4,
+      "timeAlive": 115.4,
+      "roundSecs": 35.2,
       "zHealth": 350,
       "zSpeed": 1.27,
       "zCount": 13
     },
     {
       "round": 4,
-      "points": 2970,
+      "points": 3540,
       "health": 100,
       "maxHealth": 100,
       "kills": 45,
-      "headshots": 31,
-      "shots": 145,
-      "hits": 110,
-      "accuracy": 0.759,
+      "headshots": 29,
+      "shots": 174,
+      "hits": 122,
+      "accuracy": 0.701,
       "downs": 0,
       "weapon": "m1a1_carbine",
-      "reserve": 51,
-      "perks": [],
-      "boards": 27,
-      "maxBoards": 78,
-      "timeAlive": 151.7,
-      "roundSecs": 41.9,
-      "zHealth": 450,
-      "zSpeed": 1.4,
-      "zCount": 18
-    },
-    {
-      "round": 5,
-      "points": 5100,
-      "health": 100,
-      "maxHealth": 100,
-      "kills": 69,
-      "headshots": 47,
-      "shots": 296,
-      "hits": 219,
-      "accuracy": 0.74,
-      "downs": 0,
-      "weapon": "m1a1_carbine",
-      "reserve": 16,
+      "reserve": 17,
       "perks": [
         "quickrevive"
       ],
-      "boards": 24,
+      "boards": 29,
       "maxBoards": 78,
-      "timeAlive": 210.8,
-      "roundSecs": 59.1,
-      "zHealth": 550,
-      "zSpeed": 1.9,
-      "zCount": 24
+      "timeAlive": 157.1,
+      "roundSecs": 41.7,
+      "zHealth": 450,
+      "zSpeed": 1.4,
+      "zCount": 18
     }
   ],
   "events": [
     {
-      "t": 95.5,
-      "round": 3,
-      "source": "zombie",
-      "amount": 50,
-      "hpBefore": 100,
-      "hpAfter": 50,
-      "pos": [
-        6.02,
-        0,
-        6.65
-      ],
-      "vel": 3.16,
-      "nearWithin3m": 2,
-      "nearest": 1.4,
-      "room": "se"
-    },
-    {
-      "t": 193.3,
+      "t": 201.5,
       "round": 5,
       "source": "zombie",
       "amount": 50,
       "hpBefore": 100,
       "hpAfter": 50,
       "pos": [
-        -9.19,
+        -8.38,
         0,
-        -4.28
+        1.34
       ],
-      "vel": 3,
-      "nearWithin3m": 3,
-      "nearest": 1.02,
+      "vel": 3.03,
+      "nearWithin3m": 1,
+      "nearest": 1.43,
       "room": "main"
     },
     {
-      "t": 247.7,
-      "round": 6,
-      "source": "zombie",
-      "amount": 50,
-      "hpBefore": 100,
-      "hpAfter": 50,
-      "pos": [
-        -1.3,
-        0,
-        -6.83
-      ],
-      "vel": 3,
-      "nearWithin3m": 2,
-      "nearest": 0.66,
-      "room": "main"
-    },
-    {
-      "t": 266.6,
-      "round": 6,
-      "source": "zombie",
-      "amount": 50,
-      "hpBefore": 100,
-      "hpAfter": 50,
-      "pos": [
-        6.92,
-        0,
-        -7.31
-      ],
-      "vel": 2.16,
-      "nearWithin3m": 3,
-      "nearest": 0.89,
-      "room": "ne"
-    },
-    {
-      "t": 267.2,
-      "round": 6,
+      "t": 203.2,
+      "round": 5,
       "source": "zombie",
       "amount": 50,
       "hpBefore": 50,
       "hpAfter": 0,
       "pos": [
-        7.21,
+        -9.29,
         0,
-        -6.71
+        1.69
       ],
-      "vel": 3.21,
-      "nearWithin3m": 5,
-      "nearest": 0.66,
-      "room": "ne"
+      "vel": 1.88,
+      "nearWithin3m": 2,
+      "nearest": 1.63,
+      "room": "main"
     },
     {
-      "t": 267.9,
-      "round": 6,
+      "t": 206.6,
+      "round": 5,
       "source": "zombie",
       "amount": 50,
       "hpBefore": 0,
       "hpAfter": 0,
       "pos": [
-        7.49,
+        -7.13,
         0,
-        -6.45
-      ],
-      "vel": 0.93,
-      "nearWithin3m": 3,
-      "nearest": 0.83,
-      "room": "ne"
-    },
-    {
-      "t": 268.4,
-      "round": 6,
-      "source": "zombie",
-      "amount": 50,
-      "hpBefore": 0,
-      "hpAfter": 0,
-      "pos": [
-        7.52,
-        0,
-        -5.99
+        2.87
       ],
       "vel": 0.93,
       "nearWithin3m": 2,
-      "nearest": 1.2,
-      "room": "ne"
+      "nearest": 1.55,
+      "room": "main"
     },
     {
-      "t": 269.4,
-      "round": 6,
+      "t": 208.1,
+      "round": 5,
       "source": "zombie",
       "amount": 50,
       "hpBefore": 0,
       "hpAfter": 0,
       "pos": [
-        6.92,
+        -6.47,
         0,
-        -5.89
+        4.05
       ],
-      "vel": 0.98,
+      "vel": 0.93,
       "nearWithin3m": 1,
+      "nearest": 1.49,
+      "room": "main"
+    },
+    {
+      "t": 209.6,
+      "round": 5,
+      "source": "zombie",
+      "amount": 50,
+      "hpBefore": 0,
+      "hpAfter": 0,
+      "pos": [
+        -5.48,
+        0,
+        5.03
+      ],
+      "vel": 0.93,
+      "nearWithin3m": 2,
+      "nearest": 1.45,
+      "room": "main"
+    },
+    {
+      "t": 210.6,
+      "round": 5,
+      "source": "zombie",
+      "amount": 50,
+      "hpBefore": 0,
+      "hpAfter": 0,
+      "pos": [
+        -4.68,
+        0,
+        5.43
+      ],
+      "vel": 0.93,
+      "nearWithin3m": 2,
+      "nearest": 1.44,
+      "room": "main"
+    },
+    {
+      "t": 211.1,
+      "round": 5,
+      "source": "zombie",
+      "amount": 50,
+      "hpBefore": 0,
+      "hpAfter": 0,
+      "pos": [
+        -4.22,
+        0,
+        5.62
+      ],
+      "vel": 0.93,
+      "nearWithin3m": 2,
+      "nearest": 1.42,
+      "room": "main"
+    },
+    {
+      "t": 212.1,
+      "round": 5,
+      "source": "zombie",
+      "amount": 50,
+      "hpBefore": 0,
+      "hpAfter": 0,
+      "pos": [
+        -3.39,
+        0,
+        5.96
+      ],
+      "vel": 1.1,
+      "nearWithin3m": 2,
+      "nearest": 1.49,
+      "room": "main"
+    },
+    {
+      "t": 212.6,
+      "round": 5,
+      "source": "zombie",
+      "amount": 50,
+      "hpBefore": 0,
+      "hpAfter": 0,
+      "pos": [
+        -2.89,
+        0,
+        5.96
+      ],
+      "vel": 0.93,
+      "nearWithin3m": 2,
+      "nearest": 1.46,
+      "room": "main"
+    },
+    {
+      "t": 213.6,
+      "round": 5,
+      "source": "zombie",
+      "amount": 50,
+      "hpBefore": 0,
+      "hpAfter": 0,
+      "pos": [
+        -1.99,
+        0,
+        5.97
+      ],
+      "vel": 0.93,
+      "nearWithin3m": 2,
+      "nearest": 1.42,
+      "room": "main"
+    },
+    {
+      "t": 214.1,
+      "round": 5,
+      "source": "zombie",
+      "amount": 50,
+      "hpBefore": 0,
+      "hpAfter": 0,
+      "pos": [
+        -1.51,
+        0,
+        5.82
+      ],
+      "vel": 0.93,
+      "nearWithin3m": 2,
+      "nearest": 1.54,
+      "room": "main"
+    },
+    {
+      "t": 215.1,
+      "round": 5,
+      "source": "zombie",
+      "amount": 50,
+      "hpBefore": 0,
+      "hpAfter": 0,
+      "pos": [
+        -0.67,
+        0,
+        5.59
+      ],
+      "vel": 0.93,
+      "nearWithin3m": 2,
+      "nearest": 1.28,
+      "room": "main"
+    },
+    {
+      "t": 215.8,
+      "round": 5,
+      "source": "zombie",
+      "amount": 50,
+      "hpBefore": 0,
+      "hpAfter": 0,
+      "pos": [
+        -0.18,
+        0,
+        5.19
+      ],
+      "vel": 0.94,
+      "nearWithin3m": 2,
       "nearest": 1.38,
-      "room": "ne"
-    },
-    {
-      "t": 270.9,
-      "round": 6,
-      "source": "zombie",
-      "amount": 50,
-      "hpBefore": 0,
-      "hpAfter": 0,
-      "pos": [
-        6.74,
-        0,
-        -6.63
-      ],
-      "vel": 0.93,
-      "nearWithin3m": 3,
-      "nearest": 0.87,
-      "room": "ne"
-    },
-    {
-      "t": 271.8,
-      "round": 6,
-      "source": "zombie",
-      "amount": 50,
-      "hpBefore": 0,
-      "hpAfter": 0,
-      "pos": [
-        6.75,
-        0,
-        -7.28
-      ],
-      "vel": 0.93,
-      "nearWithin3m": 3,
-      "nearest": 0.76,
-      "room": "ne"
-    },
-    {
-      "t": 272.3,
-      "round": 6,
-      "source": "zombie",
-      "amount": 50,
-      "hpBefore": 0,
-      "hpAfter": 0,
-      "pos": [
-        6.29,
-        0,
-        -7.32
-      ],
-      "vel": 0.93,
-      "nearWithin3m": 3,
-      "nearest": 0.71,
-      "room": "ne"
-    },
-    {
-      "t": 273.3,
-      "round": 6,
-      "source": "zombie",
-      "amount": 50,
-      "hpBefore": 0,
-      "hpAfter": 0,
-      "pos": [
-        5.52,
-        0,
-        -7.25
-      ],
-      "vel": 0.93,
-      "nearWithin3m": 3,
-      "nearest": 0.66,
-      "room": "ne"
-    },
-    {
-      "t": 273.8,
-      "round": 6,
-      "source": "zombie",
-      "amount": 50,
-      "hpBefore": 0,
-      "hpAfter": 0,
-      "pos": [
-        5.14,
-        0,
-        -7.2
-      ],
-      "vel": 0.93,
-      "nearWithin3m": 3,
-      "nearest": 0.67,
-      "room": "ne"
-    },
-    {
-      "t": 274.8,
-      "round": 6,
-      "source": "zombie",
-      "amount": 50,
-      "hpBefore": 0,
-      "hpAfter": 0,
-      "pos": [
-        4.53,
-        0,
-        -6.49
-      ],
-      "vel": 0.93,
-      "nearWithin3m": 3,
-      "nearest": 0.66,
-      "room": "ne"
-    },
-    {
-      "t": 275.3,
-      "round": 6,
-      "source": "zombie",
-      "amount": 50,
-      "hpBefore": 0,
-      "hpAfter": 0,
-      "pos": [
-        4.38,
-        0,
-        -6.08
-      ],
-      "vel": 0.93,
-      "nearWithin3m": 3,
-      "nearest": 0.67,
-      "room": "ne"
-    },
-    {
-      "t": 276.3,
-      "round": 6,
-      "source": "zombie",
-      "amount": 50,
-      "hpBefore": 0,
-      "hpAfter": 0,
-      "pos": [
-        3.89,
-        0,
-        -5.3
-      ],
-      "vel": 0.93,
-      "nearWithin3m": 3,
-      "nearest": 0.71,
-      "room": "ne"
-    },
-    {
-      "t": 276.8,
-      "round": 6,
-      "source": "zombie",
-      "amount": 50,
-      "hpBefore": 0,
-      "hpAfter": 0,
-      "pos": [
-        3.56,
-        0,
-        -4.97
-      ],
-      "vel": 0.93,
-      "nearWithin3m": 3,
-      "nearest": 0.81,
-      "room": "ne"
-    },
-    {
-      "t": 277.8,
-      "round": 6,
-      "source": "zombie",
-      "amount": 50,
-      "hpBefore": 0,
-      "hpAfter": 0,
-      "pos": [
-        2.89,
-        0,
-        -4.34
-      ],
-      "vel": 0.93,
-      "nearWithin3m": 3,
-      "nearest": 1.03,
       "room": "main"
     },
     {
-      "t": 278.3,
-      "round": 6,
+      "t": 216.6,
+      "round": 5,
       "source": "zombie",
       "amount": 50,
       "hpBefore": 0,
       "hpAfter": 0,
       "pos": [
-        2.52,
+        0.56,
         0,
-        -4.09
+        5.19
       ],
       "vel": 0.93,
-      "nearWithin3m": 3,
-      "nearest": 1.07,
+      "nearWithin3m": 2,
+      "nearest": 1.19,
       "room": "main"
     },
     {
-      "t": 279.3,
-      "round": 6,
+      "t": 217.3,
+      "round": 5,
       "source": "zombie",
       "amount": 50,
       "hpBefore": 0,
       "hpAfter": 0,
       "pos": [
-        2.1,
+        1.23,
         0,
-        -3.31
+        5.15
       ],
       "vel": 0.93,
-      "nearWithin3m": 3,
-      "nearest": 0.83,
+      "nearWithin3m": 2,
+      "nearest": 1.43,
       "room": "main"
     },
     {
-      "t": 280.9,
-      "round": 6,
+      "t": 218.1,
+      "round": 5,
       "source": "zombie",
       "amount": 50,
       "hpBefore": 0,
       "hpAfter": 0,
       "pos": [
-        1.55,
+        1.92,
         0,
-        -1.98
+        4.95
       ],
       "vel": 0.93,
-      "nearWithin3m": 3,
-      "nearest": 0.9,
+      "nearWithin3m": 2,
+      "nearest": 1.21,
       "room": "main"
     },
     {
-      "t": 282.4,
-      "round": 6,
+      "t": 219.1,
+      "round": 5,
       "source": "zombie",
       "amount": 50,
       "hpBefore": 0,
       "hpAfter": 0,
       "pos": [
-        1.02,
+        2.73,
         0,
-        -0.69
+        4.62
       ],
       "vel": 0.93,
-      "nearWithin3m": 3,
-      "nearest": 0.74,
+      "nearWithin3m": 2,
+      "nearest": 1.15,
       "room": "main"
     },
     {
-      "t": 283.7,
-      "round": 6,
+      "t": 219.6,
+      "round": 5,
       "source": "zombie",
       "amount": 50,
       "hpBefore": 0,
       "hpAfter": 0,
       "pos": [
-        0.54,
+        3.21,
         0,
-        0.46
+        4.42
       ],
       "vel": 0.93,
-      "nearWithin3m": 3,
-      "nearest": 0.71,
-      "room": "main"
+      "nearWithin3m": 2,
+      "nearest": 1.15,
+      "room": "se"
     },
     {
-      "t": 285.4,
-      "round": 6,
+      "t": 221,
+      "round": 5,
       "source": "zombie",
       "amount": 50,
       "hpBefore": 0,
       "hpAfter": 0,
       "pos": [
-        -0.06,
+        4.41,
         0,
-        1.9
+        3.95
       ],
       "vel": 0.93,
-      "nearWithin3m": 3,
-      "nearest": 0.84,
-      "room": "main"
+      "nearWithin3m": 2,
+      "nearest": 0.97,
+      "room": "se"
     },
     {
-      "t": 286.9,
-      "round": 6,
+      "t": 222.5,
+      "round": 5,
       "source": "zombie",
       "amount": 50,
       "hpBefore": 0,
       "hpAfter": 0,
       "pos": [
-        -0.6,
+        5.71,
         0,
-        3.21
+        3.41
       ],
       "vel": 0.93,
-      "nearWithin3m": 3,
-      "nearest": 0.89,
-      "room": "main"
+      "nearWithin3m": 2,
+      "nearest": 1.44,
+      "room": "se"
     },
     {
-      "t": 288.4,
-      "round": 6,
+      "t": 223.6,
+      "round": 5,
       "source": "zombie",
       "amount": 50,
       "hpBefore": 0,
       "hpAfter": 0,
       "pos": [
-        -1.03,
+        6.51,
         0,
-        4.49
+        2.96
       ],
       "vel": 0.93,
-      "nearWithin3m": 3,
-      "nearest": 0.84,
-      "room": "main"
+      "nearWithin3m": 2,
+      "nearest": 1.32,
+      "room": "se"
     },
     {
-      "t": 288.7,
-      "round": 6,
+      "t": 224,
+      "round": 5,
       "source": "zombie",
       "amount": 50,
       "hpBefore": 0,
       "hpAfter": 0,
       "pos": [
-        -1.21,
+        6.7,
         0,
-        4.68
+        2.58
       ],
       "vel": 0.93,
-      "nearWithin3m": 3,
-      "nearest": 0.99,
-      "room": "main"
+      "nearWithin3m": 2,
+      "nearest": 1.37,
+      "room": "se"
+    },
+    {
+      "t": 225.7,
+      "round": 5,
+      "source": "zombie",
+      "amount": 50,
+      "hpBefore": 0,
+      "hpAfter": 0,
+      "pos": [
+        7.07,
+        0,
+        1.12
+      ],
+      "vel": 0.93,
+      "nearWithin3m": 2,
+      "nearest": 1.56,
+      "room": "se"
     }
   ],
   "final": {
-    "round": 6,
-    "kills": 93,
-    "headshots": 61,
-    "accuracy": 0.739,
+    "round": 5,
+    "kills": 67,
+    "headshots": 47,
+    "accuracy": 0.733,
     "downs": 1,
     "dead": true,
-    "points": 7550,
-    "timeAlive": 292.4,
-    "roundSecs": 81.7
+    "points": 6970,
+    "timeAlive": 227.1,
+    "roundSecs": 70
   },
   "stats": {
     "mode": "gameover",
-    "fps": 10.11488964063374,
+    "fps": 12.65104262909695,
     "round": {
-      "round": 6,
+      "round": 5,
       "phase": "active",
-      "phaseT": 66.72499999999914,
-      "spawned": 27,
-      "total": 27,
-      "alive": 3,
-      "remaining": 3,
-      "health": 650,
-      "speed": 2.1333333333333333
+      "phaseT": 57.38333333333072,
+      "spawned": 24,
+      "total": 24,
+      "alive": 2,
+      "remaining": 2,
+      "health": 550,
+      "speed": 1.9
     },
     "zombies": {
-      "total": 3,
-      "alive": 3,
+      "total": 2,
+      "alive": 2,
       "tearing": 0,
-      "hunting": 3,
+      "hunting": 2,
       "climbing": 0,
       "approaching": 0,
       "dying": 0
     },
     "player": {
       "pos": [
-        -1.2249474268058482,
+        7.070089628212289,
         0.001,
-        4.691490437003776
+        1.1041399670124834
       ],
       "health": 0,
-      "points": 7550,
+      "points": 6970,
       "weapon": "m1a1_carbine",
       "mag": 0,
-      "reserve": 75,
+      "reserve": 13,
       "downed": false,
       "dead": true,
-      "kills": 93,
-      "headshots": 61
+      "kills": 67,
+      "headshots": 47
     },
     "render": {
-      "draws": 73,
-      "tris": 10914,
+      "draws": 77,
+      "tris": 12802,
       "lights": 8,
-      "worldTris": 6036,
+      "worldTris": 8880,
       "quads": 0
     },
     "fx": {
@@ -648,12 +562,12 @@
       "doublePoints": 0
     },
     "nav": {
-      "nodes": 7242,
+      "nodes": 7174,
       "cols": 80,
       "rows": 72,
       "cell": 0.5,
-      "edges": 62313,
-      "buildMs": 121.89999999990687,
+      "edges": 60879,
+      "buildMs": 161.5,
       "windowLinks": 13
     }
   }

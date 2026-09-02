@@ -641,6 +641,14 @@
     // build below 1.26 m.
     function dressProp(kind, u, floorY, ax, face, inward) {
       const out = [];
+      // One tint per prop, not per material. Every crate in the map sharing a
+      // single 256px texture at exactly one brightness is the tell that gives
+      // procedural away instantly: real cargo in a farmhouse is a jumble of
+      // ages and a jumble of shades. loadLevel() already honours a per-brush
+      // tint, so this costs nothing at draw time -- the batching is by
+      // material and the tint rides in the vertex colour.
+      const v = rng.range(0.70, 1.04);
+      const tint = [v * rng.range(0.97, 1.05), v, v * rng.range(0.90, 1.0)];
       // Convert (along, depth, height) into a world AABB.
       const put = (u0, u1, d0, d1, y0, y1, mat, opts) => {
         // Hard depth ceiling. Dressing is allowed to make a room feel lived in;
@@ -654,6 +662,7 @@
         min[ax] = Math.min(c0, c1); max[ax] = Math.max(c0, c1);
         const al = ax === 0 ? 2 : 0;
         min[al] = u + u0; max[al] = u + u1;
+        opts = Object.assign({ tint: tint }, opts);
         out.push({ min, max, mat, opts });
       };
       if (kind === 'crates') {
@@ -693,6 +702,11 @@
         }
       } else if (kind === 'planks') {
         // Boards leaning against the wall, and one dropped flat at their foot.
+        // wood_plank is the palest wood in the map and is shared with the
+        // window boarding, where pale is right -- that timber is meant to look
+        // freshly nailed up. A board that has been lying in a bombed farmhouse
+        // is not, so knock these back rather than dulling the shared texture.
+        for (let i = 0; i < 3; i++) tint[i] *= 0.72;
         const n = 2 + (rng.range(0, 1) < 0.5 ? 1 : 0);
         for (let i = 0; i < n; i++) {
           const c = rng.range(-0.34, 0.34), hw = rng.range(0.07, 0.13);
@@ -967,6 +981,19 @@
     for (const p of perkSpots) reserved.push(reserveAround(p.pos, 1.5, 2.6));
     for (const s of boxSpots) reserved.push(reserveAround(s.pos, 1.5, 2.2));
     reserved.push(reserveAround([-5.5, 0, 3.0], 1.4, 2.2));   // player start
+    // The two debris piles are the only gate in the map, and a crate stacked
+    // beside one is a free staircase over it. check-level caught precisely
+    // that -- "east upper reachable BEFORE clearing debris" -- the moment the
+    // procedural pass reshuffled. Reserve a stride around each pile, read off
+    // the debris brushes themselves rather than off their coordinates, so
+    // nothing climbable is ever within stepping distance of the gate.
+    for (const b of brushes) {
+      if (!b.debrisId) continue;
+      reserved.push({
+        min: [b.min[0] - 1.3, b.min[1] - 0.05, b.min[2] - 1.3],
+        max: [b.max[0] + 1.3, b.max[1] + 0.6, b.max[2] + 1.3],
+      });
+    }
     // keep the stair mouths and the drop-through holes clear
     reserved.push({ min: [X0, 0, 6.2], max: [-7.0, 2.6, Z1] });
     reserved.push({ min: [7.0, 0, Z0], max: [X1, 2.6, -6.2] });
