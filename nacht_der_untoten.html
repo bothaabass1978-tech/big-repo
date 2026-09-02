@@ -5152,7 +5152,7 @@ Z.assert = function (cond, msg) {
 }());
 
 
-/* ============================ 06_textures.js (2035 lines) ============================ */
+/* ============================ 06_textures.js (2055 lines) ============================ */
 // ---------------------------------------------------------------------------
 // 06_textures.js — Z.Tex: all game textures, generated to <canvas> at runtime.
 // No image assets. Everything below is procedural. Owner: technical-artist.
@@ -6999,6 +6999,25 @@ Z.assert = function (cond, msg) {
     ctx.restore();
     return c;
   }
+  // The soft warm falloff around a hanging bulb. Without it the fixture is a
+  // flat pale quad with a hard edge and nothing reads as actually lit, which
+  // is most of why the palette came across as brown rather than amber.
+  function bulbHalo() {
+    const size = SPR_L;
+    const c = mkCanvas(size);
+    const ctx = ctx2d(c);
+    const h = size / 2;
+    const g = ctx.createRadialGradient(h, h, 0, h, h, h);
+    g.addColorStop(0.00, 'rgba(255,238,196,0.95)');
+    g.addColorStop(0.13, 'rgba(255,206,124,0.55)');
+    g.addColorStop(0.34, 'rgba(240,160,64,0.20)');
+    g.addColorStop(0.62, 'rgba(196,112,32,0.06)');
+    g.addColorStop(1.00, 'rgba(160,88,24,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(h, h, h, 0, M.TAU); ctx.fill();
+    return c;
+  }
+
   function smokePuff() {
     const size = SPR_L;
     const c = mkCanvas(size);
@@ -7151,6 +7170,7 @@ Z.assert = function (cond, msg) {
     S.bullet_hole_metal = bulletHole('metal');
     for (let i = 1; i <= 3; i++) S['muzzle_flash_' + i] = muzzleFlash(i);
     S.smoke_puff = smokePuff();
+    S.bulb_halo = bulbHalo();
     S.spark = sparkSprite();
     S.dust_mote = dustMote();
     S.blood_drop = bloodDrop();
@@ -7818,7 +7838,7 @@ Z.assert = function (cond, msg) {
 }());
 
 
-/* ============================ 09_level.js (754 lines) ============================ */
+/* ============================ 09_level.js (782 lines) ============================ */
 // ---------------------------------------------------------------------------
 // 09_level.js — Nacht der Untoten.
 //
@@ -7887,8 +7907,24 @@ Z.assert = function (cond, msg) {
   // Queued decoration. Emitted only if it does not intrude on a reserved
   // zone (window approach, wall-buy, perk machine, box spot, player start).
   let pendingClutter = [];
+  // `opts.lowProfile` marks a prop short enough to step over. Those are
+  // allowed inside a window's approach slab: a knee-high crate beside a
+  // window is set dressing, and cannot stop a player repairing or a zombie
+  // landing, whereas a chest-high one in front of it would.
   function clutter(min, max, mat, opts) {
     pendingClutter.push({ min, max, mat, opts });
+  }
+
+  // Narrow a window's approach slab along the wall, keeping its depth.
+  function shrinkAlong(r) {
+    const a = r.along || [1, 0, 0];
+    const cx = (r.min[0] + r.max[0]) / 2, cz = (r.min[2] + r.max[2]) / 2;
+    const hx = (r.max[0] - r.min[0]) / 2, hz = (r.max[2] - r.min[2]) / 2;
+    const sx = a[0] ? 0.45 : 1, sz = a[2] ? 0.45 : 1;
+    return {
+      min: [cx - hx * sx, r.min[1], cz - hz * sz],
+      max: [cx + hx * sx, r.max[1], cz + hz * sz],
+    };
   }
 
   function aabbHit(min, max, r) {
@@ -7907,8 +7943,18 @@ Z.assert = function (cond, msg) {
   function emitClutter(reserved) {
     let kept = 0, dropped = 0;
     for (const c of pendingClutter) {
+      const low = !!(c.opts && c.opts.lowProfile) && (c.max[1] - c.min[1]) <= 0.44;
       let blocked = false;
       for (const r of reserved) {
+        // A short prop may sit BESIDE a window but never in front of it: the
+        // approach slab keeps its full depth and loses half its width, so the
+        // landing point and the repair stance stay clear while the flanks open
+        // up for set dressing. Skipping the slab outright put crates on the
+        // spawn point itself, which check-level catches immediately.
+        if (low && r.kind === 'window') {
+          if (aabbHit(c.min, c.max, shrinkAlong(r))) { blocked = true; break; }
+          continue;
+        }
         if (aabbHit(c.min, c.max, r)) { blocked = true; break; }
       }
       if (blocked) { dropped++; continue; }
@@ -8247,7 +8293,8 @@ Z.assert = function (cond, msg) {
       [-9.2, UP, -5.2, 0.85, 0.6, 0.7], [4.2, UP, -6.6, 0.8, 0.58, 0.66],
     ];
     for (const c of crates) {
-      clutter([c[0], c[1], c[2]], [c[0] + c[3], c[1] + c[4], c[2] + c[5]], 'crate_wood', { uvScale: 1.1 });
+      clutter([c[0], c[1], c[2]], [c[0] + c[3], c[1] + c[4], c[2] + c[5]], 'crate_wood',
+        { uvScale: 1.1, lowProfile: c[4] <= 0.44 });
     }
     // A dresser with its doors hanging off, against the west wall.
     clutter([X0 + 0.15, 0, -1.9], [X0 + 0.75, 1.35, -0.4], 'wood_plank', { uvScale: 1.1 });
@@ -8274,7 +8321,7 @@ Z.assert = function (cond, msg) {
     // sandbags near a couple of windows
     for (const s of [[-7.6, 0, -6.6], [-1.2, 0, 6.8]]) {
       clutter([s[0] - 0.85, s[1], s[2] - 0.28], [s[0] + 0.85, s[1] + 0.55, s[2] + 0.28],
-        'sandbag', { uvScale: 1.3 });
+        'sandbag', { uvScale: 1.3, lowProfile: true });
     }
     // rubble drifts in the corners
     for (let i = 0; i < 18; i++) {
@@ -8284,7 +8331,7 @@ Z.assert = function (cond, msg) {
       const pz = inHelp ? rng.range(Z0 + 0.5, -2.6) : rng.range(Z0 + 0.5, Z1 - 1.2);
       if (inHelp && px > DIV - 0.6) continue;
       const w = rng.range(0.5, 1.5), d = rng.range(0.5, 1.3), h = rng.range(0.12, 0.42);
-      clutter([px, y, pz], [px + w, y + h, pz + d], 'rubble', { uvScale: 0.9 });
+      clutter([px, y, pz], [px + w, y + h, pz + d], 'rubble', { uvScale: 0.9, lowProfile: true });
     }
     // torn posters
     box([-9.99, 1.15, -2.6], [-9.92, 2.15, -1.7], 'poster_faded', { uvScale: 1, solid: false });
@@ -8346,14 +8393,14 @@ Z.assert = function (cond, msg) {
         const inward = 0.34;
         const ox = cx + f[0] * inward, oz = cz + f[2] * inward;
         if (side < 0) {
-          clutter([ox - 0.42, fy, oz - 0.34], [ox + 0.42, fy + 0.56, oz + 0.34],
-            'crate_wood', { uvScale: 1.1 });
+          clutter([ox - 0.42, fy, oz - 0.34], [ox + 0.42, fy + 0.42, oz + 0.34],
+            'crate_wood', { uvScale: 1.1, lowProfile: true });
           // stacked, and turned a little so it is not a tower of clones
-          clutter([ox - 0.28, fy + 0.56, oz - 0.26], [ox + 0.34, fy + 1.02, oz + 0.30],
+          clutter([ox - 0.28, fy + 0.42, oz - 0.26], [ox + 0.34, fy + 0.80, oz + 0.30],
             'crate_wood', { uvScale: 1.3 });
         } else {
-          clutter([ox - 0.36, fy, oz - 0.30], [ox + 0.36, fy + 0.44, oz + 0.30],
-            'crate_wood', { uvScale: 1.25 });
+          clutter([ox - 0.36, fy, oz - 0.30], [ox + 0.36, fy + 0.40, oz + 0.30],
+            'crate_wood', { uvScale: 1.25, lowProfile: true });
         }
       }
     }
@@ -8484,6 +8531,7 @@ Z.assert = function (cond, msg) {
       const c = [w.pos[0] + n[0] * 0.9, w.floorY, w.pos[2] + n[2] * 0.9];
       const along = Math.abs(n[0]) > 0.5 ? [0, 0, 1] : [1, 0, 0];
       reserved.push({
+        kind: 'window', along: along,
         min: [Math.min(c[0] - along[0] * 1.1 - Math.abs(n[0]) * 1.2, c[0] - 1.0), w.floorY - 0.05,
           Math.min(c[2] - along[2] * 1.1 - Math.abs(n[2]) * 1.2, c[2] - 1.0)],
         max: [Math.max(c[0] + along[0] * 1.1 + Math.abs(n[0]) * 1.2, c[0] + 1.0), w.floorY + 2.4,
@@ -17752,7 +17800,7 @@ Z.assert = function (cond, msg) {
 }());
 
 
-/* ============================ 22_game.js (717 lines) ============================ */
+/* ============================ 22_game.js (742 lines) ============================ */
 // ---------------------------------------------------------------------------
 // 22_game.js — state machine, fixed-timestep loop, render order, HUD feed.
 // ---------------------------------------------------------------------------
@@ -18278,6 +18326,7 @@ Z.assert = function (cond, msg) {
     Z.Zombies.renderShadows();
     Z.FX.render();
     Z.Econ.renderPowerups();
+    renderBulbHalos();
     renderViewmodel(dt);
 
     Z.Render.post({
@@ -18297,6 +18346,30 @@ Z.assert = function (cond, msg) {
   }
 
   const vmM = Z.M.m4.create();
+  // A soft additive halo on each hanging bulb. The point light already lights
+  // the room; without something visible around the fixture itself the bulb is
+  // a flat pale quad with a hard edge, and nothing in frame reads as the
+  // source. One draw call for every bulb in the level.
+  function renderBulbHalos() {
+    const lv = Z.Level.level;
+    if (!lv || !lv.lights) return;
+    const t = Z.Render.time;
+    Z.Render.beginQuads();
+    let n = 0;
+    for (const L of lv.lights) {
+      if (!/_bulb$/.test(L.name)) continue;
+      // Ride the same flicker the light itself does, so the halo dims with it
+      // instead of floating at a constant brightness over a guttering bulb.
+      const f = L.flicker
+        ? 1 - L.flicker * 0.5 * (0.5 + 0.5 * Math.sin(t * 11.3 + (L.phase || 0)))
+        : 1;
+      const a = 0.62 * f;
+      Z.Render.billboard([L.pos[0], L.pos[1] - 0.005, L.pos[2]], [1.15, 1.15], [1, 1, 1, a]);
+      n++;
+    }
+    if (n) Z.Render.flushQuads('bulb_halo', true, 0.0);
+  }
+
   function renderViewmodel(dt) {
     if (G.mode !== 'playing' && G.mode !== 'gameover') return;
     const p = G.player;

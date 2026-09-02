@@ -1844,6 +1844,25 @@
     ctx.restore();
     return c;
   }
+  // The soft warm falloff around a hanging bulb. Without it the fixture is a
+  // flat pale quad with a hard edge and nothing reads as actually lit, which
+  // is most of why the palette came across as brown rather than amber.
+  function bulbHalo() {
+    const size = SPR_L;
+    const c = mkCanvas(size);
+    const ctx = ctx2d(c);
+    const h = size / 2;
+    const g = ctx.createRadialGradient(h, h, 0, h, h, h);
+    g.addColorStop(0.00, 'rgba(255,238,196,0.95)');
+    g.addColorStop(0.13, 'rgba(255,206,124,0.55)');
+    g.addColorStop(0.34, 'rgba(240,160,64,0.20)');
+    g.addColorStop(0.62, 'rgba(196,112,32,0.06)');
+    g.addColorStop(1.00, 'rgba(160,88,24,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(h, h, h, 0, M.TAU); ctx.fill();
+    return c;
+  }
+
   function smokePuff() {
     const size = SPR_L;
     const c = mkCanvas(size);
@@ -1996,6 +2015,7 @@
     S.bullet_hole_metal = bulletHole('metal');
     for (let i = 1; i <= 3; i++) S['muzzle_flash_' + i] = muzzleFlash(i);
     S.smoke_puff = smokePuff();
+    S.bulb_halo = bulbHalo();
     S.spark = sparkSprite();
     S.dust_mote = dustMote();
     S.blood_drop = bloodDrop();

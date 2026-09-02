@@ -66,8 +66,24 @@
   // Queued decoration. Emitted only if it does not intrude on a reserved
   // zone (window approach, wall-buy, perk machine, box spot, player start).
   let pendingClutter = [];
+  // `opts.lowProfile` marks a prop short enough to step over. Those are
+  // allowed inside a window's approach slab: a knee-high crate beside a
+  // window is set dressing, and cannot stop a player repairing or a zombie
+  // landing, whereas a chest-high one in front of it would.
   function clutter(min, max, mat, opts) {
     pendingClutter.push({ min, max, mat, opts });
+  }
+
+  // Narrow a window's approach slab along the wall, keeping its depth.
+  function shrinkAlong(r) {
+    const a = r.along || [1, 0, 0];
+    const cx = (r.min[0] + r.max[0]) / 2, cz = (r.min[2] + r.max[2]) / 2;
+    const hx = (r.max[0] - r.min[0]) / 2, hz = (r.max[2] - r.min[2]) / 2;
+    const sx = a[0] ? 0.45 : 1, sz = a[2] ? 0.45 : 1;
+    return {
+      min: [cx - hx * sx, r.min[1], cz - hz * sz],
+      max: [cx + hx * sx, r.max[1], cz + hz * sz],
+    };
   }
 
   function aabbHit(min, max, r) {
@@ -86,8 +102,18 @@
   function emitClutter(reserved) {
     let kept = 0, dropped = 0;
     for (const c of pendingClutter) {
+      const low = !!(c.opts && c.opts.lowProfile) && (c.max[1] - c.min[1]) <= 0.44;
       let blocked = false;
       for (const r of reserved) {
+        // A short prop may sit BESIDE a window but never in front of it: the
+        // approach slab keeps its full depth and loses half its width, so the
+        // landing point and the repair stance stay clear while the flanks open
+        // up for set dressing. Skipping the slab outright put crates on the
+        // spawn point itself, which check-level catches immediately.
+        if (low && r.kind === 'window') {
+          if (aabbHit(c.min, c.max, shrinkAlong(r))) { blocked = true; break; }
+          continue;
+        }
         if (aabbHit(c.min, c.max, r)) { blocked = true; break; }
       }
       if (blocked) { dropped++; continue; }
@@ -426,7 +452,8 @@
       [-9.2, UP, -5.2, 0.85, 0.6, 0.7], [4.2, UP, -6.6, 0.8, 0.58, 0.66],
     ];
     for (const c of crates) {
-      clutter([c[0], c[1], c[2]], [c[0] + c[3], c[1] + c[4], c[2] + c[5]], 'crate_wood', { uvScale: 1.1 });
+      clutter([c[0], c[1], c[2]], [c[0] + c[3], c[1] + c[4], c[2] + c[5]], 'crate_wood',
+        { uvScale: 1.1, lowProfile: c[4] <= 0.44 });
     }
     // A dresser with its doors hanging off, against the west wall.
     clutter([X0 + 0.15, 0, -1.9], [X0 + 0.75, 1.35, -0.4], 'wood_plank', { uvScale: 1.1 });
@@ -453,7 +480,7 @@
     // sandbags near a couple of windows
     for (const s of [[-7.6, 0, -6.6], [-1.2, 0, 6.8]]) {
       clutter([s[0] - 0.85, s[1], s[2] - 0.28], [s[0] + 0.85, s[1] + 0.55, s[2] + 0.28],
-        'sandbag', { uvScale: 1.3 });
+        'sandbag', { uvScale: 1.3, lowProfile: true });
     }
     // rubble drifts in the corners
     for (let i = 0; i < 18; i++) {
@@ -463,7 +490,7 @@
       const pz = inHelp ? rng.range(Z0 + 0.5, -2.6) : rng.range(Z0 + 0.5, Z1 - 1.2);
       if (inHelp && px > DIV - 0.6) continue;
       const w = rng.range(0.5, 1.5), d = rng.range(0.5, 1.3), h = rng.range(0.12, 0.42);
-      clutter([px, y, pz], [px + w, y + h, pz + d], 'rubble', { uvScale: 0.9 });
+      clutter([px, y, pz], [px + w, y + h, pz + d], 'rubble', { uvScale: 0.9, lowProfile: true });
     }
     // torn posters
     box([-9.99, 1.15, -2.6], [-9.92, 2.15, -1.7], 'poster_faded', { uvScale: 1, solid: false });
@@ -525,14 +552,14 @@
         const inward = 0.34;
         const ox = cx + f[0] * inward, oz = cz + f[2] * inward;
         if (side < 0) {
-          clutter([ox - 0.42, fy, oz - 0.34], [ox + 0.42, fy + 0.56, oz + 0.34],
-            'crate_wood', { uvScale: 1.1 });
+          clutter([ox - 0.42, fy, oz - 0.34], [ox + 0.42, fy + 0.42, oz + 0.34],
+            'crate_wood', { uvScale: 1.1, lowProfile: true });
           // stacked, and turned a little so it is not a tower of clones
-          clutter([ox - 0.28, fy + 0.56, oz - 0.26], [ox + 0.34, fy + 1.02, oz + 0.30],
+          clutter([ox - 0.28, fy + 0.42, oz - 0.26], [ox + 0.34, fy + 0.80, oz + 0.30],
             'crate_wood', { uvScale: 1.3 });
         } else {
-          clutter([ox - 0.36, fy, oz - 0.30], [ox + 0.36, fy + 0.44, oz + 0.30],
-            'crate_wood', { uvScale: 1.25 });
+          clutter([ox - 0.36, fy, oz - 0.30], [ox + 0.36, fy + 0.40, oz + 0.30],
+            'crate_wood', { uvScale: 1.25, lowProfile: true });
         }
       }
     }
@@ -663,6 +690,7 @@
       const c = [w.pos[0] + n[0] * 0.9, w.floorY, w.pos[2] + n[2] * 0.9];
       const along = Math.abs(n[0]) > 0.5 ? [0, 0, 1] : [1, 0, 0];
       reserved.push({
+        kind: 'window', along: along,
         min: [Math.min(c[0] - along[0] * 1.1 - Math.abs(n[0]) * 1.2, c[0] - 1.0), w.floorY - 0.05,
           Math.min(c[2] - along[2] * 1.1 - Math.abs(n[2]) * 1.2, c[2] - 1.0)],
         max: [Math.max(c[0] + along[0] * 1.1 + Math.abs(n[0]) * 1.2, c[0] + 1.0), w.floorY + 2.4,

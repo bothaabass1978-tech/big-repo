@@ -523,6 +523,7 @@
     Z.Zombies.renderShadows();
     Z.FX.render();
     Z.Econ.renderPowerups();
+    renderBulbHalos();
     renderViewmodel(dt);
 
     Z.Render.post({
@@ -542,6 +543,30 @@
   }
 
   const vmM = Z.M.m4.create();
+  // A soft additive halo on each hanging bulb. The point light already lights
+  // the room; without something visible around the fixture itself the bulb is
+  // a flat pale quad with a hard edge, and nothing in frame reads as the
+  // source. One draw call for every bulb in the level.
+  function renderBulbHalos() {
+    const lv = Z.Level.level;
+    if (!lv || !lv.lights) return;
+    const t = Z.Render.time;
+    Z.Render.beginQuads();
+    let n = 0;
+    for (const L of lv.lights) {
+      if (!/_bulb$/.test(L.name)) continue;
+      // Ride the same flicker the light itself does, so the halo dims with it
+      // instead of floating at a constant brightness over a guttering bulb.
+      const f = L.flicker
+        ? 1 - L.flicker * 0.5 * (0.5 + 0.5 * Math.sin(t * 11.3 + (L.phase || 0)))
+        : 1;
+      const a = 0.62 * f;
+      Z.Render.billboard([L.pos[0], L.pos[1] - 0.005, L.pos[2]], [1.15, 1.15], [1, 1, 1, a]);
+      n++;
+    }
+    if (n) Z.Render.flushQuads('bulb_halo', true, 0.0);
+  }
+
   function renderViewmodel(dt) {
     if (G.mode !== 'playing' && G.mode !== 'gameover') return;
     const p = G.player;
