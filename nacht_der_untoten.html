@@ -15240,7 +15240,7 @@ Z.assert = function (cond, msg) {
 }());
 
 
-/* ============================ 20_hud.js (1222 lines) ============================ */
+/* ============================ 20_hud.js (1257 lines) ============================ */
 // ---------------------------------------------------------------------------
 // 20_hud.js — Z.HUD. Draws the in-game HUD to the 2D `#hud` canvas.
 //
@@ -15371,6 +15371,25 @@ Z.assert = function (cond, msg) {
   // Give it a narrow cell and centre the bars in it.
   function digitCharWidth(h, ch) { return ch === '1' ? h * 0.26 : h * 0.58; }
 
+  // Stroke-then-fill in one pass. drawSegShape builds and fills its own paths
+  // per branch, so the cheapest correct way to outline is to run it twice with
+  // the composite op arranged so the stroke lands underneath.
+  function drawSegShapeStroked(x, ch, w, h, t) {
+    const fill = x.fillStyle;
+    x.fillStyle = x.strokeStyle;
+    x.save();
+    x.lineWidth = x.lineWidth;
+    for (const [dx, dy] of OUTLINE_OFFSETS) {
+      x.save(); x.translate(dx * t * 0.22, dy * t * 0.22);
+      drawSegShape(x, ch, w, h, t);
+      x.restore();
+    }
+    x.restore();
+    x.fillStyle = fill;
+    drawSegShape(x, ch, w, h, t);
+  }
+  const OUTLINE_OFFSETS = [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, -1], [-1, 1], [1, 1]];
+
   function drawSegShape(x, ch, w, h, t) {
     const mid = h / 2;
     const segs = SEG[ch];
@@ -15381,6 +15400,16 @@ Z.assert = function (cond, msg) {
       if (segs.indexOf('d') >= 0) hbar(x, w / 2, h - t / 2, w, t);
       if (segs.indexOf('f') >= 0) vbar(x, t / 2, mid / 2, mid, t);
       if (segs.indexOf('b') >= 0) vbar(x, ch === '1' ? w / 2 : w - t / 2, mid / 2, mid, t);
+      // A bare pair of vertical bars is not a '1' — it reads as a scratch,
+      // especially at round 1 sitting on a textured wall. The angled flag off
+      // the top is what makes the shape a numeral at a glance.
+      if (ch === '1') {
+        x.moveTo(w / 2 - t / 2, t * 0.5);
+        x.lineTo(w / 2 - t * 1.35, t * 1.45);
+        x.lineTo(w / 2 - t * 1.35, t * 2.30);
+        x.lineTo(w / 2 - t / 2, t * 1.35);
+        x.closePath();
+      }
       if (segs.indexOf('e') >= 0) vbar(x, t / 2, mid + mid / 2, mid, t);
       if (segs.indexOf('c') >= 0) vbar(x, ch === '1' ? w / 2 : w - t / 2, mid + mid / 2, mid, t);
       x.fill();
@@ -15428,8 +15457,14 @@ Z.assert = function (cond, msg) {
     x.fillStyle = 'rgba(10,7,4,0.55)';
     drawSegShape(x, ch, w, h, t);
     x.restore();
+    // Dark outline first. The HUD sits over the world, not over a black
+    // letterbox, so a drop shadow alone leaves the numerals fighting whatever
+    // wall texture happens to be behind them.
+    x.strokeStyle = 'rgba(8,5,3,0.85)';
+    x.lineWidth = Math.max(1.5, h * 0.10);
+    x.lineJoin = 'round';
     x.fillStyle = color;
-    drawSegShape(x, ch, w, h, t);
+    drawSegShapeStroked(x, ch, w, h, t);
     x.restore();
   }
 
