@@ -64,11 +64,20 @@ await shot('ev-04-wallbuy.png', `
 `);
 
 // --- the mystery box -------------------------------------------------------
+// The teleport used to force y = 0 regardless of where the box had spawned.
+// The box's spots include one on the upper floor, so on any seed that picked
+// it this shot put the camera on the ground floor staring at empty air three
+// and a half metres below the subject — which is why two review rounds in a
+// row reported that the mystery box "has no silhouette" and "disappears".
+// No openAll() here: the debris shot comes next and openAll() removes both
+// piles, so opening the map for this frame deleted the subject of the one
+// after it. teleport() ignores collision, so the camera can stand upstairs
+// without the stairs being cleared.
 await shot('ev-05-mysterybox.png', `
   const b = Z.Econ.box;
-  G.debug.teleport(b.pos[0] + 1.9, 0, b.pos[2] + 1.9);
+  G.debug.teleport(b.pos[0] + 1.7, b.pos[1], b.pos[2] + 1.7);
   G.player.yaw = Math.atan2(-(b.pos[0] - G.player.pos[0]), -(b.pos[2] - G.player.pos[2]));
-  G.player.pitch = -0.20;
+  G.player.pitch = -0.22;
 `);
 
 // --- a perk machine --------------------------------------------------------
@@ -88,10 +97,14 @@ await shot('ev-07-debris.png', `
 `);
 
 // --- upstairs: the HELP room ----------------------------------------------
+// The scrawl is painted on the south stub wall at z = -2.14 and the room lies
+// north of it, so the camera has to look toward +Z. At yaw 0.02 this shot was
+// pointed at the opposite wall and the one thing the room is named for was
+// behind the player in every evidence pack we have shipped.
 await shot('ev-08-helproom.png', `
   G.debug.openAll();
-  G.debug.teleport(-4.0, 3.62, -4.0);
-  G.player.yaw = Math.PI * 0.02; G.player.pitch = 0.02;
+  G.debug.teleport(-3.4, 3.62, -5.3);
+  G.player.yaw = Math.PI; G.player.pitch = 0.03;
 `);
 
 // --- a horde mid-round, close quarters -------------------------------------

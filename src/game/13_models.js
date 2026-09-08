@@ -343,10 +343,35 @@
     b.setUvMul(7);
 
     // ---- baked AO: darker under chin, armpits, crotch, inside coat -------
+    //
+    // The head gets its own treatment. Every box that makes up a face presents
+    // the same -Z plane to the viewer and box() shades all -Z faces alike, so
+    // the brow ridge, nose ridge and cheek hollows built into the mesh were
+    // lit identically to the skull behind them and the whole face resolved to
+    // one flat rectangle at any distance. Occlusion is what separates them: a
+    // socket is dark because it is a hole, and nothing else in the pipeline
+    // knows that.
+    const headY = rest[J.head][1], headZ = rest[J.head][2];
     function ao(x, y, z, nx, ny, nz) {
       let k = 1.0;
       k *= lerp(0.62, 1.0, clamp01(ny * 0.5 + 0.5));          // faces pointing down are dimmer
       k *= lerp(1.0, 0.72, clamp01(1 - abs(x) * 3.2));         // seam down the centreline
+      const dy = y - headY;
+      if (dy > -0.16 && dy < 0.22) {
+        // The socket band, under the brow and above the cheekbone. Strongest
+        // for surfaces set back from the face plane, so the recessed eye boxes
+        // take it fully and the nose ridge standing proud of them barely does.
+        const band = clamp01(1 - abs(dy - 0.108) / 0.048);
+        const depth = clamp01((z - (headZ - 0.104)) / 0.045);
+        k *= lerp(1.0, 0.44, band * depth);
+        // Under the brow ridge proper: a thin hard line, which is what makes a
+        // brow read as a brow rather than as a differently-tinted stripe.
+        k *= lerp(1.0, 0.62, clamp01(1 - abs(dy - 0.132) / 0.016));
+        // Under the jaw and into the neck.
+        k *= lerp(1.0, 0.52, clamp01(1 - abs(dy + 0.085) / 0.055));
+        // Temples: everything past the width of the face falls away.
+        k *= lerp(1.0, 0.74, clamp01((abs(x) - 0.055) / 0.035));
+      }
       return k;
     }
 
@@ -435,10 +460,21 @@
 
       if (opts.helmet) {
         b.setColor(COL.helmet[0], COL.helmet[1], COL.helmet[2]);
-        // stahlhelm shell: two stacked tapered rings + a brim skirt
-        b.cyl(hx, hz, 0.02 * rk, 0.098 * rk, hy + 0.14, hy + 0.185, 8, { caps: false, uvScale: 3 });
-        b.cyl(hx, hz, 0.098 * rk, 0.104 * rk, hy + 0.10, hy + 0.145, 8, { caps: true, uvScale: 3 });
-        box(b, hx - 0.108 * rk, hy + 0.088, hz - 0.112 * rk, hx + 0.108 * rk, hy + 0.108, hz + 0.112 * rk, COL.helmetDark);
+        // Stahlhelm. cyl() takes its radii as (r at y0, r at y1), and the old
+        // shell had them the wrong way round: a ring 0.02 wide at the bottom
+        // flaring to 0.098 at the top, sitting on a straight-sided band. That
+        // is a funnel on a drum — the variant read as a sentry turret rather
+        // than as a man in a helmet, which is a long way from the silhouette
+        // the whole mode is built on. A helmet is widest at the brim and
+        // tapers to the crown, in that order.
+        b.cyl(hx, hz, 0.108 * rk, 0.101 * rk, hy + 0.082, hy + 0.112, 10, { caps: false, uvScale: 3 });
+        b.cyl(hx, hz, 0.101 * rk, 0.088 * rk, hy + 0.112, hy + 0.152, 10, { caps: false, uvScale: 3 });
+        b.cyl(hx, hz, 0.088 * rk, 0.052 * rk, hy + 0.152, hy + 0.186, 10, { caps: true, uvScale: 3 });
+        // The flared brim, sitting proud of the shell all the way round, and
+        // deeper at the back the way a stahlhelm's neck guard is.
+        b.setColor(COL.helmetDark[0], COL.helmetDark[1], COL.helmetDark[2]);
+        b.cyl(hx, hz + 0.006 * rk, 0.124 * rk, 0.112 * rk, hy + 0.070, hy + 0.092, 10,
+          { caps: false, uvScale: 4 });
       }
     }
 
@@ -1352,20 +1388,60 @@
     const props = {};
 
     // --- mystery box ------------------------------------------------------
+    // The second most recognisable object in the mode, and it was a plain
+    // crate with two bands and a fixed lid — the same silhouette as the ammo
+    // crates stacked against every wall, so the one prop a player crosses the
+    // map for disappeared into the set dressing. What makes it read is the
+    // ironwork: brackets on all four uprights, rails top and bottom, skids
+    // holding it off the floor, and a lid that overhangs and actually opens.
+    const BOX_W = 0.56, BOX_D = 0.40, BOX_H = 0.54;
     {
       const b = Z.Mesh.builder();
+      b.setUvMul(3);
       b.setColor(1, 1, 1);
-      b.box([-0.55, 0, -0.38], [0.55, 0.52, 0.38], { uvScale: 1.1 });
-      b.setColor(0.42, 0.36, 0.28);
-      // iron banding
-      for (const zz of [-0.30, 0.30]) {
-        b.box([-0.57, 0.02, zz - 0.035], [0.57, 0.50, zz + 0.035], { uvScale: 4 });
+      b.box([-BOX_W, 0.07, -BOX_D], [BOX_W, BOX_H, BOX_D], { uvScale: 1.1 });
+      b.setColor(0.40, 0.35, 0.28);
+      // corner brackets, wrapping each upright on both faces
+      for (const sx of [-1, 1]) {
+        for (const sz of [-1, 1]) {
+          b.box([sx > 0 ? BOX_W - 0.10 : -BOX_W, 0.05, sz > 0 ? BOX_D + 0.005 : -BOX_D - 0.035],
+            [sx > 0 ? BOX_W + 0.035 : -BOX_W + 0.10, BOX_H + 0.01, sz > 0 ? BOX_D + 0.035 : -BOX_D - 0.005],
+            { uvScale: 4 });
+          b.box([sx > 0 ? BOX_W + 0.005 : -BOX_W - 0.035, 0.05, sz > 0 ? BOX_D - 0.10 : -BOX_D],
+            [sx > 0 ? BOX_W + 0.035 : -BOX_W - 0.005, BOX_H + 0.01, sz > 0 ? BOX_D : -BOX_D + 0.10],
+            { uvScale: 4 });
+        }
       }
-      b.setColor(1, 1, 1);
-      b.box([-0.57, 0.52, -0.40], [0.57, 0.60, 0.40], { uvScale: 1.1 });   // lid
+      // top and bottom rails
+      for (const yy of [0.10, BOX_H - 0.07]) {
+        b.box([-BOX_W - 0.02, yy, -BOX_D - 0.02], [BOX_W + 0.02, yy + 0.045, BOX_D + 0.02],
+          { uvScale: 4 });
+      }
+      // skids: the box sits proud of the floor, so it casts a line of shadow
+      // under itself instead of melting into the boards
+      for (const sz of [-1, 1]) {
+        b.box([-BOX_W + 0.04, 0, sz * BOX_D - 0.06], [BOX_W - 0.04, 0.075, sz * BOX_D + 0.06],
+          { uvScale: 4 });
+      }
       b.shadeBy((x, y) => 0.62 + 0.38 * Z.M.clamp01(y / 0.6));
       props.mystery_box = b.finish('mystery_box');
     }
+    // The lid is its own mesh so the box can actually open. Its origin is the
+    // hinge along the back edge, so a single rotation about X swings it.
+    {
+      const b = Z.Mesh.builder();
+      b.setUvMul(3);
+      b.setColor(1, 1, 1);
+      b.box([-BOX_W - 0.045, 0, -(BOX_D * 2 + 0.09)], [BOX_W + 0.045, 0.075, 0],
+        { uvScale: 1.1 });
+      b.setColor(0.40, 0.35, 0.28);
+      for (const sx of [-1, 1]) {
+        b.box([sx > 0 ? BOX_W - 0.02 : -BOX_W - 0.05, -0.005, -(BOX_D * 2 + 0.09)],
+          [sx > 0 ? BOX_W + 0.05 : -BOX_W + 0.02, 0.082, 0], { uvScale: 4 });
+      }
+      props.mystery_box_lid = b.finish('mystery_box');
+    }
+    props.mysteryBoxDims = { w: BOX_W, d: BOX_D, h: BOX_H };
 
     // --- perk machines ----------------------------------------------------
     const perkMats = { jugg: 'perk_jugg', speed: 'perk_speed', doubletap: 'perk_doubletap', revive: 'perk_revive' };

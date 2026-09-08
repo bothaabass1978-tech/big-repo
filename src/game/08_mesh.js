@@ -251,9 +251,15 @@
   };
 
   // Multiply every vertex colour by a scalar field — used to bake fake AO.
+  // Baked ambient occlusion, applied to vertex colour. Self-lit vertices are
+  // skipped: vCol carries both the albedo and the emissive colour, so shading
+  // a glowing vertex puts the model's ambient occlusion into the brightness of
+  // its own light source — a zombie's eyes would dim because they sit in a
+  // socket, which is the opposite of the point of a socket.
   Builder.prototype.shadeBy = function (fn) {
     const n = this.vcount();
     for (let i = 0; i < n; i++) {
+      if (this.emis[i] > 0) continue;
       const k = fn(this.pos[i * 3], this.pos[i * 3 + 1], this.pos[i * 3 + 2],
         this.nrm[i * 3], this.nrm[i * 3 + 1], this.nrm[i * 3 + 2]);
       this.col[i * 3] *= k; this.col[i * 3 + 1] *= k; this.col[i * 3 + 2] *= k;

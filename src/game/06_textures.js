@@ -1565,6 +1565,56 @@
     return { canvas: c, size, tile: [false, false], spec: 0.08, gloss: 0.16, emissive: 0, normal: null, tint: [1, 1, 1] };
   }
 
+  // The mystery box's front sigil. Drawn on its own plate rather than baked
+  // into the crate texture because it needs to SELF-LIT: the shader's emissive
+  // term multiplies the albedo, so a dark ground with a bright glyph glows in
+  // the shape of the glyph, and the box announces itself across a black room
+  // the way the real one does.
+  function makeMysterySigil() {
+    const size = PROP, seedN = 41;
+    const c = mkCanvas(size);
+    const ctx = ctx2d(c);
+    // Dark plank ground so only the mark carries light.
+    const base = baseLayer(size, 40, seedN, {
+      octaves: 4, freq: 3, warpAmt: 0.3, warpFreq: 2,
+      stops: [[0, [6, 5, 4]], [0.5, [16, 13, 10]], [1, [28, 23, 17]]],
+    });
+    ctx.drawImage(base, 0, 0);
+    const cx = size * 0.5, cy = size * 0.5;
+    // Warm halo behind the mark, so the glow has falloff rather than a hard
+    // edge where the glyph stops.
+    const g = ctx.createRadialGradient(cx, cy, size * 0.04, cx, cy, size * 0.46);
+    g.addColorStop(0, 'rgba(255,196,104,0.55)');
+    g.addColorStop(0.5, 'rgba(210,140,60,0.22)');
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, size, size);
+    // The mark itself, painted twice: a wide soft pass and a tight bright one,
+    // which is what stops a single flat glyph reading as a decal.
+    ctx.save();
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.font = `bold ${Math.round(size * 0.68)}px serif`;
+    ctx.fillStyle = 'rgba(255,178,86,0.55)';
+    ctx.fillText('?', cx, cy + size * 0.02);
+    ctx.font = `bold ${Math.round(size * 0.60)}px serif`;
+    ctx.fillStyle = 'rgba(255,232,186,0.95)';
+    ctx.fillText('?', cx, cy + size * 0.02);
+    ctx.restore();
+    // Age it: the box has been in a burning farmhouse, not a shop window.
+    const st = rng(seedN + 60);
+    ctx.save();
+    ctx.globalCompositeOperation = 'destination-out';
+    for (let i = 0; i < 40; i++) {
+      ctx.fillStyle = `rgba(0,0,0,${st.range(0.15, 0.5).toFixed(3)})`;
+      const w = st.range(size * 0.02, size * 0.09);
+      ctx.fillRect(st.range(0, size), st.range(0, size), w, st.range(size * 0.01, w));
+    }
+    ctx.restore();
+    grime(ctx, size, seedN, 0.7);
+    return { canvas: c, size, tile: [false, false], spec: 0.05, gloss: 0.1,
+      emissive: 0, normal: null, tint: [1, 1, 1] };
+  }
+
   // Chalk wall-buy silhouettes. `draw(ctx,st,cx,cy,s)` draws the gun in a
   // roughly (-s..s) box centred at (cx,cy) using chalkLine/chalkPoly.
   // Closed side-profile silhouettes in units of `s`, +x = toward the muzzle,
@@ -2010,6 +2060,7 @@
     M_.perk_doubletap = makePerkPanel(22, [210, 160, 30], 'DOUBLE TAP', 'ROOT BEER');
     M_.perk_revive = makePerkPanel(23, [120, 165, 200], 'QUICK REVIVE', 'RESTORATIVE');
     M_.mystery_box = makeMysteryBox();
+    M_.mystery_sigil = makeMysterySigil();
     M_.wall_weapon_chalk = makeWallWeaponChalk();
     let ci = 0;
     for (const key of Object.keys(CHALK_GUNS)) { M_['chalk_' + key] = makeChalkGun(key, ci++); }

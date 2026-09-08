@@ -5152,7 +5152,7 @@ Z.assert = function (cond, msg) {
 }());
 
 
-/* ============================ 06_textures.js (2070 lines) ============================ */
+/* ============================ 06_textures.js (2121 lines) ============================ */
 // ---------------------------------------------------------------------------
 // 06_textures.js — Z.Tex: all game textures, generated to <canvas> at runtime.
 // No image assets. Everything below is procedural. Owner: technical-artist.
@@ -6720,6 +6720,56 @@ Z.assert = function (cond, msg) {
     return { canvas: c, size, tile: [false, false], spec: 0.08, gloss: 0.16, emissive: 0, normal: null, tint: [1, 1, 1] };
   }
 
+  // The mystery box's front sigil. Drawn on its own plate rather than baked
+  // into the crate texture because it needs to SELF-LIT: the shader's emissive
+  // term multiplies the albedo, so a dark ground with a bright glyph glows in
+  // the shape of the glyph, and the box announces itself across a black room
+  // the way the real one does.
+  function makeMysterySigil() {
+    const size = PROP, seedN = 41;
+    const c = mkCanvas(size);
+    const ctx = ctx2d(c);
+    // Dark plank ground so only the mark carries light.
+    const base = baseLayer(size, 40, seedN, {
+      octaves: 4, freq: 3, warpAmt: 0.3, warpFreq: 2,
+      stops: [[0, [6, 5, 4]], [0.5, [16, 13, 10]], [1, [28, 23, 17]]],
+    });
+    ctx.drawImage(base, 0, 0);
+    const cx = size * 0.5, cy = size * 0.5;
+    // Warm halo behind the mark, so the glow has falloff rather than a hard
+    // edge where the glyph stops.
+    const g = ctx.createRadialGradient(cx, cy, size * 0.04, cx, cy, size * 0.46);
+    g.addColorStop(0, 'rgba(255,196,104,0.55)');
+    g.addColorStop(0.5, 'rgba(210,140,60,0.22)');
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, size, size);
+    // The mark itself, painted twice: a wide soft pass and a tight bright one,
+    // which is what stops a single flat glyph reading as a decal.
+    ctx.save();
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.font = `bold ${Math.round(size * 0.68)}px serif`;
+    ctx.fillStyle = 'rgba(255,178,86,0.55)';
+    ctx.fillText('?', cx, cy + size * 0.02);
+    ctx.font = `bold ${Math.round(size * 0.60)}px serif`;
+    ctx.fillStyle = 'rgba(255,232,186,0.95)';
+    ctx.fillText('?', cx, cy + size * 0.02);
+    ctx.restore();
+    // Age it: the box has been in a burning farmhouse, not a shop window.
+    const st = rng(seedN + 60);
+    ctx.save();
+    ctx.globalCompositeOperation = 'destination-out';
+    for (let i = 0; i < 40; i++) {
+      ctx.fillStyle = `rgba(0,0,0,${st.range(0.15, 0.5).toFixed(3)})`;
+      const w = st.range(size * 0.02, size * 0.09);
+      ctx.fillRect(st.range(0, size), st.range(0, size), w, st.range(size * 0.01, w));
+    }
+    ctx.restore();
+    grime(ctx, size, seedN, 0.7);
+    return { canvas: c, size, tile: [false, false], spec: 0.05, gloss: 0.1,
+      emissive: 0, normal: null, tint: [1, 1, 1] };
+  }
+
   // Chalk wall-buy silhouettes. `draw(ctx,st,cx,cy,s)` draws the gun in a
   // roughly (-s..s) box centred at (cx,cy) using chalkLine/chalkPoly.
   // Closed side-profile silhouettes in units of `s`, +x = toward the muzzle,
@@ -7165,6 +7215,7 @@ Z.assert = function (cond, msg) {
     M_.perk_doubletap = makePerkPanel(22, [210, 160, 30], 'DOUBLE TAP', 'ROOT BEER');
     M_.perk_revive = makePerkPanel(23, [120, 165, 200], 'QUICK REVIVE', 'RESTORATIVE');
     M_.mystery_box = makeMysteryBox();
+    M_.mystery_sigil = makeMysterySigil();
     M_.wall_weapon_chalk = makeWallWeaponChalk();
     let ci = 0;
     for (const key of Object.keys(CHALK_GUNS)) { M_['chalk_' + key] = makeChalkGun(key, ci++); }
@@ -7541,7 +7592,7 @@ Z.assert = function (cond, msg) {
 }());
 
 
-/* ============================ 08_mesh.js (318 lines) ============================ */
+/* ============================ 08_mesh.js (324 lines) ============================ */
 // ---------------------------------------------------------------------------
 // 08_mesh.js — CPU mesh construction. Everything in this game is generated
 // here: walls, stairs, rubble, zombie limbs, gun viewmodels.
@@ -7795,9 +7846,15 @@ Z.assert = function (cond, msg) {
   };
 
   // Multiply every vertex colour by a scalar field — used to bake fake AO.
+  // Baked ambient occlusion, applied to vertex colour. Self-lit vertices are
+  // skipped: vCol carries both the albedo and the emissive colour, so shading
+  // a glowing vertex puts the model's ambient occlusion into the brightness of
+  // its own light source — a zombie's eyes would dim because they sit in a
+  // socket, which is the opposite of the point of a socket.
   Builder.prototype.shadeBy = function (fn) {
     const n = this.vcount();
     for (let i = 0; i < n; i++) {
+      if (this.emis[i] > 0) continue;
       const k = fn(this.pos[i * 3], this.pos[i * 3 + 1], this.pos[i * 3 + 2],
         this.nrm[i * 3], this.nrm[i * 3 + 1], this.nrm[i * 3 + 2]);
       this.col[i * 3] *= k; this.col[i * 3 + 1] *= k; this.col[i * 3 + 2] *= k;
@@ -7861,7 +7918,7 @@ Z.assert = function (cond, msg) {
 }());
 
 
-/* ============================ 09_level.js (1075 lines) ============================ */
+/* ============================ 09_level.js (1159 lines) ============================ */
 // ---------------------------------------------------------------------------
 // 09_level.js — Nacht der Untoten.
 //
@@ -8287,15 +8344,86 @@ Z.assert = function (cond, msg) {
     box([8.0, 0, -6.6], [8.2, UP, -2.0], 'wood_wall', { uvScale: 0.6, group: 'stair_e_rail' });
 
     // Debris piles. Tagged so removeDebris() can pull them out of the world.
-    for (let i = 0; i < 5; i++) {
-      const t = i / 5;
-      box([X0 + rng.range(0, 0.3), 0, Z1 - 1.0 + t * 0.9],
-        [-8.2 - rng.range(0, 0.3), 1.5 + rng.range(0, 0.8) - t * 0.5, Z1 - 0.9 + t * 0.9],
-        'rubble', { debrisId: 'stairs_west', uvScale: 0.8, group: 'debris' });
-      box([8.2 + rng.range(0, 0.3), 0, Z0 + 0.9 - t * 0.9],
-        [X1 - rng.range(0, 0.3), 1.5 + rng.range(0, 0.8) - t * 0.5, Z0 + 1.0 - t * 0.9],
-        'rubble', { debrisId: 'stairs_east', uvScale: 0.8, group: 'debris' });
+    //
+    // These are the two most-looked-at props in the map — they gate every run's
+    // progression, so the player stands in front of one deciding whether to
+    // spend a thousand points — and they used to be five parallel slabs of
+    // identical width and orientation stepped across the opening, which read
+    // as venetian blinds or as z-fighting rather than as a collapsed staircase.
+    //
+    // A collapsed ceiling is not a stack of anything. It is one dense mass with
+    // a broken silhouette: masonry lumps of every size, splintered joists
+    // driven through at whatever angle they fell, and the wreck of whatever was
+    // stored underneath. Built as a plug that guarantees the gate holds plus a
+    // jumble in front of it that gives the thing a shape — check-level asserts
+    // both floors stay unreachable until the pile is bought, so the plug is not
+    // optional and must not be replaced by "enough chunks that it probably
+    // blocks".
+    function debrisPile(id, x0, x1, z0, z1) {
+      const w = x1 - x0, d = z1 - z0;
+      // The plug. Not one box: a single 1.8 m by 1.6 m face carrying one and a
+      // half texture tiles reads as a flat painted rectangle with confetti on
+      // it, which is exactly what the first rewrite produced. Six overlapping
+      // columns of varied height and depth span the opening — the overlap is
+      // what guarantees the gate holds — and give the mass a broken top edge
+      // before a single chunk is placed on it.
+      const COLS = 6;
+      for (let i = 0; i < COLS; i++) {
+        const cx0 = x0 + (w * i) / COLS - 0.04;
+        const cx1 = x0 + (w * (i + 1)) / COLS + 0.04;
+        box([cx0, 0, z0 + d * rng.range(0.30, 0.50)], [cx1, rng.range(1.34, 1.78), z1],
+          'rubble', { debrisId: id, uvScale: rng.range(1.9, 2.6), group: 'debris',
+            tint: [rng.range(0.78, 1.06), rng.range(0.76, 1.02), rng.range(0.72, 0.98)] });
+      }
+      // Masonry. Sizes spread over an order of magnitude, because a graded
+      // pile of same-size lumps is the other way this reads as procedural.
+      // Masonry, kept in the FRONT half. Chunks buried inside the plug are
+      // wasted triangles; what the pile needs is a broken face and a broken
+      // top edge, and both of those live in front of and above the columns.
+      for (let i = 0; i < 30; i++) {
+        const cw = rng.range(0.12, 0.54), cd = rng.range(0.12, 0.40);
+        // Stratified across the opening rather than uniformly random. Thirty
+        // chunks scattered freely still leave two or three of the six columns
+        // bare, and one bare column is a flat wall of texture in the middle of
+        // a pile — which was the whole complaint about the version before this.
+        const lane = i % 10;
+        const px = x0 - 0.05 + (w * lane) / 10 + rng.range(-0.06, w / 10 - cw + 0.12);
+        const pz = rng.range(z0 - 0.14, z0 + d * 0.55);
+        // A sixth of them ride high on the heap and break its skyline; the rest
+        // bank up against the front of it in a slope you cannot climb.
+        const high = rng.range(0, 1) < 0.17;
+        const y = high ? rng.range(1.15, 1.62) : rng.range(0, 0.75);
+        const h = high ? rng.range(0.18, 0.40) : rng.range(0.20, 0.62);
+        box([px, y, pz], [px + cw, y + h, pz + cd],
+          'rubble', { debrisId: id, uvScale: rng.range(2.0, 3.4), group: 'debris',
+            tint: [rng.range(0.7, 1.1), rng.range(0.68, 1.05), rng.range(0.62, 1.0)] });
+      }
+      // Splintered joists, driven through the mass at the angle they fell. The
+      // level is axis-aligned brushes, so "angle" is aspect ratio and height:
+      // a long thin beam lying across the pile at knee height reads as a beam.
+      for (let i = 0; i < 5; i++) {
+        const alongX = rng.range(0, 1) < 0.55;
+        const len = rng.range(0.55, 0.95), th = rng.range(0.07, 0.13);
+        const py = rng.range(0.25, 1.35);
+        const px = rng.range(x0 - 0.05, x1 - (alongX ? len * w : th));
+        const pz = rng.range(z0 - 0.16, z0 + d * 0.5);
+        box([px, py, pz],
+          [px + (alongX ? len * w : th), py + th, pz + (alongX ? th : len * d)],
+          'wood_plank', { debrisId: id, uvScale: 1.6, group: 'debris',
+            tint: [0.58, 0.52, 0.44] });
+      }
+      // Whatever was stored under the stairs, now part of the pile.
+      for (let i = 0; i < 3; i++) {
+        const cw = rng.range(0.28, 0.44);
+        const px = rng.range(x0, x1 - cw), pz = rng.range(z0 - 0.1, z0 + d * 0.4);
+        const py = rng.range(0, 0.5);
+        box([px, py, pz], [px + cw, py + rng.range(0.22, 0.38), pz + cw],
+          'crate_wood', { debrisId: id, uvScale: 1.4, group: 'debris',
+            tint: [rng.range(0.62, 0.86), rng.range(0.58, 0.8), rng.range(0.5, 0.72)] });
+      }
     }
+    debrisPile('stairs_west', X0, -8.2, Z1 - 1.05, Z1 - 0.05);
+    debrisPile('stairs_east', 8.2, X1, Z0 + 0.05, Z0 + 1.05);
 
     // =====================================================================
     // Clutter — the stuff that makes it a place instead of a box.
@@ -8599,7 +8727,20 @@ Z.assert = function (cond, msg) {
       pmax[ax] = face + (inward > 0 ? 0.02 : 0.16);
       const al = ax === 0 ? 2 : 0;
       pmin[al] = u - 0.12; pmax[al] = u + 0.12;
-      return !clearOf(pmin, pmax);            // clear behind means it is an opening
+      if (clearOf(pmin, pmax)) return false;  // clear behind means it is an opening
+      // And there has to be room to run past it. Depth alone is not enough of
+      // a guarantee: a 0.6 m prop is harmless against the long side of the main
+      // hall and lethal in the gap between the perk machine and the divider,
+      // and check-level measures the largest circle a body can actually run in
+      // each room and fails the build below 1.26 m. Demand open floor in front
+      // of every prop so the dressing can never close a pinch point.
+      const RUN = 2.3;
+      const qmin = [], qmax = [];
+      qmin[1] = floorY + 0.20; qmax[1] = floorY + 1.60;
+      qmin[ax] = Math.min(face + inward * 0.66, face + inward * RUN);
+      qmax[ax] = Math.max(face + inward * 0.66, face + inward * RUN);
+      qmin[al] = u - 0.34; qmax[al] = u + 0.34;
+      return clearOf(qmin, qmax);
     }
 
     // Weighted so crates and debris carry the room and the louder props stay
@@ -10839,7 +10980,7 @@ Z.assert = function (cond, msg) {
 }());
 
 
-/* ============================ 13_models.js (1529 lines) ============================ */
+/* ============================ 13_models.js (1605 lines) ============================ */
 // ---------------------------------------------------------------------------
 // 13_models.js — Z.Models: every piece of geometry in the game that is not a
 // level brush. Zombies (skinned + variants), procedural animation, first
@@ -11185,10 +11326,35 @@ Z.assert = function (cond, msg) {
     b.setUvMul(7);
 
     // ---- baked AO: darker under chin, armpits, crotch, inside coat -------
+    //
+    // The head gets its own treatment. Every box that makes up a face presents
+    // the same -Z plane to the viewer and box() shades all -Z faces alike, so
+    // the brow ridge, nose ridge and cheek hollows built into the mesh were
+    // lit identically to the skull behind them and the whole face resolved to
+    // one flat rectangle at any distance. Occlusion is what separates them: a
+    // socket is dark because it is a hole, and nothing else in the pipeline
+    // knows that.
+    const headY = rest[J.head][1], headZ = rest[J.head][2];
     function ao(x, y, z, nx, ny, nz) {
       let k = 1.0;
       k *= lerp(0.62, 1.0, clamp01(ny * 0.5 + 0.5));          // faces pointing down are dimmer
       k *= lerp(1.0, 0.72, clamp01(1 - abs(x) * 3.2));         // seam down the centreline
+      const dy = y - headY;
+      if (dy > -0.16 && dy < 0.22) {
+        // The socket band, under the brow and above the cheekbone. Strongest
+        // for surfaces set back from the face plane, so the recessed eye boxes
+        // take it fully and the nose ridge standing proud of them barely does.
+        const band = clamp01(1 - abs(dy - 0.108) / 0.048);
+        const depth = clamp01((z - (headZ - 0.104)) / 0.045);
+        k *= lerp(1.0, 0.44, band * depth);
+        // Under the brow ridge proper: a thin hard line, which is what makes a
+        // brow read as a brow rather than as a differently-tinted stripe.
+        k *= lerp(1.0, 0.62, clamp01(1 - abs(dy - 0.132) / 0.016));
+        // Under the jaw and into the neck.
+        k *= lerp(1.0, 0.52, clamp01(1 - abs(dy + 0.085) / 0.055));
+        // Temples: everything past the width of the face falls away.
+        k *= lerp(1.0, 0.74, clamp01((abs(x) - 0.055) / 0.035));
+      }
       return k;
     }
 
@@ -11277,10 +11443,21 @@ Z.assert = function (cond, msg) {
 
       if (opts.helmet) {
         b.setColor(COL.helmet[0], COL.helmet[1], COL.helmet[2]);
-        // stahlhelm shell: two stacked tapered rings + a brim skirt
-        b.cyl(hx, hz, 0.02 * rk, 0.098 * rk, hy + 0.14, hy + 0.185, 8, { caps: false, uvScale: 3 });
-        b.cyl(hx, hz, 0.098 * rk, 0.104 * rk, hy + 0.10, hy + 0.145, 8, { caps: true, uvScale: 3 });
-        box(b, hx - 0.108 * rk, hy + 0.088, hz - 0.112 * rk, hx + 0.108 * rk, hy + 0.108, hz + 0.112 * rk, COL.helmetDark);
+        // Stahlhelm. cyl() takes its radii as (r at y0, r at y1), and the old
+        // shell had them the wrong way round: a ring 0.02 wide at the bottom
+        // flaring to 0.098 at the top, sitting on a straight-sided band. That
+        // is a funnel on a drum — the variant read as a sentry turret rather
+        // than as a man in a helmet, which is a long way from the silhouette
+        // the whole mode is built on. A helmet is widest at the brim and
+        // tapers to the crown, in that order.
+        b.cyl(hx, hz, 0.108 * rk, 0.101 * rk, hy + 0.082, hy + 0.112, 10, { caps: false, uvScale: 3 });
+        b.cyl(hx, hz, 0.101 * rk, 0.088 * rk, hy + 0.112, hy + 0.152, 10, { caps: false, uvScale: 3 });
+        b.cyl(hx, hz, 0.088 * rk, 0.052 * rk, hy + 0.152, hy + 0.186, 10, { caps: true, uvScale: 3 });
+        // The flared brim, sitting proud of the shell all the way round, and
+        // deeper at the back the way a stahlhelm's neck guard is.
+        b.setColor(COL.helmetDark[0], COL.helmetDark[1], COL.helmetDark[2]);
+        b.cyl(hx, hz + 0.006 * rk, 0.124 * rk, 0.112 * rk, hy + 0.070, hy + 0.092, 10,
+          { caps: false, uvScale: 4 });
       }
     }
 
@@ -12194,20 +12371,60 @@ Z.assert = function (cond, msg) {
     const props = {};
 
     // --- mystery box ------------------------------------------------------
+    // The second most recognisable object in the mode, and it was a plain
+    // crate with two bands and a fixed lid — the same silhouette as the ammo
+    // crates stacked against every wall, so the one prop a player crosses the
+    // map for disappeared into the set dressing. What makes it read is the
+    // ironwork: brackets on all four uprights, rails top and bottom, skids
+    // holding it off the floor, and a lid that overhangs and actually opens.
+    const BOX_W = 0.56, BOX_D = 0.40, BOX_H = 0.54;
     {
       const b = Z.Mesh.builder();
+      b.setUvMul(3);
       b.setColor(1, 1, 1);
-      b.box([-0.55, 0, -0.38], [0.55, 0.52, 0.38], { uvScale: 1.1 });
-      b.setColor(0.42, 0.36, 0.28);
-      // iron banding
-      for (const zz of [-0.30, 0.30]) {
-        b.box([-0.57, 0.02, zz - 0.035], [0.57, 0.50, zz + 0.035], { uvScale: 4 });
+      b.box([-BOX_W, 0.07, -BOX_D], [BOX_W, BOX_H, BOX_D], { uvScale: 1.1 });
+      b.setColor(0.40, 0.35, 0.28);
+      // corner brackets, wrapping each upright on both faces
+      for (const sx of [-1, 1]) {
+        for (const sz of [-1, 1]) {
+          b.box([sx > 0 ? BOX_W - 0.10 : -BOX_W, 0.05, sz > 0 ? BOX_D + 0.005 : -BOX_D - 0.035],
+            [sx > 0 ? BOX_W + 0.035 : -BOX_W + 0.10, BOX_H + 0.01, sz > 0 ? BOX_D + 0.035 : -BOX_D - 0.005],
+            { uvScale: 4 });
+          b.box([sx > 0 ? BOX_W + 0.005 : -BOX_W - 0.035, 0.05, sz > 0 ? BOX_D - 0.10 : -BOX_D],
+            [sx > 0 ? BOX_W + 0.035 : -BOX_W - 0.005, BOX_H + 0.01, sz > 0 ? BOX_D : -BOX_D + 0.10],
+            { uvScale: 4 });
+        }
       }
-      b.setColor(1, 1, 1);
-      b.box([-0.57, 0.52, -0.40], [0.57, 0.60, 0.40], { uvScale: 1.1 });   // lid
+      // top and bottom rails
+      for (const yy of [0.10, BOX_H - 0.07]) {
+        b.box([-BOX_W - 0.02, yy, -BOX_D - 0.02], [BOX_W + 0.02, yy + 0.045, BOX_D + 0.02],
+          { uvScale: 4 });
+      }
+      // skids: the box sits proud of the floor, so it casts a line of shadow
+      // under itself instead of melting into the boards
+      for (const sz of [-1, 1]) {
+        b.box([-BOX_W + 0.04, 0, sz * BOX_D - 0.06], [BOX_W - 0.04, 0.075, sz * BOX_D + 0.06],
+          { uvScale: 4 });
+      }
       b.shadeBy((x, y) => 0.62 + 0.38 * Z.M.clamp01(y / 0.6));
       props.mystery_box = b.finish('mystery_box');
     }
+    // The lid is its own mesh so the box can actually open. Its origin is the
+    // hinge along the back edge, so a single rotation about X swings it.
+    {
+      const b = Z.Mesh.builder();
+      b.setUvMul(3);
+      b.setColor(1, 1, 1);
+      b.box([-BOX_W - 0.045, 0, -(BOX_D * 2 + 0.09)], [BOX_W + 0.045, 0.075, 0],
+        { uvScale: 1.1 });
+      b.setColor(0.40, 0.35, 0.28);
+      for (const sx of [-1, 1]) {
+        b.box([sx > 0 ? BOX_W - 0.02 : -BOX_W - 0.05, -0.005, -(BOX_D * 2 + 0.09)],
+          [sx > 0 ? BOX_W + 0.05 : -BOX_W + 0.02, 0.082, 0], { uvScale: 4 });
+      }
+      props.mystery_box_lid = b.finish('mystery_box');
+    }
+    props.mysteryBoxDims = { w: BOX_W, d: BOX_D, h: BOX_H };
 
     // --- perk machines ----------------------------------------------------
     const perkMats = { jugg: 'perk_jugg', speed: 'perk_speed', doubletap: 'perk_doubletap', revive: 'perk_revive' };
@@ -15282,7 +15499,7 @@ Z.assert = function (cond, msg) {
 }());
 
 
-/* ============================ 19_econ.js (611 lines) ============================ */
+/* ============================ 19_econ.js (645 lines) ============================ */
 // ---------------------------------------------------------------------------
 // 19_econ.js — everything you spend points on, plus the barricades.
 //
@@ -15808,9 +16025,43 @@ Z.assert = function (cond, msg) {
       : (b.state === 'spinning' || b.state === 'offering') ? 1
         : (b.state === 'closing') ? 1 - M.clamp01(b.t / 0.7) : 0;
     if (b.state !== 'moving' || b.t < 1.6) {
-      const boxProp = Z.Models && Z.Models.props && Z.Models.props.mystery_box;
+      const P = Z.Models && Z.Models.props;
+      const boxProp = P && P.mystery_box;
+      const dims = (P && P.mysteryBoxDims) || { w: 0.5, d: 0.35, h: 0.54 };
       M.m4.compose(mm, b.pos[0], b.pos[1], b.pos[2], b.yaw, 0, 0, 1, 1, 1);
       Z.Render.drawMesh(boxProp ? boxProp.gpu || boxMesh : boxMesh, mm, { mat: 'mystery_box' });
+
+      // The lid, hinged along the back edge. It used to be welded to the box
+      // and the only thing that changed on opening was a light appearing
+      // inside a shut crate.
+      const lidProp = P && P.mystery_box_lid;
+      if (lidProp && lidProp.gpu) {
+        const sy = Math.sin(b.yaw), cy2 = Math.cos(b.yaw);
+        M.m4.compose(mm,
+          b.pos[0] - sy * (dims.d + 0.045), b.pos[1] + dims.h, b.pos[2] - cy2 * (dims.d + 0.045),
+          b.yaw, -lidOpen * 1.75, 0, 1, 1, 1);
+        Z.Render.drawMesh(lidProp.gpu, mm, { mat: 'mystery_box' });
+      }
+
+      // The sigil, on the face the player walks up to. Self-lit, and it
+      // breathes: a fixed emissive reads as a sticker, a slow pulse reads as
+      // something inside the box that wants opening. Brightest while the box
+      // is actually offering.
+      const pulse = 0.42 + 0.13 * Math.sin(Z.Render.time * 1.7)
+        + 0.50 * lidOpen;
+      for (const side of [1, -1]) {
+        M.m4.compose(mm,
+          b.pos[0] + Math.sin(b.yaw) * side * (dims.d + 0.045),
+          b.pos[1] + dims.h * 0.56,
+          b.pos[2] + Math.cos(b.yaw) * side * (dims.d + 0.045),
+          b.yaw + (side < 0 ? Math.PI : 0), 0, 0, 0.60, 0.36, 1);
+        Z.Render.drawMesh(panelMesh, mm, { mat: 'mystery_sigil', emissive: pulse });
+      }
+      // A small warm emitter of its own, so the box lights the floor around it
+      // and can be found in a dark room rather than only seen once lit by
+      // something else.
+      Z.Render.addLight([b.pos[0], b.pos[1] + 0.45, b.pos[2]],
+        [1.0, 0.72, 0.34], 3.6, 0.34 + 0.10 * Math.sin(Z.Render.time * 1.7));
       if (lidOpen > 0.02) {
         // shaft of light out of the open box
         Z.Render.addLight([b.pos[0], b.pos[1] + 1.0, b.pos[2]], [0.95, 0.85, 0.55], 5.5, 1.4 * lidOpen);

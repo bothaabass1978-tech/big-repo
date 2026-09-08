@@ -523,9 +523,43 @@
       : (b.state === 'spinning' || b.state === 'offering') ? 1
         : (b.state === 'closing') ? 1 - M.clamp01(b.t / 0.7) : 0;
     if (b.state !== 'moving' || b.t < 1.6) {
-      const boxProp = Z.Models && Z.Models.props && Z.Models.props.mystery_box;
+      const P = Z.Models && Z.Models.props;
+      const boxProp = P && P.mystery_box;
+      const dims = (P && P.mysteryBoxDims) || { w: 0.5, d: 0.35, h: 0.54 };
       M.m4.compose(mm, b.pos[0], b.pos[1], b.pos[2], b.yaw, 0, 0, 1, 1, 1);
       Z.Render.drawMesh(boxProp ? boxProp.gpu || boxMesh : boxMesh, mm, { mat: 'mystery_box' });
+
+      // The lid, hinged along the back edge. It used to be welded to the box
+      // and the only thing that changed on opening was a light appearing
+      // inside a shut crate.
+      const lidProp = P && P.mystery_box_lid;
+      if (lidProp && lidProp.gpu) {
+        const sy = Math.sin(b.yaw), cy2 = Math.cos(b.yaw);
+        M.m4.compose(mm,
+          b.pos[0] - sy * (dims.d + 0.045), b.pos[1] + dims.h, b.pos[2] - cy2 * (dims.d + 0.045),
+          b.yaw, -lidOpen * 1.75, 0, 1, 1, 1);
+        Z.Render.drawMesh(lidProp.gpu, mm, { mat: 'mystery_box' });
+      }
+
+      // The sigil, on the face the player walks up to. Self-lit, and it
+      // breathes: a fixed emissive reads as a sticker, a slow pulse reads as
+      // something inside the box that wants opening. Brightest while the box
+      // is actually offering.
+      const pulse = 0.42 + 0.13 * Math.sin(Z.Render.time * 1.7)
+        + 0.50 * lidOpen;
+      for (const side of [1, -1]) {
+        M.m4.compose(mm,
+          b.pos[0] + Math.sin(b.yaw) * side * (dims.d + 0.045),
+          b.pos[1] + dims.h * 0.56,
+          b.pos[2] + Math.cos(b.yaw) * side * (dims.d + 0.045),
+          b.yaw + (side < 0 ? Math.PI : 0), 0, 0, 0.60, 0.36, 1);
+        Z.Render.drawMesh(panelMesh, mm, { mat: 'mystery_sigil', emissive: pulse });
+      }
+      // A small warm emitter of its own, so the box lights the floor around it
+      // and can be found in a dark room rather than only seen once lit by
+      // something else.
+      Z.Render.addLight([b.pos[0], b.pos[1] + 0.45, b.pos[2]],
+        [1.0, 0.72, 0.34], 3.6, 0.34 + 0.10 * Math.sin(Z.Render.time * 1.7));
       if (lidOpen > 0.02) {
         // shaft of light out of the open box
         Z.Render.addLight([b.pos[0], b.pos[1] + 1.0, b.pos[2]], [0.95, 0.85, 0.55], 5.5, 1.4 * lidOpen);

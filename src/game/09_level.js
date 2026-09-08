@@ -423,15 +423,86 @@
     box([8.0, 0, -6.6], [8.2, UP, -2.0], 'wood_wall', { uvScale: 0.6, group: 'stair_e_rail' });
 
     // Debris piles. Tagged so removeDebris() can pull them out of the world.
-    for (let i = 0; i < 5; i++) {
-      const t = i / 5;
-      box([X0 + rng.range(0, 0.3), 0, Z1 - 1.0 + t * 0.9],
-        [-8.2 - rng.range(0, 0.3), 1.5 + rng.range(0, 0.8) - t * 0.5, Z1 - 0.9 + t * 0.9],
-        'rubble', { debrisId: 'stairs_west', uvScale: 0.8, group: 'debris' });
-      box([8.2 + rng.range(0, 0.3), 0, Z0 + 0.9 - t * 0.9],
-        [X1 - rng.range(0, 0.3), 1.5 + rng.range(0, 0.8) - t * 0.5, Z0 + 1.0 - t * 0.9],
-        'rubble', { debrisId: 'stairs_east', uvScale: 0.8, group: 'debris' });
+    //
+    // These are the two most-looked-at props in the map — they gate every run's
+    // progression, so the player stands in front of one deciding whether to
+    // spend a thousand points — and they used to be five parallel slabs of
+    // identical width and orientation stepped across the opening, which read
+    // as venetian blinds or as z-fighting rather than as a collapsed staircase.
+    //
+    // A collapsed ceiling is not a stack of anything. It is one dense mass with
+    // a broken silhouette: masonry lumps of every size, splintered joists
+    // driven through at whatever angle they fell, and the wreck of whatever was
+    // stored underneath. Built as a plug that guarantees the gate holds plus a
+    // jumble in front of it that gives the thing a shape — check-level asserts
+    // both floors stay unreachable until the pile is bought, so the plug is not
+    // optional and must not be replaced by "enough chunks that it probably
+    // blocks".
+    function debrisPile(id, x0, x1, z0, z1) {
+      const w = x1 - x0, d = z1 - z0;
+      // The plug. Not one box: a single 1.8 m by 1.6 m face carrying one and a
+      // half texture tiles reads as a flat painted rectangle with confetti on
+      // it, which is exactly what the first rewrite produced. Six overlapping
+      // columns of varied height and depth span the opening — the overlap is
+      // what guarantees the gate holds — and give the mass a broken top edge
+      // before a single chunk is placed on it.
+      const COLS = 6;
+      for (let i = 0; i < COLS; i++) {
+        const cx0 = x0 + (w * i) / COLS - 0.04;
+        const cx1 = x0 + (w * (i + 1)) / COLS + 0.04;
+        box([cx0, 0, z0 + d * rng.range(0.30, 0.50)], [cx1, rng.range(1.34, 1.78), z1],
+          'rubble', { debrisId: id, uvScale: rng.range(1.9, 2.6), group: 'debris',
+            tint: [rng.range(0.78, 1.06), rng.range(0.76, 1.02), rng.range(0.72, 0.98)] });
+      }
+      // Masonry. Sizes spread over an order of magnitude, because a graded
+      // pile of same-size lumps is the other way this reads as procedural.
+      // Masonry, kept in the FRONT half. Chunks buried inside the plug are
+      // wasted triangles; what the pile needs is a broken face and a broken
+      // top edge, and both of those live in front of and above the columns.
+      for (let i = 0; i < 30; i++) {
+        const cw = rng.range(0.12, 0.54), cd = rng.range(0.12, 0.40);
+        // Stratified across the opening rather than uniformly random. Thirty
+        // chunks scattered freely still leave two or three of the six columns
+        // bare, and one bare column is a flat wall of texture in the middle of
+        // a pile — which was the whole complaint about the version before this.
+        const lane = i % 10;
+        const px = x0 - 0.05 + (w * lane) / 10 + rng.range(-0.06, w / 10 - cw + 0.12);
+        const pz = rng.range(z0 - 0.14, z0 + d * 0.55);
+        // A sixth of them ride high on the heap and break its skyline; the rest
+        // bank up against the front of it in a slope you cannot climb.
+        const high = rng.range(0, 1) < 0.17;
+        const y = high ? rng.range(1.15, 1.62) : rng.range(0, 0.75);
+        const h = high ? rng.range(0.18, 0.40) : rng.range(0.20, 0.62);
+        box([px, y, pz], [px + cw, y + h, pz + cd],
+          'rubble', { debrisId: id, uvScale: rng.range(2.0, 3.4), group: 'debris',
+            tint: [rng.range(0.7, 1.1), rng.range(0.68, 1.05), rng.range(0.62, 1.0)] });
+      }
+      // Splintered joists, driven through the mass at the angle they fell. The
+      // level is axis-aligned brushes, so "angle" is aspect ratio and height:
+      // a long thin beam lying across the pile at knee height reads as a beam.
+      for (let i = 0; i < 5; i++) {
+        const alongX = rng.range(0, 1) < 0.55;
+        const len = rng.range(0.55, 0.95), th = rng.range(0.07, 0.13);
+        const py = rng.range(0.25, 1.35);
+        const px = rng.range(x0 - 0.05, x1 - (alongX ? len * w : th));
+        const pz = rng.range(z0 - 0.16, z0 + d * 0.5);
+        box([px, py, pz],
+          [px + (alongX ? len * w : th), py + th, pz + (alongX ? th : len * d)],
+          'wood_plank', { debrisId: id, uvScale: 1.6, group: 'debris',
+            tint: [0.58, 0.52, 0.44] });
+      }
+      // Whatever was stored under the stairs, now part of the pile.
+      for (let i = 0; i < 3; i++) {
+        const cw = rng.range(0.28, 0.44);
+        const px = rng.range(x0, x1 - cw), pz = rng.range(z0 - 0.1, z0 + d * 0.4);
+        const py = rng.range(0, 0.5);
+        box([px, py, pz], [px + cw, py + rng.range(0.22, 0.38), pz + cw],
+          'crate_wood', { debrisId: id, uvScale: 1.4, group: 'debris',
+            tint: [rng.range(0.62, 0.86), rng.range(0.58, 0.8), rng.range(0.5, 0.72)] });
+      }
     }
+    debrisPile('stairs_west', X0, -8.2, Z1 - 1.05, Z1 - 0.05);
+    debrisPile('stairs_east', 8.2, X1, Z0 + 0.05, Z0 + 1.05);
 
     // =====================================================================
     // Clutter — the stuff that makes it a place instead of a box.
@@ -735,7 +806,20 @@
       pmax[ax] = face + (inward > 0 ? 0.02 : 0.16);
       const al = ax === 0 ? 2 : 0;
       pmin[al] = u - 0.12; pmax[al] = u + 0.12;
-      return !clearOf(pmin, pmax);            // clear behind means it is an opening
+      if (clearOf(pmin, pmax)) return false;  // clear behind means it is an opening
+      // And there has to be room to run past it. Depth alone is not enough of
+      // a guarantee: a 0.6 m prop is harmless against the long side of the main
+      // hall and lethal in the gap between the perk machine and the divider,
+      // and check-level measures the largest circle a body can actually run in
+      // each room and fails the build below 1.26 m. Demand open floor in front
+      // of every prop so the dressing can never close a pinch point.
+      const RUN = 2.3;
+      const qmin = [], qmax = [];
+      qmin[1] = floorY + 0.20; qmax[1] = floorY + 1.60;
+      qmin[ax] = Math.min(face + inward * 0.66, face + inward * RUN);
+      qmax[ax] = Math.max(face + inward * 0.66, face + inward * RUN);
+      qmin[al] = u - 0.34; qmax[al] = u + 0.34;
+      return clearOf(qmin, qmax);
     }
 
     // Weighted so crates and debris carry the room and the louder props stay

@@ -204,12 +204,20 @@ for (const L of lv.lights) {
 const DIMS = Z.Level.DIMS;
 const BODY = 0.34 + 0.32;          // player radius + zombie radius
 const RING = 20;
+// Measure from knee height, not from the floor. A running player steps over
+// anything shorter than STEP_UP without breaking stride, so testing the body
+// from the boards up counted every knee-high debris drift as a wall — one
+// 0.4 m rubble drift that had been sitting mid-room since the first clutter
+// pass was reported as taking a metre off the north-east room's circle. What
+// actually has to be clear is the volume from the step height to the top of
+// the head.
+const STEP = Z.C.STEP_UP + 0.02;
 function bestCircle(y) {
   const per = {};
   for (let x = DIMS.X0 + 0.5; x <= DIMS.X1 - 0.5; x += 0.4) {
     for (let z = DIMS.Z0 + 0.5; z <= DIMS.Z1 - 0.5; z += 0.4) {
       const c = [x, y, z];
-      if (Z.Phys.boxSolid([c[0], c[1] + 0.05, c[2]], R, H)) continue;
+      if (Z.Phys.boxSolid([c[0], c[1] + STEP, c[2]], R, H - STEP)) continue;
       const room = Z.Level.roomAt(c);
       let best = 0;
       for (let r = 0.8; r <= 4.0; r += 0.1) {
@@ -218,7 +226,7 @@ function bestCircle(y) {
           const a = (i / RING) * Math.PI * 2;
           const px = x + Math.cos(a) * r, pz = z + Math.sin(a) * r;
           if (px < DIMS.X0 || px > DIMS.X1 || pz < DIMS.Z0 || pz > DIMS.Z1) { okRing = false; break; }
-          if (Z.Phys.boxSolid([px, y + 0.05, pz], R, H)) { okRing = false; break; }
+          if (Z.Phys.boxSolid([px, y + STEP, pz], R, H - STEP)) { okRing = false; break; }
           if (Z.Level.roomAt([px, y, pz]) !== room) { okRing = false; break; }
         }
         if (!okRing) break;
