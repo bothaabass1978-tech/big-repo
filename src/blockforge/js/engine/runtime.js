@@ -904,8 +904,11 @@
         return n;
       },
       quest(event, n) { BF.quests.track(event, n == null ? 1 : n, { gameId: s.gameId }); },
+      /** Award one of this game's badges (ignored for other games, e.g. a creator game built on this template). */
       badge(id) {
-        if (BF.badges.award(id)) { const d = BF.badges.def(id); if (d && s) s.badges.push(d); return true; }
+        const def = BF.badges.def(id);
+        if (!def || !s || (def.gameId && def.gameId !== s.gameId)) return false;
+        if (BF.badges.award(id)) { s.badges.push(def); return true; }
         return false;
       },
       /** Add a collectible to the platform inventory. */
