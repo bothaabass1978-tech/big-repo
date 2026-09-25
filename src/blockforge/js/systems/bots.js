@@ -211,6 +211,8 @@
       .replace(/\{item\}/g, ctx.item || U.pick(BF.ITEM_LIST.filter((i) => i.price > 500 && i.cat !== 'collectible')).name);
   }
 
+  const lastSaid = new Map();
+
   BF.dialogue = {
     /** Chat filter used on player text and bot text. */
     filter(text) {
@@ -231,7 +233,11 @@
       let pool;
       if (gameLines && persLines) pool = Math.random() < 0.62 ? gameLines : persLines;
       else pool = gameLines || persLines || BF.DIALOGUE.idle[bot.personality];
-      return style(bot, fill(U.pick(pool), { game }));
+      // avoid saying the same thing twice in a row
+      let raw = U.pick(pool);
+      if (pool.length > 1 && raw === lastSaid.get(bot.id)) raw = U.pick(pool.filter((x) => x !== raw));
+      lastSaid.set(bot.id, raw);
+      return style(bot, fill(raw, { game }));
     },
 
     /**

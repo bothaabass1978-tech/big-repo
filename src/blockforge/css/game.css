@@ -162,6 +162,7 @@ button.gr-player:hover { background: #171c25; }
 .gpanel .gp-close { position: absolute; top: 10px; right: 10px; }
 .gpanel .dialog-name { color: #ffb454; font-weight: 700; margin-bottom: 4px; }
 .gpanel .btn { font-size: 12.5px; }
+.gpanel .gp-card .btn { white-space: normal; height: auto; min-height: 30px; padding: 5px 9px; line-height: 1.25; text-align: center; }
 
 @media (max-width: 980px) {
   .gr-side { position: absolute; right: 0; top: 0; bottom: 0; z-index: 12; width: min(320px, 88vw); box-shadow: -20px 0 40px rgba(0, 0, 0, 0.5); }
