@@ -161,6 +161,19 @@ async function signIn(page) {
   });
   check('save export and import round-trips', roundTrip);
 
+  // with automatic saving switched off, closing or reloading the page must not persist changes
+  await page.evaluate(() => { location.hash = '#/settings/data'; });
+  await page.waitForTimeout(400);
+  await page.click('label[for="data.autosave"]');
+  await page.waitForTimeout(200);
+  const savedBal = await page.evaluate(() => { const b = BF.economy.balance(); BF.economy.earn(250, 'e2e: unsaved change', 'debug'); return b; });
+  await page.reload();
+  await page.waitForSelector('#topbar', { timeout: 10000 });
+  await page.waitForTimeout(600);
+  const afterReload = await page.evaluate(() => ({ bal: BF.economy.balance(), autosave: BF.store.state.settings.data.autosave }));
+  check('autosave off: a reload does not save unsaved changes', afterReload.bal === savedBal && afterReload.autosave === false, JSON.stringify(afterReload) + ' expected ' + savedBal);
+  await page.evaluate(() => { BF.store.update('settings', (s) => { s.settings.data.autosave = true; }); BF.store.save('manual'); });
+
   // ------------------------------------------------------------ mobile
   const phone = await newPage(browser, { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
   await signIn(phone);

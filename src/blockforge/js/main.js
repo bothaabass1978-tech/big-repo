@@ -88,7 +88,7 @@
     window.addEventListener('pointerdown', unlock, true);
     window.addEventListener('keydown', unlock, true);
 
-    const flush = () => { if (BF.store.state) BF.store.save('unload'); };
+    const flush = () => BF.store.backgroundSave('unload');
     window.addEventListener('beforeunload', flush);
     document.addEventListener('visibilitychange', () => { if (document.hidden) flush(); });
 
@@ -130,7 +130,7 @@
       if (!routerStarted) { routerStarted = true; BF.router.start(); } else BF.router.handle();
       BF.achievements.evaluate();
       clearInterval(saveInterval);
-      saveInterval = setInterval(() => { if (BF.store.state) BF.store.save('interval'); }, 30000);
+      saveInterval = setInterval(() => BF.store.backgroundSave('interval'), 30000);
       if (opts.welcome) {
         BF.ui.toast({ title: 'Welcome to BlockForge, ' + s.player.displayName + '!', text: 'You start with 1,500 ForgeCoins. Claim your daily reward, then jump into a game.', kind: 'success', icon: 'sparkle', duration: 6000 });
       } else if (!opts.resume) {

@@ -305,10 +305,21 @@
       });
     },
 
+    /** True when the player allows background saves (Settings > Data > Automatic save). */
+    autosaveEnabled() {
+      return !!(store.state && store.state.settings.data.autosave);
+    },
+
     scheduleSave() {
-      if (!store.state || !store.state.settings.data.autosave) return;
+      if (!store.autosaveEnabled()) return;
       clearTimeout(saveTimer);
       saveTimer = setTimeout(() => store.save('auto'), 900);
+    },
+
+    /** Save for a background reason (interval, tab hidden, page closing). Skipped while autosave is off. */
+    backgroundSave(reason) {
+      if (!store.autosaveEnabled()) return { ok: false, skipped: true };
+      return store.save(reason);
     },
 
     /** Write the current state to storage now. */

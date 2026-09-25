@@ -261,6 +261,8 @@
           while (parts.length > 1) o = o[parts.shift()];
           o[parts[0]] = value;
         });
+        // the autosave switch itself must persist even when it turns background saving off
+        if (path === 'data.autosave') BF.store.save('settings');
         BF.applyAppearance();
       };
       root.querySelectorAll('.switch input[id]').forEach((inp) => inp.addEventListener('change', () => { set(inp.id, inp.checked); BF.sfx.play('tab'); }));

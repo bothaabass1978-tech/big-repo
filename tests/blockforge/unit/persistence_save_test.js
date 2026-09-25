@@ -48,3 +48,25 @@ test('test_accounts_are_local_profiles_without_credentials', () => {
   assert.ok(!/password|token|secret/i.test(stored));
   assert.ok(acc);
 });
+
+test('test_autosave_off_skips_background_saves_but_keeps_manual_saves', () => {
+  // Arrange: a signed-in account that has turned automatic saving off
+  const first = bootDefault();
+  const { BF } = first;
+  BF.store.update('settings', (s) => { s.settings.data.autosave = false; });
+  BF.store.save('settings');
+  first.timers.list.length = 0;
+
+  // Act: change something, then let the background savers run
+  BF.economy.earn(250, 'Unsaved experiment', 'game');
+  const interval = BF.store.backgroundSave('interval');
+  const unload = BF.store.backgroundSave('unload');
+
+  // Assert: nothing was queued or written until the player saves by hand
+  assert.equal(interval.skipped, true);
+  assert.equal(unload.skipped, true);
+  assert.equal(first.timers.list.length, 0, 'no debounced autosave should be scheduled');
+  assert.equal(bootDefault({ storage: first.storage }).BF.economy.balance(), 1500);
+  BF.store.save('manual');
+  assert.equal(bootDefault({ storage: first.storage }).BF.economy.balance(), 1750);
+});
