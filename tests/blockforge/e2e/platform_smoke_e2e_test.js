@@ -4,9 +4,11 @@
  *   node tests/blockforge/e2e/platform_smoke_e2e_test.js [--shots <dir>]
  *
  * Covers: sign-in, daily reward, every page route, a shop purchase and the
- * "Not enough ForgeCoins." path, launching and leaving all 20 games, creator
- * games built from every template, save export/import, and a phone-sized
- * viewport with touch controls. Exits non-zero on any failed check or page error.
+ * "Not enough ForgeCoins." path, launching and leaving all 20 games (in 3D, plus
+ * the Classic 2D setting), a bot answering a DM, creator games built from every
+ * template, a Studio layout, an ad campaign with its sponsored slot and refund,
+ * collecting creator earnings, save export/import, and a phone-sized viewport
+ * with touch controls. Exits non-zero on any failed check or page error.
  */
 'use strict';
 
@@ -115,6 +117,8 @@ async function signIn(page) {
   const games = await page.evaluate(() => BF.GAME_REGISTRY.map((g) => g.id));
   check('20 built-in games are registered', games.length === 20, String(games.length));
   const keys = ['KeyW', 'KeyD', 'Space', 'KeyS', 'KeyA', 'KeyE', 'KeyJ'];
+  const webgl = await page.evaluate(() => BF.g3d.supported());
+  let in3d = 0;
   for (const id of games) {
     const before = page.errors.length;
     await page.evaluate((gid) => { location.hash = '#/game/' + gid; }, id);
@@ -129,10 +133,35 @@ async function signIn(page) {
       await page.keyboard.up(keys[i % keys.length]);
     }
     const running = await page.evaluate(() => BF.runtime.active);
-    if (id === 'mystery-mansion' || id === 'pet-battle-arena') await shot(page, '04-game-' + id);
+    if (await page.evaluate(() => { const s = BF.runtime.session(); return !!(s && s.use3d && s.g3 && document.querySelector('canvas.gr-3d')); })) in3d++;
+    if (id === 'mystery-mansion' || id === 'pet-battle-arena' || id === 'pixel-soccer') await shot(page, '04-game-' + id);
     await page.evaluate(() => BF.runtime.leave());
     await page.waitForTimeout(200);
     check('game ' + id + ' launches, runs and exits cleanly', running && page.errors.length === before, page.errors.slice(before).join(' | '));
+  }
+
+  check('every game renders in 3D when WebGL is available', !webgl || in3d === games.length, in3d + ' of ' + games.length + ' in 3D');
+
+  // Classic 2D stays available as a setting
+  {
+    const before = page.errors.length;
+    await page.evaluate(() => { BF.store.update('settings', (st) => { st.settings.gameplay.graphics = 'classic'; }); BF.play('block-battlegrounds'); });
+    await page.waitForTimeout(1500);
+    const s2 = await page.evaluate(() => ({ active: BF.runtime.active, use3d: BF.runtime.session().use3d }));
+    await page.evaluate(() => { BF.runtime.leave(); BF.store.update('settings', (st) => { st.settings.gameplay.graphics = 'auto'; }); });
+    await page.waitForTimeout(200);
+    check('Classic 2D graphics setting plays games with the flat renderer', s2.active && s2.use3d === false && page.errors.length === before, JSON.stringify(s2) + page.errors.slice(before).join(' | '));
+  }
+
+  // ------------------------------------------------------------ bot chat
+  {
+    const bot = await page.evaluate(() => BF.friends.list()[0].id);
+    await page.evaluate((id) => { location.hash = '#/messages/' + id; }, bot);
+    await page.waitForTimeout(500);
+    const sent = await page.evaluate((id) => { BF.messages.send(id, 'what is 6 times 7?'); return true; }, bot);
+    await page.waitForTimeout(3500);
+    const reply = await page.evaluate((id) => { const t = BF.store.state.messages[id]; const last = t && t.msgs[t.msgs.length - 1]; return last ? last.from + ': ' + last.text : ''; }, bot);
+    check('a bot answers a direct message with the right result', sent && /^them: .*42/.test(reply), reply);
   }
 
   // ------------------------------------------------------------ creator
@@ -155,6 +184,50 @@ async function signIn(page) {
     await page.waitForTimeout(150);
     check('creator game ' + id + ' is playable', running && page.errors.length === before, page.errors.slice(before).join(' | '));
   }
+  // Studio: save a layout for the obby creation and play it
+  const obbyId = await page.evaluate((ids) => ids.find((id) => BF.creator.get(id).template === 'obby'), made);
+  await page.evaluate((id) => { location.hash = '#/create/' + id + '/studio'; }, obbyId);
+  await page.waitForTimeout(700);
+  const cv = await page.$('#studio-canvas');
+  if (cv) { const bb = await cv.boundingBox(); await page.click('[data-tile=kill]'); await page.mouse.click(bb.x + 120, bb.y + 60); }
+  await page.click('[data-studio-save]').catch(() => {});
+  await page.waitForTimeout(500);
+  await shot(page, '06-studio');
+  const layoutOk = await page.evaluate((id) => { const g = BF.creator.get(id); return !!(g.layout && BF.studio.validate('obby', g.layout).ok && BF.catalog.get(id).config.layout); }, obbyId);
+  check('Studio saves a valid obby layout that the game receives', layoutOk);
+  {
+    const before = page.errors.length;
+    await page.evaluate((id) => BF.play(id), obbyId);
+    await page.waitForTimeout(2000);
+    const running = await page.evaluate(() => BF.runtime.active && !!BF.runtime.session().ctx.config.layout);
+    await page.evaluate(() => BF.runtime.leave());
+    await page.waitForTimeout(200);
+    check('a Studio-built level is playable', running && page.errors.length === before, page.errors.slice(before).join(' | '));
+  }
+  // Ads: launch a campaign from the Ads tab, let it run, see it in the Sponsored row
+  await page.evaluate((id) => { location.hash = '#/create/' + id + '/ads'; }, obbyId);
+  await page.waitForTimeout(600);
+  const balBefore = await page.evaluate(() => BF.economy.balance());
+  await page.click('#ad-form button[type=submit]');
+  await page.waitForTimeout(350);
+  await page.click('.modal .btn-primary').catch(() => {});
+  await page.waitForTimeout(500);
+  const ad = await page.evaluate((id) => { const c = BF.ads.active(id)[0]; if (!c) return null; for (let i = 0; i < 20; i++) BF.ads.simulate(4); BF.store.touch(['ads', 'created']); return { budget: c.budget, spent: c.spent, visits: c.visits, bal: BF.economy.balance() }; }, obbyId);
+  check('launching an ad campaign charges its budget and buys visits', !!ad && ad.bal === balBefore - ad.budget && ad.spent > 0 && ad.visits > 0, JSON.stringify(ad));
+  await page.waitForTimeout(400);
+  await shot(page, '07-ads');
+  await page.evaluate(() => { location.hash = '#/home'; });
+  await page.waitForTimeout(700);
+  const sponsored = await page.evaluate((id) => !!document.querySelector('.sponsored-row [data-game="' + id + '"]'), obbyId);
+  check('the advertised game appears in the Home Sponsored row', sponsored);
+  const refund = await page.evaluate((id) => { const c = BF.ads.active(id)[0]; const before = BF.economy.balance(); const r = BF.ads.stop(c.id); return { ok: r.ok, refunded: BF.economy.balance() - before, expect: Math.floor(c.budget - c.spent) }; }, obbyId);
+  check('stopping a campaign refunds the unspent budget', refund.ok && refund.refunded === refund.expect, JSON.stringify(refund));
+  await page.evaluate(() => { location.hash = '#/create'; });
+  await page.waitForTimeout(600);
+  const collected = await page.evaluate(() => { const t = BF.creator.totals(); const want = BF.creator.list().reduce((a, g) => a + Math.floor(g.pending || 0), 0); const r = BF.creator.collectAll(); return want === 0 || (r.ok && r.amount === want && t.revenue > 0); });
+  check('creator earnings can be collected into the wallet', collected);
+  await shot(page, '08-create-dashboard');
+
   const cleaned = await page.evaluate((ids) => ids.every((id) => BF.creator.remove(id).ok), made);
   check('creator games can be deleted', cleaned);
 
