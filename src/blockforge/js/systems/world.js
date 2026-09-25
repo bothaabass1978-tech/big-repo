@@ -171,6 +171,15 @@
       world.stop();
       const s = BF.store.state;
       BF.bots.install(BF.bots.generate(s.world.seed));
+      // saves from older builds can name bots the current roster no longer has
+      const known = (id) => !!BF.bots.get(id);
+      const soc = s.social;
+      if (['friends', 'followers', 'following', 'blocked'].some((k) => soc[k].some((id) => !known(id))) || ['incoming', 'outgoing', 'recent'].some((k) => soc[k].some((r) => !known(r.id)))) {
+        BF.store.update('social', (st) => {
+          for (const k of ['friends', 'followers', 'following', 'blocked']) st.social[k] = st.social[k].filter(known);
+          for (const k of ['incoming', 'outgoing', 'recent']) st.social[k] = st.social[k].filter((r) => known(r.id));
+        });
+      }
       world.servers = new Map();
       world.loc = new Map();
       world.menuOnline = new Set();
@@ -228,7 +237,7 @@
     place(bot, gameId) {
       if (!world.servers.has(gameId)) world.servers.set(gameId, []);
       const list = world.servers.get(gameId);
-      let srv = list.find((sv) => sv.bots.length + (sv.user ? 1 : 0) < Math.floor(sv.max * (0.6 + Math.random() * 0.35)));
+      let srv = list.find((sv) => sv.bots.length + (sv.user ? 1 : 0) < Math.floor(sv.max * (0.72 + Math.random() * 0.26)));
       if (!srv) srv = world.newServer(gameId);
       if (!srv) return null;
       srv.bots.push(bot.id);

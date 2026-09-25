@@ -5,11 +5,17 @@ const { bootDefault } = require('./harness');
 
 test('test_bot_population_has_unique_fictional_profiles', () => {
   const { BF } = bootDefault();
-  assert.equal(BF.bots.list.length, 640);
+  assert.equal(BF.bots.list.length, 2000);
+  assert.equal(BF.bots.list.filter((x) => x.handcrafted).length, BF.BOT_SEEDS.length);
   const names = new Set(BF.bots.list.map((b) => b.username.toLowerCase()));
-  assert.equal(names.size, 640);
+  assert.equal(names.size, 2000);
+  assert.ok(BF.bots.list.every((x) => x.username.length <= 20));
   const personalities = new Set(BF.bots.list.map((b) => b.personality));
-  for (const p of ['competitive', 'friendly', 'explorer', 'collector', 'chaotic', 'beginner']) assert.ok(personalities.has(p), 'missing ' + p);
+  for (const p of Object.keys(BF.PERSONALITIES)) {
+    assert.ok(personalities.has(p), 'missing ' + p);
+    for (const table of ['greet', 'idle', 'join', 'leave', 'friend', 'challenge', 'help', 'dmOpen', 'dmReply']) assert.ok(BF.DIALOGUE[table][p] && BF.DIALOGUE[table][p].length, table + ' lines for ' + p);
+    assert.ok(BF.BOT_BIOS[p].length, 'bios for ' + p);
+  }
   const b = BF.bots.list[0];
   for (const k of ['username', 'displayName', 'avatar', 'personality', 'skill']) assert.ok(b[k] != null, 'bot field ' + k);
 });

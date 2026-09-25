@@ -7,9 +7,9 @@
   'use strict';
 
   const U = BF.util;
-  const POPULATION = 640;
+  const POPULATION = 2000;
 
-  const PERSONALITY_WEIGHTS = [[20, 'competitive'], [22, 'friendly'], [16, 'explorer'], [14, 'collector'], [12, 'chaotic'], [16, 'beginner']];
+  const PERSONALITY_WEIGHTS = [[18, 'competitive'], [20, 'friendly'], [14, 'explorer'], [12, 'collector'], [11, 'chaotic'], [15, 'beginner'], [9, 'builder'], [7, 'speedrunner'], [8, 'roleplayer'], [7, 'helper']];
 
   const GAME_TASTE = {
     competitive: ['block-battlegrounds', 'elemental-clash', 'skyline-racers', 'battle-boats', 'speed-trials', 'pixel-soccer'],
@@ -18,6 +18,10 @@
     collector: ['pet-world', 'pet-battle-arena', 'mega-miners', 'treasure-tycoon', 'factory-tycoon'],
     chaotic: ['zombie-outbreak', 'block-battlegrounds', 'cosmic-survival', 'sky-obby', 'battle-boats'],
     beginner: ['sky-obby', 'pet-world', 'city-life', 'towerfall-legends', 'castle-siege'],
+    builder: ['factory-tycoon', 'treasure-tycoon', 'castle-siege', 'towerfall-legends', 'mega-miners'],
+    speedrunner: ['sky-obby', 'speed-trials', 'skyline-racers', 'mega-miners'],
+    roleplayer: ['city-life', 'mystery-mansion', 'dungeon-frontier', 'treasure-islands', 'pet-world'],
+    helper: ['pet-world', 'city-life', 'towerfall-legends', 'treasure-islands', 'sky-obby'],
   };
 
   const OPTIONAL_SLOTS = { jacket: 0.3, hat: 0.6, back: 0.3, neck: 0.3, shoulder: 0.22, accessory: 0.35 };

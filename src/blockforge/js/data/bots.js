@@ -16,6 +16,10 @@
     collector: { label: 'Collector', color: '#ffb52e', accept: 0.72, chatty: 0.9, skill: [0.4, 0.75], icon: 'gem', blurb: 'Lives for rare items and pickups.' },
     chaotic: { label: 'Chaotic', color: '#b67cff', accept: 0.6, chatty: 1.5, skill: [0.3, 0.8], icon: 'bolt', blurb: 'Unpredictable, loud and fun.' },
     beginner: { label: 'Beginner', color: '#9aa5b5', accept: 0.92, chatty: 1.1, skill: [0.15, 0.45], icon: 'sparkle', blurb: 'New to BlockForge and full of questions.' },
+    builder: { label: 'Builder', color: '#ff9f43', accept: 0.8, chatty: 1.0, skill: [0.4, 0.8], icon: 'hammer', blurb: 'Makes games in the Studio and notices good level design.' },
+    speedrunner: { label: 'Speedrunner', color: '#39f3ff', accept: 0.6, chatty: 0.8, skill: [0.7, 0.98], icon: 'timer', blurb: 'Chases personal bests and knows every shortcut.' },
+    roleplayer: { label: 'Roleplayer', color: '#ff7ad9', accept: 0.85, chatty: 1.3, skill: [0.3, 0.7], icon: 'hat', blurb: 'Treats every game like an adventure story.' },
+    helper: { label: 'Helper', color: '#7ee081', accept: 0.95, chatty: 1.1, skill: [0.5, 0.85], icon: 'info', blurb: 'Answers questions and welcomes new players.' },
   };
 
   /** Hand-authored bots (stable ids). The first eight start as your friends. */
@@ -42,10 +46,48 @@
     ['MapleMarble', 'Maple Marble', 'beginner', 6],
     ['BlockMasterFan', 'BlockMaster Fan', 'beginner', 8],
     ['CinderMoth', 'Cinder Moth', 'explorer', 27],
+    ['RubyRocket', 'Ruby Rocket', 'speedrunner', 44],
+    ['TinkerTerra', 'Tinker Terra', 'builder', 51],
+    ['CaptainCobble', 'Captain Cobble', 'roleplayer', 23],
+    ['HelpfulHaze', 'Helpful Haze', 'helper', 58],
+    ['NeonNimbus', 'Neon Nimbus', 'chaotic', 17],
+    ['SirPebbleton', 'Sir Pebbleton', 'roleplayer', 34],
+    ['QuickSilverQ', 'Quick Silver', 'speedrunner', 61],
+    ['MossyMaker', 'Mossy Maker', 'builder', 39],
+    ['PatchworkPip', 'Patchwork Pip', 'beginner', 2],
+    ['StarlightSage', 'Starlight Sage', 'helper', 66],
+    ['BoltBrigade', 'Bolt Brigade', 'competitive', 55],
+    ['CocoaComet', 'Cocoa Comet', 'friendly', 22],
+    ['DriftDynamo', 'Drift Dynamo', 'speedrunner', 37],
+    ['GizmoGardener', 'Gizmo Gardener', 'builder', 28],
+    ['LadyLantern', 'Lady Lantern', 'roleplayer', 31],
+    ['ThunderToast', 'Thunder Toast', 'chaotic', 14],
+    ['VelvetVortex', 'Velvet Vortex', 'collector', 48],
+    ['WaffleWarden', 'Waffle Warden', 'friendly', 19],
+    ['ArcadeAtlas', 'Arcade Atlas', 'explorer', 42],
+    ['BrickBard', 'Brick Bard', 'roleplayer', 25],
+    ['CircuitCedar', 'Circuit Cedar', 'builder', 46],
+    ['DoodleDash', 'Doodle Dash', 'beginner', 5],
+    ['EmberEcho', 'Ember Echo', 'competitive', 52],
+    ['FableFinch', 'Fable Finch', 'helper', 35],
+    ['GravityGus', 'Gravity Gus', 'speedrunner', 29],
+    ['HazelHopper', 'Hazel Hopper', 'friendly', 12],
+    ['InkyIgloo', 'Inky Igloo', 'explorer', 20],
+    ['JoltJackal', 'Jolt Jackal', 'competitive', 60],
+    ['KiloKoala', 'Kilo Koala', 'collector', 33],
+    ['LoopLynx', 'Loop Lynx', 'speedrunner', 47],
+    ['MarbleMonarch', 'Marble Monarch', 'roleplayer', 40],
+    ['NoodleNavigator', 'Noodle Navigator', 'explorer', 16],
+    ['OrbitOtter', 'Orbit Otter', 'beginner', 7],
+    ['PrismPilot', 'Prism Pilot', 'collector', 54],
+    ['QuillQuokka', 'Quill Quokka', 'helper', 43],
+    ['RivetRaven', 'Rivet Raven', 'builder', 57],
+    ['SproutSparrow', 'Sprout Sparrow', 'beginner', 1],
+    ['ZestyZephyr', 'Zesty Zephyr', 'friendly', 24],
   ];
 
-  BF.BOT_PREFIXES = ['Pixel', 'Nova', 'Crimson', 'Byte', 'Shadow', 'Luna', 'Turbo', 'Echo', 'Frost', 'Blaze', 'Quantum', 'Neon', 'Sky', 'Iron', 'Storm', 'Mystic', 'Cosmo', 'Rusty', 'Sunny', 'Glitch', 'Hyper', 'Zippy', 'Pebble', 'Ember', 'Aqua', 'Volt', 'Onyx', 'Jade', 'Maple', 'Comet', 'Cobalt', 'Velvet', 'Arctic', 'Solar', 'Lunar', 'Rocket', 'Pocket', 'Tiny', 'Mega', 'Ultra', 'Silver', 'Golden', 'Cloud', 'Thunder', 'Crystal', 'Dusk', 'Dawn', 'Orbit', 'Pumpkin', 'Waffle', 'Noodle', 'Pickle', 'Mango', 'Cactus', 'Marble', 'Fuzzy', 'Clever', 'Brave', 'Swift', 'Copper', 'Maple', 'Honey', 'Indigo', 'Scarlet', 'Mint', 'Nimbus', 'Zen', 'Rogue', 'Sprout', 'Biscuit'];
-  BF.BOT_SUFFIXES = ['Rider', 'Builder', 'Cube', 'Knight', 'Blocks', 'Craft', 'Fox', 'Wolf', 'Ninja', 'Wizard', 'Pilot', 'Miner', 'Racer', 'Hunter', 'Gamer', 'Bytes', 'Blade', 'Star', 'Spark', 'Dash', 'Hopper', 'Smith', 'Panda', 'Tiger', 'Otter', 'Falcon', 'Golem', 'Sprite', 'Scout', 'Ranger', 'Drifter', 'Voyager', 'Chef', 'Bard', 'Maker', 'Tinker', 'Nomad', 'Paws', 'Bean', 'Toast', 'Loop', 'Shard', 'Quest', 'Beacon', 'Penguin', 'Owl', 'Moth', 'Kitten', 'Dragon', 'Llama'];
+  BF.BOT_PREFIXES = ['Pixel', 'Nova', 'Crimson', 'Byte', 'Shadow', 'Luna', 'Turbo', 'Echo', 'Frost', 'Blaze', 'Quantum', 'Neon', 'Sky', 'Iron', 'Storm', 'Mystic', 'Cosmo', 'Rusty', 'Sunny', 'Glitch', 'Hyper', 'Zippy', 'Pebble', 'Ember', 'Aqua', 'Volt', 'Onyx', 'Jade', 'Maple', 'Comet', 'Cobalt', 'Velvet', 'Arctic', 'Solar', 'Lunar', 'Rocket', 'Pocket', 'Tiny', 'Mega', 'Ultra', 'Silver', 'Golden', 'Cloud', 'Thunder', 'Crystal', 'Dusk', 'Dawn', 'Orbit', 'Pumpkin', 'Waffle', 'Noodle', 'Pickle', 'Mango', 'Cactus', 'Marble', 'Fuzzy', 'Clever', 'Brave', 'Swift', 'Copper', 'Maple', 'Honey', 'Indigo', 'Scarlet', 'Mint', 'Nimbus', 'Zen', 'Rogue', 'Sprout', 'Biscuit', 'Aurora', 'Blizzard', 'Cinder', 'Dusty', 'Everest', 'Fizzy', 'Galaxy', 'Harbor', 'Icy', 'Jumbo', 'Kiwi', 'Lemon', 'Meteor', 'Nacho', 'Oak', 'Poppy', 'Quartz', 'Ripple', 'Saffron', 'Tango', 'Umber', 'Vapor', 'Willow', 'Yeti', 'Zigzag', 'Basil', 'Coral', 'Denim', 'Echoing', 'Frosty', 'Gummy', 'Hazel', 'Ivory', 'Jelly', 'Karma', 'Lucky', 'Mocha', 'Pixelated', 'Rainy', 'Sandy', 'Tofu', 'Velcro', 'Wobbly'];
+  BF.BOT_SUFFIXES = ['Rider', 'Builder', 'Cube', 'Knight', 'Blocks', 'Craft', 'Fox', 'Wolf', 'Ninja', 'Wizard', 'Pilot', 'Miner', 'Racer', 'Hunter', 'Gamer', 'Bytes', 'Blade', 'Star', 'Spark', 'Dash', 'Hopper', 'Smith', 'Panda', 'Tiger', 'Otter', 'Falcon', 'Golem', 'Sprite', 'Scout', 'Ranger', 'Drifter', 'Voyager', 'Chef', 'Bard', 'Maker', 'Tinker', 'Nomad', 'Paws', 'Bean', 'Toast', 'Loop', 'Shard', 'Quest', 'Beacon', 'Penguin', 'Owl', 'Moth', 'Kitten', 'Dragon', 'Llama', 'Badger', 'Comet', 'Dynamo', 'Engineer', 'Finch', 'Gecko', 'Hawk', 'Inventor', 'Jester', 'Koala', 'Lynx', 'Mage', 'Narwhal', 'Oracle', 'Parrot', 'Quokka', 'Raccoon', 'Sailor', 'Turtle', 'Unicorn', 'Viking', 'Walrus', 'Yak', 'Zebra', 'Architect', 'Buccaneer', 'Captain', 'Detective', 'Explorer', 'Flash', 'Guardian', 'Hero', 'Jumper', 'Legend', 'Mechanic', 'Pioneer', 'Runner', 'Sage', 'Trailblazer', 'Wanderer'];
 
   BF.BOT_BIOS = {
     competitive: ['Top of the {game} leaderboard. Come get me.', 'I do not lose. I learn. Then I win.', 'Ranked grinder. 1v1s welcome.', 'GG only if you earn it.'],
@@ -54,6 +96,10 @@
     collector: ['{n} rare items and counting.', 'Shop drops are my cardio.', 'Legendary hunter. Trades welcome.', 'Ask me about my hat collection.'],
     chaotic: ['i press buttons and things happen', 'professional button masher', 'if you see me running in circles, that is the strategy', 'bananas.'],
     beginner: ['new here!! how do i get forgecoins', 'just started, be nice pls', 'learning {game} one fall at a time', 'hi i am new'],
+    builder: ['Building my next map in the Studio. Feedback welcome!', 'I have published {n} levels so far. Go play them!', 'Level designer by day, obby tester by night.', 'Every block in its place.'],
+    speedrunner: ['Sky Obby PB: 1:{n}. Coming for you.', 'Frames matter.', 'Speed Trials gold on every course (almost).', 'If there is a shortcut, I found it.'],
+    roleplayer: ['Knight of the Blocky Realm. *bows*', 'Self-appointed mayor of City Life.', 'Every game is a story. What is yours?', 'Detective, pirate or chef. Depends on the server.'],
+    helper: ['New here? Message me, happy to help!', 'Ask me anything about {game}.', 'Tips, guides and good vibes.', 'I answer every question. Even the weird ones.'],
   };
 
   /**
@@ -68,6 +114,10 @@
       collector: ['hi! nice outfit', 'hey, love the avatar', 'hello!'],
       chaotic: ['HELLO', 'hiiiiiiii', 'yo yo yo', 'AAAA hi'],
       beginner: ['hi', 'hello how do i play', 'hey'],
+      builder: ['hey!', 'hi, loving this map'],
+      speedrunner: ['yo', 'hey. racing?'],
+      roleplayer: ['*waves* greetings!', 'hail, friend'],
+      helper: ['hi! welcome :)', 'hey, need any help?'],
     },
     idle: {
       competitive: ['anyone good here?', '1v1 me', 'check the leaderboard, im on it', 'who is top score rn', 'this is too easy'],
@@ -76,6 +126,10 @@
       collector: ['just got a new hat', 'anyone trading?', 'the shop restocked i think', 'my inventory is almost full lol', 'who has the fire halo'],
       chaotic: ['lol', 'bananas', 'WHO TOUCHED MY STUFF', 'brb eating cereal', 'i am speed', 'weeeee'],
       beginner: ['how do i do this', 'wait what', 'is this the right way??', 'this is my first time', 'how do u get coins'],
+      builder: ['the lighting in this map is nice', 'i would add more checkpoints here', 'who built this? its great', 'taking notes for my own game lol'],
+      speedrunner: ['there is a skip here i think', 'new pb incoming', 'lost 2 seconds on that jump ugh', 'anyone doing timed runs?'],
+      roleplayer: ['*sharpens sword*', 'the tavern is open, adventurers', '*gazes at the horizon dramatically*', 'this server is my kingdom now'],
+      helper: ['if anyone is stuck, just ask me!', 'tip: the controls are shown at the top', 'daily rewards reset every day btw', 'dont forget your quests!'],
     },
     join: {
       competitive: ['im here, relax', 'lets go'],
@@ -84,6 +138,10 @@
       collector: ['hey!', 'hi'],
       chaotic: ['IM HERE', 'guess who'],
       beginner: ['hi', 'hello?'],
+      builder: ['hi all', 'hey, checking out this map'],
+      speedrunner: ['here', 'lets go fast'],
+      roleplayer: ['*enters dramatically*', 'the hero has arrived'],
+      helper: ['hi everyone! :)', 'hey all'],
     },
     leave: {
       competitive: ['gg im out', 'too easy, bye'],
@@ -92,6 +150,10 @@
       collector: ['bye!', 'gotta check the shop'],
       chaotic: ['BYE', 'poof'],
       beginner: ['bye', 'my mom says dinner'],
+      builder: ['back to the Studio, bye!', 'gtg build, cya'],
+      speedrunner: ['gg, off to grind pbs', 'bye'],
+      roleplayer: ['*vanishes in a puff of smoke*', 'farewell, friends!'],
+      helper: ['bye everyone, have fun!', 'cya!'],
     },
     reply: {
       gg: ['gg!', 'gg wp', 'ggs', 'gg :)'],
@@ -109,6 +171,10 @@
       collector: ['sure! nice avatar btw', 'ok'],
       chaotic: ['FRIENDSHIP ACTIVATED', 'ok lol'],
       beginner: ['yes pls!', 'ok!! my first friend'],
+      builder: ['sure! check out my games sometime', 'yeah!'],
+      speedrunner: ['sure', 'ok, race me later'],
+      roleplayer: ['*shakes hand* a new ally!', 'of course, friend!'],
+      helper: ['of course! :)', 'yes! message me anytime'],
     },
     challenge: {
       competitive: ['youre on', 'bring it', 'easy win for me'],
@@ -117,6 +183,10 @@
       collector: ['sure', 'if i win i get bragging rights'],
       chaotic: ['LETS GOOOO', 'already started'],
       beginner: ['im not good but ok', 'how'],
+      builder: ['sure, but im better at building lol', 'ok!'],
+      speedrunner: ['timer is running. go', 'bet'],
+      roleplayer: ['*draws sword* have at thee!', 'a duel! splendid'],
+      helper: ['sure! good luck :)', 'ok, lets have fun'],
     },
     help: {
       competitive: ['watch and learn', 'practice more'],
@@ -125,6 +195,10 @@
       collector: ['the shop has good stuff', 'ask me about items'],
       chaotic: ['have you tried jumping', 'no idea lol'],
       beginner: ['i need help too lol', 'same question'],
+      builder: ['look for the checkpoints', 'the Studio has tips too'],
+      speedrunner: ['hug the inside corners', 'jump earlier than you think'],
+      roleplayer: ['*unrolls map* go that way!', 'follow me, traveler'],
+      helper: ['sure! what are you stuck on?', 'the controls are on screen. what do you need?'],
     },
     dmOpen: {
       competitive: ['rematch in {game}? i will win this time', 'saw your score in {game}. not bad. not good either', 'you up for {game}? loser buys the next pass'],
@@ -133,6 +207,10 @@
       collector: ['have you seen the {item} in the shop?', 'what is the rarest thing you own?', 'i just bought the {item}!!'],
       chaotic: ['i just fell off the map in {game} 10 times lol', 'hi. bye. hi again', 'CAN YOU HEAR THE MUSIC'],
       beginner: ['hi! how do i earn forgecoins faster?', 'how do daily rewards work?', 'can you show me how to play {game}?'],
+      builder: ['hey! i just made a new game, want to try it?', 'what do you think makes a good obby?', 'building something in {game} style, any ideas?'],
+      speedrunner: ['got a new pb in {game}. beat it', 'want to race in Speed Trials?', 'whats your best Sky Obby time?'],
+      roleplayer: ['*sends a raven* the kingdom of {game} needs you!', 'hail! care to join a quest in {game}?', 'the mansion mystery awaits, detective'],
+      helper: ['hi! how is BlockForge going so far?', 'hey, remember to claim your daily reward :)', 'need any tips for {game}?'],
     },
     dmReply: {
       competitive: ['whatever you say', 'we will see in game', 'ok', 'noted'],
@@ -141,6 +219,10 @@
       collector: ['nice!', 'what rarity?', 'cool cool'],
       chaotic: ['LOL', 'bananas', 'wait what', 'yes. no. maybe'],
       beginner: ['oh ok thanks', 'wow', 'i didnt know that'],
+      builder: ['cool!', 'nice idea', 'haha yes'],
+      speedrunner: ['nice', 'ok', 'fast'],
+      roleplayer: ['*nods*', 'indeed!', 'splendid'],
+      helper: ['glad to help!', 'of course!', 'sounds good :)'],
     },
     invite: ['wanna join me in {game}?', 'come play {game} with me!', 'join my {game} server?'],
   };
