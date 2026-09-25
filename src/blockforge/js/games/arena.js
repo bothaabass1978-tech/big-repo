@@ -49,6 +49,7 @@
   }
 
   BF.GameModules.register('arena', {
+    three: true,
     actions: { attack: ['Space', 'Mouse0', 'KeyJ'], dash: ['ShiftLeft', 'ShiftRight', 'KeyK'], swap: ['KeyQ', 'KeyL'] },
     controls: { joystick: true, buttons: [{ act: 'attack', label: 'Attack', icon: 'sword' }, { act: 'dash', label: 'Dash', icon: 'bolt' }, { act: 'swap', label: 'Swap', icon: 'refresh' }] },
     create(ctx) {
@@ -57,8 +58,9 @@
       const theme = ctx.config.themeColor || '#ff7a2e';
       const diff = { easy: 0.75, normal: 1, hard: 1.25 }[ctx.difficulty] || 1;
       const flame = ctx.hasItem('tool_flame_blade');
-      const parts = new BF.Particles(500);
-      const floats = new BF.Floaters();
+      const V = ctx.g3;
+      const parts = V ? V.particles2d(18) : new BF.Particles(500);
+      const floats = V ? V.floaters2d(70) : new BF.Floaters();
       const bounds = { x: 16, y: 16, w: W - 32, h: H - 32 };
       let phase = 'lobby';
       let map = 'classic';
@@ -361,7 +363,7 @@
             const t = nearestEnemy(me, 320);
             if (t) me.angle = U.angleTo(me.x, me.y, t.x, t.y);
             else if (Math.hypot(ax.x, ax.y) > 0.2) me.angle = Math.atan2(ax.y, ax.x);
-          } else me.angle = U.angleTo(me.x, me.y, inp.pointer.x, inp.pointer.y);
+          } else { const pw = ctx.pointerWorld(24); me.angle = U.angleTo(me.x, me.y, pw.x, pw.y); }
           if (inp.act('attack')) attack(me);
           if (inp.actPressed('dash')) dash(me, ax.x, ax.y);
           if (inp.actPressed('swap')) {
@@ -596,7 +598,138 @@
         if (phase === 'countdown') G.display(g, String(Math.ceil(countdown)), W / 2, H / 2 + 60, 64, '#ffd66b');
       }
 
+      // ----------------------------------------------------------------- 3D
+
+      const TOOL = { blade: 'sword', blaster: 'blaster', hammer: 'hammer' };
+      const view = V && (() => {
+        const built = {};
+        let mapGroup = null;
+        let ventMeshes = [];
+        const extras = V.pool(), shotPool = V.pool(), pickPool = V.pool(), coinPool = V.pool();
+        const arcGeo = V.own(new THREE.RingGeometry(0.72, 1, 20, 1, 0, T.weapons.blade.arc));
+        const PICK = { health: ['box', '#3fd08a'], speed: ['cone4', '#46a8ff'], damage: ['octa', '#ff5a6a'], shield: ['sphere', '#b67cff'] };
+
+        function rebuild() {
+          built.rects = rects; built.vents = vents; built.map = map;
+          if (mapGroup) V.remove(mapGroup);
+          mapGroup = V.group();
+          const vip = map === 'vip';
+          const accent = vip ? '#ffc940' : custom ? theme : '#ff7a2e';
+          const floor = vip ? '#241a26' : custom ? U.shade(theme, -0.78) : '#1b2333';
+          V.preset(vip ? 'dusk' : 'arena', { fogNear: 1500, fogFar: 4200 });
+          V.shadowSize(640);
+          V.ground(-1400, -1000, W + 1400, H + 1000, U.shade(floor, -0.45), { parent: mapGroup, y: -1 });
+          V.gridFloor(0, 0, W, H, floor, 'rgba(255,255,255,0.07)', 40, { parent: mapGroup, noise: true });
+          const walls = [[W / 2, 6, W + 24, 20], [W / 2, H - 6, W + 24, 20], [6, H / 2, 20, H], [W - 6, H / 2, 20, H]];
+          V.boxes(walls.map(([x, z, w, d]) => ({ x, z, w, h: 26, d, color: '#2b3448' })), { parent: mapGroup });
+          V.boxes(walls.map(([x, z, w, d]) => ({ x, y: 26, z, w, h: 4, d, color: accent })), { parent: mapGroup, glow: 0.9, shadow: false });
+          const ring = V.shape('ring', W / 2, 1.2, H / 2, 230, 230, 1, accent, { parent: mapGroup, basic: true, opacity: 0.28, shadow: false });
+          ring.rotation.x = -Math.PI / 2;
+          const col = vip ? '#5a4632' : custom ? U.shade(theme, -0.45) : '#39465f';
+          V.boxes(rects.map((r) => ({ x: r.x + r.w / 2, z: r.y + r.h / 2, w: r.w, h: 54, d: r.h, color: col })), { parent: mapGroup });
+          V.boxes(rects.map((r) => ({ x: r.x + r.w / 2, y: 54, z: r.y + r.h / 2, w: r.w - 8, h: 4, d: r.h - 8, color: U.shade(col, 0.3) })), { parent: mapGroup });
+          V.boxes(rects.map((r) => ({ x: r.x + r.w / 2, y: 18, z: r.y + r.h / 2, w: r.w + 1, h: 5, d: r.h + 1, color: accent })), { parent: mapGroup, glow: 0.5, shadow: false });
+          ventMeshes = vents.map((v) => {
+            V.shape('cyl', v.x, 1, v.y, v.r * 2 + 12, 3, v.r * 2 + 12, '#2a1810', { parent: mapGroup });
+            return V.shape('cyl', v.x, 2.5, v.y, v.r * 2, 3, v.r * 2, '#4a2a1a', { parent: mapGroup, shadow: false });
+          });
+          if (vip) {
+            const th = V.box(W / 2, 0, H / 2, 120, 6, 80, '#ffc940', { parent: mapGroup, metal: 0.6, rough: 0.35 });
+            th.receiveShadow = true;
+          }
+        }
+
+        return function sync(dt) {
+          if (built.rects !== rects || built.vents !== vents || built.map !== map) rebuild();
+          const me = fighters[0];
+          const follow = me && me.alive && phase !== 'lobby';
+          V.look(follow ? W / 2 + (me.x - W / 2) * 0.45 : W / 2, 0, (follow ? H / 2 + (me.y - H / 2) * 0.45 : H / 2) + 20, { dist: follow ? 640 : 760, pitch: 0.96, fov: 44, lerp: 0.05 }, dt);
+          vents.forEach((v, i) => {
+            const m = ventMeshes[i];
+            if (m) m.material = V.mat(v.state === 'erupt' ? '#ff5a1f' : v.state === 'warn' ? '#ff9d3c' : '#4a2a1a', { glow: v.state === 'erupt' ? 1.4 : v.state === 'warn' ? 0.7 : 0 });
+          });
+          if (phase === 'lobby') {
+            const rig = V.actor('me', ctx.player.avatar, { scale: 10.5 });
+            rig.setPos(W / 2, 0, H / 2);
+            rig.group.rotation.y = Math.sin(ctx.time * 0.6) * 0.5;
+            rig.set({ move: 0 });
+          }
+          for (const f of fighters) {
+            const rig = V.actor(f.id, f.isPlayer ? ctx.player.avatar : f.bot.avatar, { scale: 10.5 });
+            const blink = f.protect > 0 && phase === 'play' && Math.floor(ctx.time * 10 + f.name.length) % 3 === 0;
+            rig.group.visible = f.alive && !blink;
+            if (!f.alive) { f._px = null; continue; }
+            const v = f._px != null && dt > 0 ? Math.hypot(f.x - f._px, f.y - f._py) / dt : 0;
+            f._px = f.x; f._py = f.y;
+            rig.setPos(f.x, 0, f.y);
+            rig.faceAngle(f.angle);
+            rig.set({ move: f.dashT > 0 ? 1.3 : v / T.speed });
+            if (rig._w !== f.weapon) { rig.hold(TOOL[f.weapon], f.weapon === 'blade' && f.isPlayer && flame ? '#ff7a2e' : undefined); rig._w = f.weapon; }
+            if (f.swing > (f._sw || 0) + 0.05) rig.play('attack');
+            f._sw = f.swing;
+            if (f.flash > 0.1 && !f._fl) rig.play('hit');
+            f._fl = f.flash > 0.1;
+            const ex = extras.use(f.id, () => {
+              const g = V.group();
+              g.userData.shield = V.shape('sphere', 0, 30, 0, 64, 70, 64, '#b67cff', { parent: g, opacity: 0.22, glow: 0.8, shadow: false, depthWrite: false });
+              g.userData.ring = V.shape('ring', 0, 1.6, 0, 48, 48, 1, '#ff5a6a', { parent: g, basic: true, opacity: 0.85, shadow: false });
+              g.userData.ring.rotation.x = -Math.PI / 2;
+              const arcMesh = new THREE.Mesh(arcGeo, V.mat('#ffffff', { basic: true, opacity: 0.6, side: 2, depthWrite: false }));
+              arcMesh.rotation.x = -Math.PI / 2;
+              arcMesh.position.y = 20;
+              g.add(arcMesh);
+              g.userData.arc = arcMesh;
+              return g;
+            });
+            ex.position.set(f.x, 0, f.y);
+            ex.userData.shield.visible = f.shield > 0;
+            ex.userData.ring.visible = f.buffs.damage > 0;
+            const w = T.weapons[f.weapon];
+            const arc = ex.userData.arc;
+            arc.visible = f.swing > 0 && w.kind === 'melee';
+            if (arc.visible) {
+              arc.scale.set(w.range + T.radius, w.range + T.radius, 1);
+              arc.rotation.z = -(f.angle + w.arc / 2);
+              arc.material = V.mat(f.isPlayer && flame ? '#ff9d3c' : '#ffffff', { basic: true, opacity: Math.round(Math.min(1, f.swing * 5) * 5) / 5 || 0.2, side: 2, depthWrite: false });
+            }
+            V.label(f.x, 82, f.y, { name: f.name, color: f.isPlayer ? '#ffb454' : '#ffffff', hp: f.hp / T.hp, hpColor: f.isPlayer ? '#3fd08a' : '#ff5a6a', bubble: ctx.bubbleText(f.id) });
+          }
+          extras.sweep();
+          for (const sh of shots) {
+            const m = shotPool.use(sh, () => V.shape('sphere', 0, 0, 0, 10, 10, 10, sh.owner.isPlayer ? '#ffd66b' : '#8fd3ff', { glow: 1.4, shadow: false }));
+            m.position.set(sh.x, 24, sh.y);
+          }
+          shotPool.sweep();
+          for (const pk of pickups) {
+            const g = pickPool.use(pk, () => {
+              const grp = V.group();
+              const d = PICK[pk.type];
+              grp.userData.icon = V.shape(d[0], 0, 0, 0, 18, 18, 18, d[1], { parent: grp, glow: 0.7 });
+              const glowDisc = V.shape('disc', 0, 1.3, 0, 40, 40, 1, d[1], { parent: grp, basic: true, opacity: 0.35, shadow: false });
+              glowDisc.rotation.x = -Math.PI / 2;
+              return grp;
+            });
+            g.position.set(pk.x, 0, pk.y);
+            g.userData.icon.position.y = 22 + Math.sin(pk.t * 4) * 4;
+            g.userData.icon.rotation.y = pk.t * 2;
+          }
+          pickPool.sweep();
+          for (const c of coins) {
+            const m = coinPool.use(c, () => { const k = V.shape('cyl', 0, 0, 0, 20, 4, 20, '#ffc940', { glow: 0.5, metal: 0.6, rough: 0.3 }); return k; });
+            m.position.set(c.x, 18 + Math.sin(c.t * 5) * 3, c.y);
+            m.rotation.set(Math.PI / 2, 0, c.t * 3);
+          }
+          coinPool.sweep();
+          V.sweep();
+        };
+      })();
+
       return {
+        render3d(dt) { view(dt); },
+        hud(g) {
+          if (phase !== 'lobby') drawHud(g);
+          else { g.fillStyle = 'rgba(6,8,12,.28)'; g.fillRect(0, 0, W, H); }
+        },
         update(dt) {
           parts.update(dt);
           floats.update(dt);

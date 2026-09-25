@@ -171,6 +171,15 @@
   function render(av, opts) {
     opts = opts || {};
     av = av || { skin: BF.STARTER_SKIN, equipped: BF.STARTER_EQUIP };
+    if (!opts.svg && BF.avatar3d && BF.avatar3d.available()) {
+      const html = BF.avatar3d.image(av, opts);
+      if (html) return html;
+    }
+    return renderSvg(av, opts);
+  }
+
+  /** The original layered SVG avatar (Classic 2D mode, no WebGL, and unit tests). */
+  function renderSvg(av, opts) {
     const eq = av.equipped || {};
     const skin = av.skin || BF.STARTER_SKIN;
     const get = (slot) => lookOf(eq[slot]);
@@ -273,6 +282,7 @@
 
   BF.avatar = {
     render,
+    renderSvg,
     look,
 
     /** Equip an owned item into its slot. */

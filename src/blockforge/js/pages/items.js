@@ -4,6 +4,8 @@
 (function (BF) {
   'use strict';
 
+  const live3d = () => !!(BF.avatar3d && BF.avatar3d.available());
+
   const U = BF.util;
   const esc = U.esc;
 
@@ -207,12 +209,13 @@
       }
       const emoteItem = BF.ITEMS[eq.emote];
       return '<div class="page-head"><div><h1 class="page-title">Avatar</h1><p class="page-sub">Mix and match everything you own. Changes save automatically and show up in every game.</p></div></div>' +
-        '<div class="avatar-editor"><div class="ae-stage-col"><div class="ae-stage" id="avatar-stage">' + BF.avatar.render(s.avatar, { size: 250, emote: stageEmote }) + '</div>' +
+        '<div class="avatar-editor"><div class="ae-stage-col"><div class="ae-stage' + (live3d() ? ' live' : '') + '" id="avatar-stage">' + (live3d() ? '<div class="av-live" id="av-live"></div><span class="ae-drag-hint">' + BF.icon('refresh', 12) + 'Drag to spin</span>' : BF.avatar.render(s.avatar, { size: 250, emote: stageEmote })) + '</div>' +
         '<div class="ae-stage-actions"><button class="btn btn-sm btn-outline" data-stage-emote' + (emoteItem ? '' : ' disabled') + '>' + BF.icon('emote', 15) + (emoteItem ? 'Play ' + esc(emoteItem.name) : 'No emote') + '</button><button class="btn btn-sm btn-outline" data-randomize>' + BF.icon('refresh', 15) + 'Randomize</button><button class="btn btn-sm btn-ghost" data-reset-look>' + BF.icon('x', 15) + 'Reset</button></div>' +
         '<div class="panel tight ae-wearing"><div class="eyebrow" style="padding:4px 4px 8px">Currently wearing</div>' + wearing.map((i) => '<div class="wear-row"><span class="rarity-dot rar-' + i.rarity + '"></span><span class="wr-cat faint">' + esc(BF.ITEM_CATS[i.cat].label) + '</span><button class="wr-name" data-act="item-detail" data-item="' + i.id + '">' + esc(i.name) + '</button>' + (!BF.REQUIRED_SLOTS[BF.ITEM_CATS[i.cat].slot] && i.cat !== 'emote' ? '<button class="icon-btn sm" data-clear="' + BF.ITEM_CATS[i.cat].slot + '" aria-label="Remove ' + esc(i.name) + '" data-tip="Remove">' + BF.icon('x', 13) + '</button>' : '') + '</div>').join('') + '</div></div>' +
         '<div class="ae-picker"><div class="chips ae-cats">' + EDIT_CATS.map((c) => '<a class="chip' + (c === cat ? ' on' : '') + '" href="#/avatar/' + c + '">' + (c === 'skin' ? 'Skin tone' : esc(BF.ITEM_CATS[c].label)) + (c !== 'skin' ? '<span class="count">' + BF.ITEM_LIST.filter((i) => i.cat === c && BF.inventory.owns(i.id)).length + '</span>' : '') + '</a>').join('') + '</div>' + grid + '</div></div>';
     },
     mount(root) {
+      if (live3d()) BF.avatar3d.live(root.querySelector('#av-live'), BF.store.state.avatar, { emote: stageEmote });
       stageEmote = null;
       root.querySelectorAll('[data-wear]').forEach((b) => b.addEventListener('click', () => {
         const item = BF.ITEMS[b.dataset.wear];
@@ -231,8 +234,8 @@
       if (emoteBtn) emoteBtn.addEventListener('click', () => {
         const item = BF.ITEMS[BF.store.state.avatar.equipped.emote];
         if (!item) return;
-        const stage = root.querySelector('#avatar-stage');
-        stage.innerHTML = BF.avatar.render(BF.store.state.avatar, { size: 250, emote: item.look.anim });
+        if (live3d()) BF.avatar3d.liveEmote(item.look.anim);
+        else root.querySelector('#avatar-stage').innerHTML = BF.avatar.render(BF.store.state.avatar, { size: 250, emote: item.look.anim });
         BF.sfx.play('pickup');
       });
       root.querySelector('[data-randomize]').addEventListener('click', () => { BF.avatar.randomize(); BF.ui.toast({ title: 'Outfit randomized from your items', kind: 'info', icon: 'refresh' }); });

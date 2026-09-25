@@ -12,8 +12,16 @@
  *     controls: {joystick: true, buttons: [{act, label, icon}]},
  *     maxBots: 7,                                   // active participants (default game.activeBots)
  *     feedTop: 0.12,                                // optional feed offset (fraction of view height) to clear a HUD strip
- *     create(ctx) -> {update(dt), draw(g), destroy?, onBotJoin?, onBotLeave?, onEmote?, onChat?}
+ *     three: true,                                  // has a 3D view (ctx.g3); otherwise 2D only
+ *     create(ctx) -> {update(dt), draw(g), destroy?, onBotJoin?, onBotLeave?, onEmote?, onChat?,
+ *                     render3d?(dt), hud?(g)}
  *   })
+ *
+ * 3D mode (module.three and BF.g3d.enabled()): ctx.g3 is a BF.g3d World. Each
+ * frame the runtime calls update(dt), render3d(dt) to sync the scene, animates
+ * and renders it, then clears the transparent HUD canvas and draws queued
+ * labels followed by hud(g). In 2D mode (Classic 2D setting or no WebGL)
+ * ctx.g3 is null and draw(g) paints everything as before.
  */
 (function (BF) {
   'use strict';
@@ -114,6 +122,7 @@
       cancelAnimationFrame(s.raf);
       if (s.instance && s.instance.destroy) { try { s.instance.destroy(); } catch (e) { console.error(e); } }
       if (s.input) s.input.destroy();
+      if (s.g3) { try { s.g3.dispose(); } catch (e) { console.error(e); } if (s.g3.canvas.parentNode) s.g3.canvas.remove(); s.g3 = null; }
       window.removeEventListener('resize', s.onResize);
       document.removeEventListener('keydown', s.onKey, true);
       document.removeEventListener('visibilitychange', s.onVis);
@@ -168,6 +177,18 @@
     s.root = root;
     s.canvas = root.querySelector('#gr-canvas');
     s.g = s.canvas.getContext('2d');
+    s.use3d = !!(s.mod.three && BF.g3d && BF.g3d.enabled());
+    if (s.use3d) {
+      try {
+        s.g3 = BF.g3d.world({ W, H });
+        s.canvas.classList.add('hud');
+        s.canvas.parentNode.insertBefore(s.g3.canvas, s.canvas);
+      } catch (e) {
+        console.warn('[BF.runtime] 3D unavailable, using 2D', e);
+        s.use3d = false;
+        s.g3 = null;
+      }
+    }
     s.frame = root.querySelector('#gr-frame');
     s.stage = root.querySelector('#gr-stage');
     s.chatLog = root.querySelector('#gr-chat-log');
@@ -230,6 +251,7 @@
     s.canvas.height = Math.round(h * dpr);
     s.scale = s.canvas.width / W;
     s.frame.style.setProperty('--gs', (w / W).toFixed(4));
+    if (s.g3) s.g3.resize(w, h, window.devicePixelRatio || 1);
   }
 
   function openSide(tab) {
@@ -306,6 +328,15 @@
     s.uiHandler = null;
     s.overlay.hidden = true;
     s.ctx.time = 0;
+    if (s.use3d) {
+      if (s.g3 && s.g3.used) {
+        s.g3.dispose();
+        s.g3 = BF.g3d.world({ W, H });
+        resize();
+      }
+      s.g3.used = true;
+      s.ctx.g3 = s.g3;
+    }
     try {
       s.instance = s.mod.create(s.ctx);
     } catch (e) {
@@ -352,7 +383,15 @@
     const g = s.g;
     g.setTransform(s.scale, 0, 0, s.scale, 0, 0);
     try {
-      inst.draw(g);
+      if (s.g3) {
+        const vdt = s.paused ? 0 : dt;
+        if (inst.render3d) inst.render3d(vdt);
+        s.g3.update(vdt);
+        s.g3.render();
+        g.clearRect(0, 0, W, H);
+        s.g3.drawOverlay(g);
+        if (inst.hud) inst.hud(g);
+      } else inst.draw(g);
     } catch (e) {
       crash(e);
       return;
@@ -850,6 +889,15 @@
       config: cfg,
       difficulty: cfg.difficulty || 'normal',
       input: s.input,
+      /** 3D world (BF.g3d) when the module runs in 3D, else null. */
+      g3: null,
+      /** Pointer in world coordinates: the ground point under it in 3D (height h), the screen point in 2D. */
+      pointerWorld(h) {
+        const p = s.input.pointer;
+        if (!s.g3) return { x: p.x, y: p.y };
+        const v = s.g3.groundAt(p.x, p.y, h || 0);
+        return v ? { x: v.x, y: v.z } : { x: p.x, y: p.y };
+      },
       canvas: s.canvas,
       time: 0,
       mobile: touchOn(),

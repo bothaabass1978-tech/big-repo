@@ -212,3 +212,7 @@ button.gr-player:hover { background: #171c25; }
 @media (max-width: 640px) and (orientation: portrait) {
   .gr-stage::after { content: 'Tip: turn your phone sideways for a bigger view'; color: #8b95a7; font-size: 12px; text-align: center; }
 }
+
+/* 3D view: WebGL canvas under the transparent HUD canvas */
+.gr-frame canvas.gr-3d { position: absolute; inset: 0; width: 100% !important; height: 100% !important; z-index: 0; }
+.gr-frame canvas#gr-canvas.hud { position: relative; z-index: 1; background: transparent; }

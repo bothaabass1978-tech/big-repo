@@ -5,6 +5,17 @@
 (function (BF) {
   'use strict';
 
+  const live3d = () => !!(BF.avatar3d && BF.avatar3d.available());
+
+  /** Profile hero: a live, draggable 3D avatar when WebGL is on, else the image. */
+  function heroAvatar(av) {
+    return live3d() ? '<div class="av-live ph-live" data-hero-live></div>' : BF.avatar.render(av, { size: 190 });
+  }
+  function mountHero(root, av) {
+    const el = root.querySelector('[data-hero-live]');
+    if (el) BF.avatar3d.live(el, av, { autoRotate: true });
+  }
+
   const U = BF.util;
   const esc = U.esc;
 
@@ -47,7 +58,7 @@
         '<div><div class="panel"><h3 class="panel-title">' + BF.icon('shirt', 17) + 'Currently wearing</h3><div class="wearing-grid">' + BF.AVATAR_SLOTS.filter((k) => s.avatar.equipped[k]).map((k) => BF.ITEMS[s.avatar.equipped[k]]).filter(Boolean).map((i) => '<button class="wear-chip rar-' + i.rarity + '" data-act="item-detail" data-item="' + i.id + '"><span class="rarity-dot rar-' + i.rarity + '"></span>' + esc(i.name) + '</button>').join('') + '</div></div>' +
         '<div class="panel" style="margin-top:14px"><h3 class="panel-title">' + BF.icon('medal', 17) + 'Badges</h3><div class="badge-grid small">' + (badges.slice(0, 6).map((b) => badgeTile(b, b.id === 'forgecore_unlocked')).join('') || '<p class="faint">No badges yet.</p>') + '</div></div></div></div>';
     }
-    return '<section class="profile-hero"><div class="ph-avatar">' + BF.avatar.render(s.avatar, { size: 190 }) + '</div><div class="ph-main"><div class="ph-names"><h1 class="page-title">' + esc(p.displayName) + '</h1><span class="faint">@' + esc(p.username) + '</span><span class="lvl-badge">' + BF.icon('star', 13) + 'Level ' + p.level + '</span>' + (s.secrets.forgecore.unlocked ? '<span class="pill" style="background:rgba(255,95,15,.14);color:#ff7a2e" data-forgecore role="button" tabindex="0" data-tip="Forgecore">' + BF.icon('terminal', 12) + 'Forgecore</span>' : '') + '</div>' +
+    return '<section class="profile-hero"><div class="ph-avatar">' + heroAvatar(s.avatar) + '</div><div class="ph-main"><div class="ph-names"><h1 class="page-title">' + esc(p.displayName) + '</h1><span class="faint">@' + esc(p.username) + '</span><span class="lvl-badge">' + BF.icon('star', 13) + 'Level ' + p.level + '</span>' + (s.secrets.forgecore.unlocked ? '<span class="pill" style="background:rgba(255,95,15,.14);color:#ff7a2e" data-forgecore role="button" tabindex="0" data-tip="Forgecore">' + BF.icon('terminal', 12) + 'Forgecore</span>' : '') + '</div>' +
       '<div class="ph-xp">' + BF.ui.bar(p.xp, need, 'xp') + '<span class="faint num">' + U.fmt(p.xp) + ' / ' + U.fmt(need) + ' XP to level ' + (p.level + 1) + '</span></div>' +
       '<div class="ph-stats"><a href="#/friends"><b class="num">' + s.social.friends.length + '</b><span>Friends</span></a><a href="#/friends/followers"><b class="num">' + s.social.followers.length + '</b><span>Followers</span></a><a href="#/friends/following"><b class="num">' + s.social.following.length + '</b><span>Following</span></a><a href="#/wallet"><b class="num">' + U.fmt(s.wallet.balance) + '</b><span>ForgeCoins</span></a><a href="#/profile/creations"><b class="num">' + s.created.length + '</b><span>Games created</span></a><a href="#/achievements"><b class="num">' + unlocked.length + '</b><span>Achievements</span></a></div>' +
       '<div class="ph-meta faint">' + BF.icon('calendar', 14) + ' Joined ' + U.fmtDate(p.joinDate) + ' · ' + U.plural(st.gamesPlayed, 'game') + ' played · ' + U.fmtDuration(st.playSeconds) + ' in game</div>' +
@@ -115,7 +126,7 @@
       if (status.state === 'ingame') actions += '<button class="btn btn-play" data-act="join-friend" data-bot="' + bot.id + '">' + BF.icon('play', 13) + 'Join game</button>';
     }
     actions += '<button class="icon-btn" data-act="user-menu" data-bot="' + bot.id + '" aria-label="More">' + BF.icon('dots', 18) + '</button>';
-    return '<section class="profile-hero"><div class="ph-avatar">' + BF.avatar.render(bot.avatar, { size: 190 }) + '</div><div class="ph-main"><div class="ph-names"><h1 class="page-title">' + esc(bot.displayName) + '</h1><span class="faint">@' + esc(bot.username) + '</span><span class="lvl-badge">' + BF.icon('star', 13) + 'Level ' + st.level + '</span>' + (F.followsYou(bot.id) ? '<span class="pill">Follows you</span>' : '') + '</div>' +
+    return '<section class="profile-hero"><div class="ph-avatar">' + heroAvatar(bot.avatar, bot.id) + '</div><div class="ph-main"><div class="ph-names"><h1 class="page-title">' + esc(bot.displayName) + '</h1><span class="faint">@' + esc(bot.username) + '</span><span class="lvl-badge">' + BF.icon('star', 13) + 'Level ' + st.level + '</span>' + (F.followsYou(bot.id) ? '<span class="pill">Follows you</span>' : '') + '</div>' +
       '<div class="ph-status"><span class="status-dot ' + status.state + '" data-live="dot:' + bot.id + '"></span><span data-live="status:' + bot.id + '">' + BF.ui.statusText(status) + '</span></div>' +
       '<div class="ph-stats"><div><b class="num">' + st.friends + '</b><span>Friends</span></div><div><b class="num">' + U.compact(st.followers) + '</b><span>Followers</span></div><div><b class="num">' + st.following + '</b><span>Following</span></div><div><b class="num">' + U.compact(st.coins) + '</b><span>ForgeCoins</span></div><div><b class="num">' + st.achievements + '</b><span>Achievements</span></div></div>' +
       '<div class="ph-meta faint">' + BF.icon('calendar', 14) + ' Joined ' + U.fmtDate(bot.joinDate) + ' · ' + U.plural(st.gamesPlayed, 'game') + ' played</div><div class="ph-actions">' + actions + '</div></div></section>' + tabs + body;
@@ -148,6 +159,7 @@
       return selfProfile(params.tab || 'about');
     },
     mount(root) {
+      mountHero(root, BF.store.state.avatar);
       root.querySelectorAll('[data-edit-profile]').forEach((b) => b.addEventListener('click', editProfile));
       root.querySelectorAll('[data-forgecore]').forEach((b) => {
         const open = () => { if (BF.secrets.isUnlocked() && BF.forgecore) BF.forgecore.open(); };
@@ -165,6 +177,10 @@
       const bot = BF.bots.get(params.id);
       if (!bot) return BF.ui.empty({ icon: 'user', title: 'Player not found', action: { label: 'Find players', href: '#/friends/find' } });
       return botProfile(bot, params.tab || 'about');
+    },
+    mount(root, params) {
+      const bot = BF.bots.get(params.id);
+      if (bot) mountHero(root, bot.avatar);
     },
   });
 })((window.BF = window.BF || {}));

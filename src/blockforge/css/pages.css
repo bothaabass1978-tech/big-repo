@@ -535,7 +535,7 @@ label.setting-row { cursor: pointer; }
   .settings-nav { flex-direction: row; overflow-x: auto; position: static; }
   .settings-nav .nav-item { flex: none; width: auto; }
   .settings-nav .nav-item .nav-text { display: inline; }
-  .profile-hero .ph-avatar svg { width: 150px; height: auto; }
+  .profile-hero .ph-avatar svg, .profile-hero .ph-avatar .avatar-3d { width: 150px; height: auto; }
   .creation { grid-template-columns: 120px minmax(0, 1fr); }
   .cr-actions { grid-column: 1 / -1; justify-content: flex-start; max-width: none; }
   .admin-hero { grid-template-columns: 140px minmax(0, 1fr); }
@@ -588,4 +588,14 @@ label.setting-row { cursor: pointer; }
   .quest-grid { grid-template-columns: minmax(0, 1fr); }
   .dr-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
   .login-tiles { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* live 3D avatar viewers */
+.ae-stage.live { position: relative; padding: 0; height: 400px; }
+.ae-stage.live .av-live { position: absolute; inset: 0; }
+.ae-drag-hint { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); font-size: 11.5px; color: var(--text-3); display: inline-flex; gap: 5px; align-items: center; pointer-events: none; white-space: nowrap; }
+.ph-avatar .ph-live { width: 210px; height: 270px; }
+@media (max-width: 760px) {
+  .ae-stage.live { height: 320px; }
+  .ph-avatar .ph-live { width: 160px; height: 210px; }
 }
