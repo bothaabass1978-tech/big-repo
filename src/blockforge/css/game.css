@@ -204,3 +204,11 @@ button.gr-player:hover { background: #171c25; }
   .gr-stage { padding: 4px; }
   .pcard { grid-template-columns: minmax(0, 1fr); }
 }
+@media (max-width: 640px) {
+  .gr-feed { max-width: 78%; gap: 3px; left: 6px; }
+  .gr-feed-item { font-size: 10.5px; padding: 3px 7px; }
+  .gpanel { font-size: 12px; }
+}
+@media (max-width: 640px) and (orientation: portrait) {
+  .gr-stage::after { content: 'Tip: turn your phone sideways for a bigger view'; color: #8b95a7; font-size: 12px; text-align: center; }
+}
