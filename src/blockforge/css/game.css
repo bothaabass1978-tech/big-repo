@@ -145,6 +145,7 @@ button.gr-player:hover { background: #171c25; }
 .gpanel .ec-ab .ec-cd { position: absolute; left: 0; bottom: 0; height: 3px; width: 0; background: #ffb454; }
 .gpanel .ec-ab.dim { opacity: 0.55; }
 .gpanel .ec-ab .faint { color: #7fe7ff; font-size: 11px; }
+.gpanel.top.end { left: auto; right: 1.5%; transform: none; }
 .gpanel.top { left: 50%; top: 2%; transform: translateX(-50%); padding: 6px 12px; border-radius: 10px; background: rgba(13, 16, 24, 0.8); }
 .gpanel h3 { font-size: 17px; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
 .gpanel h4 { font-size: 13px; color: #a1abbb; text-transform: uppercase; letter-spacing: 0.06em; margin: 10px 0 6px; }

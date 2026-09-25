@@ -37,6 +37,8 @@
   };
 
   U.pct = (v) => Math.round((Number(v) || 0) * 100) + '%';
+  /** 'Iron Sword' -> 'an Iron Sword'. */
+  U.withArticle = (w) => (/^[aeiou]/i.test(String(w)) ? 'an ' : 'a ') + w;
   U.plural = (n, one, many) => U.fmt(n) + ' ' + (Math.abs(n) === 1 ? one : many || one + 's');
 
   /** FNV-1a 32-bit string hash (unsigned). */

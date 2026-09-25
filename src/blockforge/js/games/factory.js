@@ -299,7 +299,7 @@
             if (bt.buyT <= 0) {
               bt.buyT = 30 + Math.random() * 50;
               const it = U.pick(ITEMS.filter((x) => x.price > 0 && x.price < bt.value / 2 + 5000));
-              if (it) { bt.value += it.price; ctx.feed(bt.bot.displayName + ' bought a ' + it.name + ' for their factory.', 'info', '#8fd3ff'); }
+              if (it) { bt.value += it.price; ctx.feed(bt.bot.displayName + ' bought ' + U.withArticle(it.name) + ' for their factory.', 'info', '#8fd3ff'); }
               else if (Math.random() < 0.5) ctx.botSay(bt.bot, 'any', 100);
             }
             bt.value += dt * 2;

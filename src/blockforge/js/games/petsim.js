@@ -388,7 +388,7 @@
           if (!bestHatch || rank(sp.rarity) > rank(bestHatch.rarity)) bestHatch = sp;
           ctx.reward(T.rewards.hatch[sp.rarity], 'pet hatching');
           ctx.xp(T.rewards.xpHatch);
-          if (rank(sp.rarity) >= 4) { ctx.badge('pw_legendary'); ctx.feed('You hatched a ' + BF.RARITY[sp.rarity].label + ' ' + sp.name + '!', 'star', BF.RARITY[sp.rarity].color); }
+          if (rank(sp.rarity) >= 4) { ctx.badge('pw_legendary'); ctx.feed('You hatched ' + U.withArticle(BF.RARITY[sp.rarity].label) + ' ' + sp.name + '!', 'star', BF.RARITY[sp.rarity].color); }
         }
         ctx.addStat('pets', count);
         ctx.playerStat('petsHatched', count);
@@ -602,7 +602,7 @@
             const sp = SPECIES[rollSpecies(ZONES[bt.zi].egg, Math.random)];
             if (bt.pets.length < 3) bt.pets.push({ sp, x: bt.x, y: bt.y, bob: 0 });
             else bt.pets[Math.floor(Math.random() * 3)].sp = sp;
-            if (rank(sp.rarity) >= 2) ctx.feed(bt.bot.displayName + ' hatched a ' + BF.RARITY[sp.rarity].label + ' ' + sp.name + '!', 'star', BF.RARITY[sp.rarity].color);
+            if (rank(sp.rarity) >= 2) ctx.feed(bt.bot.displayName + ' hatched ' + U.withArticle(BF.RARITY[sp.rarity].label) + ' ' + sp.name + '!', 'star', BF.RARITY[sp.rarity].color);
             if (rank(sp.rarity) >= 4 && Math.random() < 0.7) ctx.botSay(bt.bot, 'win');
           }
           if (!bt.target || !bt.target.alive) {

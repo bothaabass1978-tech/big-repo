@@ -206,7 +206,7 @@
         const [cx, cy] = U.pick(spots);
         a.gold -= TOWERS[type].cost;
         place(type, cx, cy, a.bot);
-        ctx.feed(a.bot.displayName + ' built ' + (/^[AEIOU]/.test(TOWERS[type].name) ? 'an ' : 'a ') + TOWERS[type].name + ' tower.', 'info', '#8fd3ff');
+        ctx.feed(a.bot.displayName + ' built ' + U.withArticle(TOWERS[type].name) + ' tower.', 'info', '#8fd3ff');
         if (Math.random() < 0.3) ctx.botSay(a.bot, 'idle');
       }
 

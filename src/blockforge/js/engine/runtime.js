@@ -463,11 +463,12 @@
     s.offs.push(BF.bus.on('server:join', (ev) => {
       if (!s || ev.serverId !== s.server.id || ev.gameId !== s.gameId) return;
       if (BF.friends.isBlocked(ev.bot.id)) return;
+      if (s.all.some((b) => b.id === ev.bot.id)) return;
       const bot = prepBot(ev.bot);
-      if (!s.all.includes(bot)) s.all.push(bot);
+      s.all.push(bot);
       feed(bot.displayName + ' joined the server.', 'join', '#86e3a8');
       BF.sfx.play('join');
-      if (s.active.length < maxActive()) {
+      if (s.active.length < maxActive() && !s.active.some((b) => b.id === bot.id)) {
         s.active.push(bot);
         if (s.instance && s.instance.onBotJoin && !s.loading) { try { s.instance.onBotJoin(bot); } catch (e) { console.error(e); } }
       }
@@ -484,7 +485,7 @@
       feed(bot.displayName + ' left the server.', 'leave', '#ff9d9d');
       BF.sfx.play('leave');
       if (wasActive && s.instance && s.instance.onBotLeave) { try { s.instance.onBotLeave(bot); } catch (e) { console.error(e); } }
-      const bench = s.all.find((b) => !s.active.includes(b));
+      const bench = s.all.find((b) => !s.active.some((a) => a.id === b.id));
       if (wasActive && bench) {
         s.active.push(bench);
         if (s.instance && s.instance.onBotJoin) { try { s.instance.onBotJoin(bench); } catch (e) { console.error(e); } }
@@ -502,7 +503,7 @@
     const me = BF.store.state;
     const row = (b) => {
       const friend = BF.friends.isFriend(b.id);
-      return '<button class="gr-player" data-pl="' + b.id + '">' + BF.ui.avatarChip(b.avatar, { size: 'sm' }) + '<span class="gp-main"><span class="gp-name" style="color:' + BF.gfx.nameColor(b.username) + '">' + esc(b.displayName) + '</span><span class="gp-sub">@' + esc(b.username) + ' · Lv ' + BF.bots.level(b) + (s.active.includes(b) ? '' : ' · in lobby') + '</span></span>' + (friend ? '<span class="pill success">Friend</span>' : BF.friends.hasOutgoing(b.id) ? '<span class="pill">Sent</span>' : '') + '</button>';
+      return '<button class="gr-player" data-pl="' + b.id + '">' + BF.ui.avatarChip(b.avatar, { size: 'sm' }) + '<span class="gp-main"><span class="gp-name" style="color:' + BF.gfx.nameColor(b.username) + '">' + esc(b.displayName) + '</span><span class="gp-sub">@' + esc(b.username) + ' · Lv ' + BF.bots.level(b) + (s.active.some((x) => x.id === b.id) ? '' : ' · in lobby') + '</span></span>' + (friend ? '<span class="pill success">Friend</span>' : BF.friends.hasOutgoing(b.id) ? '<span class="pill">Sent</span>' : '') + '</button>';
     };
     el.innerHTML = '<div class="gr-player me">' + BF.ui.avatarChip(me.avatar, { size: 'sm' }) + '<span class="gp-main"><span class="gp-name">' + esc(me.player.displayName) + ' <span class="pill accent">You</span></span><span class="gp-sub">@' + esc(me.player.username) + ' · Lv ' + me.player.level + '</span></span></div>' + s.all.map(row).join('');
   }

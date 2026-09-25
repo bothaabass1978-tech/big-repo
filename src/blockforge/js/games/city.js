@@ -452,7 +452,7 @@
           parked.filter((p) => p.mine && !p.def.company).forEach((p) => parked.splice(parked.indexOf(p), 1));
           spawnOwnCar(id, dealer.door.x, dealer.door.y + 44);
           ctx.banner(c.name + ' purchased!', 'It is parked outside. Press E to drive it.', 2000);
-          ctx.feed('You bought a ' + c.name + '!', 'star', '#ffd66b');
+          ctx.feed('You bought ' + U.withArticle(c.name) + '!', 'star', '#ffd66b');
           renderPanel();
           return;
         }

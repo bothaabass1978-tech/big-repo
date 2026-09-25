@@ -292,7 +292,7 @@
         const roll = Math.random();
         const tier = Math.min(floorN + (Math.random() < 0.3 ? 1 : 0), 4);
         let msg;
-        if (roll < 0.3 && tier > me.sword) { me.sword = tier; msg = 'Found a ' + SWORDS[tier].name + '!'; }
+        if (roll < 0.3 && tier > me.sword) { me.sword = tier; msg = 'Found ' + U.withArticle(SWORDS[tier].name) + '!'; }
         else if (roll < 0.52 && Math.min(tier, 3) > me.armor) { me.armor = Math.min(tier, 3); msg = 'Found ' + ARMORS[me.armor].name + '!'; }
         else if (roll < 0.75) { me.potions++; msg = 'Found a potion!'; }
         else { const gd = 15 + Math.floor(Math.random() * 25 * floorN); gold += gd; msg = '+' + gd + ' gold'; }
