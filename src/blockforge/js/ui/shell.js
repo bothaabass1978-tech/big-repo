@@ -340,7 +340,7 @@
     const t = e.target;
     if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
     if (e.ctrlKey || e.metaKey || e.altKey) return;
-    if (document.querySelector('.modal-scrim')) return;
+    if (document.querySelector('.modal-scrim, .fc-scrim')) return;
     if (gPending) {
       gPending = false;
       clearTimeout(gTimer);

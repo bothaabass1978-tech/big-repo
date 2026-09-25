@@ -194,7 +194,7 @@
     s.onKey = (e) => {
       if (!s) return;
       const inChat = document.activeElement && document.activeElement.id === 'gr-chat-input';
-      if (document.querySelector('.modal-scrim')) return;
+      if (document.querySelector('.modal-scrim, .fc-scrim')) return;
       if (e.key === 'Escape') {
         e.preventDefault();
         if (inChat) { document.activeElement.blur(); return; }

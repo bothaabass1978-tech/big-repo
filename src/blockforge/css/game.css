@@ -145,6 +145,33 @@ button.gr-player:hover { background: #171c25; }
 .gpanel .ec-ab .ec-cd { position: absolute; left: 0; bottom: 0; height: 3px; width: 0; background: #ffb454; }
 .gpanel .ec-ab.dim { opacity: 0.55; }
 .gpanel .ec-ab .faint { color: #7fe7ff; font-size: 11px; }
+.gpanel.bottom.pb { width: min(760px, 96%); bottom: 2%; padding: 10px; }
+.gpanel .pb-moves { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
+.gpanel .pb-moves p { grid-column: 1 / -1; }
+.gpanel .pb-move { height: auto; min-height: 44px; flex-direction: column; align-items: flex-start; gap: 1px; padding: 6px 10px; border-left: 4px solid var(--mt, #9aa5b5); text-align: left; white-space: normal; }
+.gpanel .pb-move small { color: #a1abbb; font-size: 11px; font-weight: 500; }
+.gpanel .pb-move em { font-size: 11px; font-style: normal; font-weight: 700; }
+.gpanel .pb-team { margin-top: 8px; }
+.gpanel .pb-mate.on { border-color: #ffb454; }
+.gpanel .mm-shelf { display: flex; gap: 6px; justify-content: center; align-items: flex-end; padding: 10px; background: #3a2418; border-radius: 8px; margin: 8px 0; }
+.gpanel .mm-book { width: 44px; height: 120px; border-radius: 4px 4px 2px 2px; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 8px; box-shadow: inset -6px 0 0 rgba(0, 0, 0, 0.2); transition: transform var(--t-fast); }
+.gpanel .mm-book:hover { transform: translateY(-6px); }
+.gpanel .mm-book span { writing-mode: vertical-rl; color: rgba(255, 255, 255, 0.85); font-size: 12px; font-weight: 700; }
+.gpanel .mm-display { font: 700 28px var(--font-mono); letter-spacing: 0.2em; text-align: center; padding: 8px; margin: 8px auto; width: 180px; border-radius: 8px; background: #0b0e13; color: #3fd08a; }
+.gpanel .mm-keypad { display: grid; grid-template-columns: repeat(3, 64px); gap: 6px; justify-content: center; }
+.gpanel .mm-key { height: 44px; font-size: 16px; }
+.gpanel .mm-fuses { display: flex; gap: 8px; justify-content: center; margin: 10px 0; }
+.gpanel .mm-fuse { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 76px; padding: 10px 4px; border-radius: 8px; background: #1a2030; border: 1px solid #2a3344; color: #cfd6e2; font-size: 11.5px; }
+.gpanel .mm-fuse i { width: 22px; height: 22px; border-radius: 50%; background: #2a2f3a; box-shadow: inset 0 0 0 2px #39414f; }
+.gpanel .mm-fuse.on i { background: #ffd66b; box-shadow: 0 0 14px #ffd66b; }
+.gpanel .mm-dials { display: flex; gap: 8px; justify-content: center; margin: 10px 0; }
+.gpanel .mm-dial { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px; border-radius: 8px; background: #2a1e10; border: 1px solid #8a6a2a; }
+.gpanel .mm-dial b { font: 700 26px var(--font-mono); color: #ffd66b; width: 32px; text-align: center; }
+.gpanel .mm-runes { display: flex; gap: 10px; justify-content: center; margin: 12px 0; }
+.gpanel .mm-rune { width: 70px; height: 70px; border-radius: 12px; font-size: 30px; color: #ff9d5c; background: #2a1206; border: 1px solid #5a2a0e; transition: transform var(--t-fast), box-shadow var(--t-fast), background var(--t-fast); }
+.gpanel .mm-rune:hover:not([disabled]) { transform: translateY(-2px); }
+.gpanel .mm-rune.lit { background: #ff7a2e; color: #fff; box-shadow: 0 0 24px #ff7a2e; }
+.gpanel .mm-notes { margin: 6px 0 0 18px; color: #b7c0cf; font-size: 12.5px; line-height: 1.5; }
 .gpanel.top.end { left: auto; right: 1.5%; transform: none; }
 .gpanel.top { left: 50%; top: 2%; transform: translateX(-50%); padding: 6px 12px; border-radius: 10px; background: rgba(13, 16, 24, 0.8); }
 .gpanel h3 { font-size: 17px; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
