@@ -208,7 +208,7 @@
       body: '<p class="muted" style="margin-bottom:10px">' + (json.length / 1024).toFixed(1) + ' KB of JSON. Download it, or copy it somewhere safe.</p><textarea class="textarea mono" id="export-json" readonly rows="10">' + esc(json) + '</textarea>',
       actions: [
         { label: 'Copy JSON', kind: 'outline', icon: 'copy', onClick: () => { U.copyText(json).then((ok) => { if (!ok) { const ta = h.el.querySelector('#export-json'); ta.focus(); ta.select(); } BF.ui.toast({ title: ok ? 'Save copied to clipboard' : 'Text selected: press Ctrl+C to copy', kind: ok ? 'success' : 'info' }); }); return false; } },
-        { label: 'Download .json', kind: 'primary', icon: 'download', onClick: () => { const ok = U.downloadText(name, json); BF.ui.toast({ title: ok ? 'Downloading ' + name : 'Downloads are blocked here: use Copy JSON', kind: ok ? 'success' : 'info' }); return false; } },
+        { label: 'Download .json', kind: 'primary', icon: 'download', onClick: () => { const ok = U.downloadText(name, json); BF.ui.toast(ok ? { title: 'Download started: ' + name, text: 'No file? Some embedded views block downloads. Use Copy JSON instead.', kind: 'success' } : { title: 'Downloads are blocked here: use Copy JSON', kind: 'info' }); return false; } },
       ],
     });
   }

@@ -53,8 +53,11 @@ async function signIn(page) {
   const page = await newPage(browser);
   await signIn(page);
   await shot(page, '01-home-daily');
-  const daily = await page.$('[data-act="claim-daily"], .daily-modal .btn-play, .daily-modal .btn-primary');
-  if (daily) { await daily.click(); await page.waitForTimeout(600); }
+  const dailyBefore = await page.evaluate(() => ({ bal: BF.economy.balance(), amount: BF.daily.status().nextAmount }));
+  const claimBtn = await page.waitForSelector('#daily-claim-btn', { timeout: 4000 }).catch(() => null);
+  if (claimBtn) { await claimBtn.click(); await page.waitForTimeout(600); }
+  const dailyAfter = await page.evaluate(() => ({ bal: BF.economy.balance(), last: BF.economy.history()[0] }));
+  check('daily reward pops up on sign-in and claiming pays out with a ledger entry', !!claimBtn && dailyAfter.bal === dailyBefore.bal + dailyBefore.amount && dailyAfter.last.cat === 'daily', JSON.stringify({ dailyBefore, dailyAfter }));
   await page.keyboard.press('Escape');
   const header = await page.evaluate(() => ({ bal: BF.economy.balance(), text: (document.querySelector('.coin-chip, .fc-chip, [data-act="wallet"]') || {}).textContent || '' }));
   check('signed in as ForgePlayer with a ForgeCoin balance', header.bal >= 1500, JSON.stringify(header));
