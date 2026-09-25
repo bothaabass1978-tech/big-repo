@@ -70,14 +70,16 @@
   const costText = (cost) => Object.entries(cost).map(([k, v]) => v + ' ' + RES[k].name.toLowerCase()).join(', ');
 
   BF.GameModules.register('treasuretycoon', {
-    maxBots: 3,
+    three: true,
+    maxBots: 5,
     feedTop: 0.2,
     actions: { use: ['KeyE', 'Space'] },
     controls: { joystick: true, buttons: [{ act: 'use', label: 'Gather / Hit', icon: 'hammer' }] },
     create(ctx) {
       const W = ctx.W, H = ctx.H;
-      const parts = new BF.Particles(400);
-      const floats = new BF.Floaters();
+      const V = ctx.g3;
+      const parts = V ? V.particles2d(14) : new BF.Particles(400);
+      const floats = V ? V.floaters2d(60) : new BF.Floaters();
       const cam = new BF.Camera(W, H);
       cam.bounds = { x: 0, y: 0, w: WW, h: WH };
       const d = ctx.data;
@@ -343,6 +345,182 @@
         G.text(g, label, x, y - 52, { size: 12, align: 'center', color: '#fff', weight: 800, stroke: 'rgba(0,0,0,.6)', strokeW: 3 });
       }
 
+      // ------------------------------------------------------------ 3D view
+      const PIRATE = { skin: '#e0ac69', equipped: { face: { style: 'determined' }, shirt: { style: 'stripe', c1: '#b0412e', c2: '#f4f1ea' }, pants: { style: 'plain', c1: '#1f2a44' }, hat: { style: 'bandana', c1: '#1b1b22' } } };
+      const view = !V ? null : (() => {
+        V.preset('day', { fogNear: 1100, fogFar: 3000 });
+        V.shadowSize(620);
+        const L = BEACH + 40;
+        V.ground(0, 0, 1000, L, '#ffffff', { map: BF.g3d.gridTex('#5fae52', 'rgba(0,0,0,0)', 1, { check: '#58a64b', repeat: [1000 / 160, L / 160], noise: true }) });
+        V.ground(1000, 0, 1800, L, '#ffffff', { map: BF.g3d.gridTex('#2f7a3a', 'rgba(0,0,0,0)', 1, { check: '#2a7035', repeat: [800 / 160, L / 160], noise: true }) });
+        V.ground(1800, 0, WW, L, '#ffffff', { map: BF.g3d.gridTex('#3a2a2a', 'rgba(0,0,0,0)', 1, { check: '#34262a', repeat: [600 / 160, L / 160], noise: true }) });
+        V.ground(-600, L, WW + 600, BEACH + 120, '#e8d08a', { y: -1, map: BF.g3d.gridTex('#e8d08a', 'rgba(0,0,0,0)', 1, { repeat: [30, 2], noise: true }) });
+        V.ground(-3000, -1600, WW + 3000, WH + 2600, '#16608f', { y: -14 });
+        const sea = V.ground(-3000, BEACH + 110, WW + 3000, WH + 2600, '#1f7fb8', { y: -4, opacity: 0.85, rough: 0.2 });
+        V.ground(-3000, -1600, 0, BEACH + 120, '#2f7a3a', { y: -0.5 });
+        V.ground(WW, -1600, WW + 3000, BEACH + 120, '#3a2a2a', { y: -0.5 });
+        V.ground(-600, -1600, WW + 600, 0, '#2a5a2a', { y: -0.5 });
+        // lava river and the volcano
+        V.box(1800, -2, (60 + BEACH + 40) / 2, 22, 3, BEACH - 20, '#ff5a1f', { glow: 1.4, shadow: false });
+        const lavaCore = V.box(1800, -1, (60 + BEACH + 40) / 2, 8, 3, BEACH - 20, '#ffd66b', { glow: 1.6, shadow: false });
+        const volcano = V.shape('cone', 2150, 110, 300, 460, 220, 400, '#4a2e28', { flat: true });
+        volcano.receiveShadow = true;
+        V.shape('cyl', 2150, 216, 300, 120, 8, 110, '#ff5a1f', { glow: 1.5, shadow: false });
+        let bridge = null;
+        // locked zone veils and the jungle hedge
+        const veils = {};
+        for (const [id, z] of Object.entries(ZONES)) {
+          const g = V.group();
+          V.ground(z.x0, 0, z.x1, L, '#080a10', { parent: g, y: 1, basic: true, opacity: 0.35, depthWrite: false });
+          if (id === 'jungle') V.boxes(Array.from({ length: 40 }, (_, i) => ({ x: z.x0 + (i % 2) * 10, y: 0, z: 70 + i * 28, w: 44, h: 48, d: 44, color: i % 2 ? '#1f5a2a' : '#256a30' })), { parent: g, geo: 'sphereLo' });
+          veils[id] = g;
+        }
+        // buildings
+        const bg = {};
+        const B = BUILDINGS;
+        const mill = V.group(); mill.position.set(B.mill.x, 0, B.mill.y);
+        V.box(0, 0, 0, 110, 60, 70, '#8b5a2b', { parent: mill }); V.box(0, 60, 0, 116, 10, 76, '#b07a45', { parent: mill });
+        const blades = V.group(mill); blades.position.set(40, 60, 38);
+        for (let i = 0; i < 4; i++) { const b2 = V.box(0, 0, 0, 8, 46, 2, '#e8d3a8', { parent: blades }); b2.geometry = BF.g3d.geo('box'); b2.position.set(0, 0, 0); b2.rotation.z = (i * Math.PI) / 2; b2.translateY(23); }
+        bg.blades = blades;
+        const quarry = V.group(); quarry.position.set(B.quarry.x, 0, B.quarry.y);
+        V.box(0, 0, 0, 110, 50, 70, '#6a707c', { parent: quarry }); V.box(-20, 50, 0, 40, 30, 40, '#9aa5b5', { parent: quarry }); V.box(30, 0, 40, 30, 16, 20, '#9aa5b5', { parent: quarry });
+        const vault = V.group(); vault.position.set(B.vault.x, 0, B.vault.y);
+        V.box(0, 0, 0, 112, 70, 80, '#6a707c', { parent: vault, metal: 0.3 }); V.box(0, 70, 0, 100, 8, 70, '#8a94a6', { parent: vault });
+        V.shape('torus', 0, 36, 41, 44, 44, 30, '#ffd66b', { parent: vault, metal: 0.6, rough: 0.3 });
+        bg.dial = V.box(0, 30, 42, 3, 14, 2, '#ffd66b', { parent: vault });
+        const hut = V.group(); hut.position.set(B.hut.x, 0, B.hut.y);
+        V.box(0, 0, 0, 100, 44, 60, '#a86b3c', { parent: hut });
+        for (const sd of [-1, 1]) { const slope = V.box(0, 0, 0, 112, 6, 44, '#7a4a2a', { parent: hut }); slope.position.set(0, 56, sd * 16); slope.rotation.x = sd * 0.62; }
+        V.box(0, 44, 0, 100, 1, 1, '#7a4a2a', { parent: hut, shadow: false });
+        V.box(0, 0, 30.5, 18, 28, 2, '#5a3a20', { parent: hut });
+        const bat = V.group(); bat.position.set(B.cannons.x, 0, B.cannons.y);
+        V.box(0, 0, 0, 80, 10, 48, '#5a4a3a', { parent: bat }); V.box(0, 10, -16, 80, 16, 10, '#7a6a5a', { parent: bat });
+        const cannons = CANNON_SPOTS.map((c) => {
+          const g = V.group(); g.position.set(c.x, 0, c.y);
+          V.shape('cyl', 0, 6, 0, 28, 12, 28, '#39414f', { parent: g });
+          const barrel = V.group(g); barrel.position.y = 16;
+          const b2 = V.shape('cyl', 14, 0, 0, 12, 30, 12, '#2a2f3a', { parent: barrel, metal: 0.5 }); b2.rotation.z = Math.PI / 2;
+          g.userData.barrel = barrel;
+          return g;
+        });
+        const nodePool = V.pool(), ballPool = V.pool();
+        let ship = null;
+        function nodeModel(n) {
+          const g = V.group();
+          if (n.left <= 0) { V.shape('cylLo', 0, 3, 0, 16, 6, 16, n.kind === 'tree' ? '#7a4a2a' : '#6a707c', { parent: g }); return g; }
+          if (n.kind === 'tree') {
+            const jungle = n.zone !== 'home';
+            V.shape('cylLo', 0, 16, 0, 10, 32, 10, '#7a4a2a', { parent: g });
+            V.shape(jungle ? 'sphereLo' : 'cone', 0, jungle ? 42 : 50, 0, n.r * 2.6, jungle ? n.r * 2.2 : n.r * 3, n.r * 2.6, jungle ? '#1f7a3a' : '#2f9a47', { parent: g, flat: true });
+          } else if (n.kind === 'rock') {
+            V.shape('dodeca', 0, n.r * 0.6, 0, n.r * 2.2, n.r * 1.4, n.r * 2, n.zone === 'volcano' ? '#3a3440' : '#7a8494', { parent: g, flat: true });
+          } else if (n.kind === 'crystal') {
+            for (const [ox, h, oz] of [[-7, 30, 2], [5, 42, -4], [11, 24, 6]]) V.shape('octa', ox, h / 2, oz, 12, h, 12, '#7fe7ff', { parent: g, glow: 0.7, opacity: 0.92, flat: true, shadow: false });
+          } else {
+            V.shape('dodeca', 0, n.r * 0.6, 0, n.r * 2.2, n.r * 1.4, n.r * 2, '#4a3a30', { parent: g, flat: true });
+            for (const [ox, oy, oz] of [[-6, 16, 8], [6, 10, 10], [0, 22, 2]]) V.shape('octa', ox, oy, oz, 8, 8, 8, '#ffd66b', { parent: g, metal: 0.6, rough: 0.3, glow: 0.3 });
+          }
+          return g;
+        }
+        function shipModel() {
+          const g = V.group();
+          V.box(0, -10, 0, 150, 30, 56, '#5a3a2a', { parent: g });
+          V.box(0, 20, 0, 136, 6, 48, '#7a4a2a', { parent: g });
+          V.box(62, 20, 0, 30, 20, 50, '#5a3a2a', { parent: g });
+          V.box(0, 26, 0, 6, 110, 6, '#3a2a1e', { parent: g });
+          V.box(4, 60, 0, 2, 60, 80, '#1b1b22', { parent: g, side: 2 });
+          V.shape('sphere', 6, 92, 0, 16, 16, 4, '#f4f1ea', { parent: g, basic: true });
+          return g;
+        }
+        const workerLook = (w) => w.look;
+
+        return function sync(dt) {
+          const t = ctx.time;
+          V.look(me.x, 0, me.y, { dist: 560, pitch: 0.95, fov: 45, lerp: 0.12 }, dt);
+          sea.position.y = -4 + Math.sin(t) * 1.5;
+          lavaCore.material.emissiveIntensity = 1.3 + Math.sin(t * 3) * 0.4;
+          for (const [id, g] of Object.entries(veils)) g.visible = !d.zones[id];
+          if (d.zones.volcano && !bridge) { bridge = V.box(1800, 0, 560, 60, 4, 60, '#7a4a2a'); }
+          bg.blades.rotation.z = t * (0.6 + d.levels.mill * 0.4);
+          bg.dial.rotation.z = t;
+          cannons.forEach((c, i) => { c.visible = i < d.levels.cannons; const cs = CANNON_SPOTS[i]; c.userData.barrel.rotation.y = -(cs.aim != null ? cs.aim : -Math.PI / 2); });
+          // labels on buildings and locked gates
+          for (const id of Object.keys(BUILDINGS)) {
+            const b = BUILDINGS[id];
+            if (Math.abs(b.x - me.x) > 700 || Math.abs(b.y - me.y) > 600) continue;
+            const lvl = d.levels[id];
+            const near = U.dist(b.x, b.y, me.x, me.y) < 110 && !gather;
+            V.label(b.x, 100, b.y, { name: (near ? '[E] ' : '') + b.name + (lvl != null ? ' · L' + lvl : id === 'hut' ? ' · ' + d.workers + '/' + maxWorkers() : ''), color: near ? '#ffd66b' : '#ffffff' });
+          }
+          for (const [id, z] of Object.entries(ZONES)) if (!d.zones[id] && Math.abs(z.gate.x - me.x) < 800) V.label(z.gate.x, 70, z.gate.y, { name: z.name + ' (locked) · ' + costText(z.cost) + (U.dist(z.gate.x, z.gate.y, me.x, me.y) < 110 ? ' · [E]' : ''), color: '#ffd66b' });
+          // resource nodes near the camera
+          for (const n of nodes) {
+            if (Math.abs(n.x - me.x) > 900 || Math.abs(n.y - me.y) > 700) continue;
+            const m = nodePool.use(n.kind + (n.left > 0 ? '' : 'x') + nodes.indexOf(n), () => nodeModel(n));
+            const shake = gather && gather.node === n ? Math.sin(t * 40) * 1.5 : 0;
+            m.position.set(n.x + shake, 0, n.y);
+            if (n.left > 0 && n.left < n.charges) V.label(n.x, n.kind === 'tree' ? 76 : 44, n.y, { hp: n.left / n.charges, hpColor: RES[n.res].color });
+          }
+          nodePool.sweep();
+          // raid
+          if (raid) {
+            if (!ship) ship = shipModel();
+            ship.visible = true;
+            ship.position.set(raid.ship.x, Math.sin(t * 1.5) * 3, raid.ship.y);
+            ship.rotation.y = Math.PI / 2;
+            ship.rotation.z = Math.sin(t * 1.2) * 0.04;
+            raid.pirates.forEach((p) => {
+              if (!p._id) p._id = U.uid('pirate');
+              const rig = V.actor(p._id, PIRATE, { scale: 7.5 });
+              rig.setPos(p.x, 0, p.y);
+              rig.faceAngle(p.a);
+              rig.set({ move: 0.8 });
+              if (!rig._held) { rig.hold('sword', '#c9ced8'); rig._held = true; }
+              if (p.flash > 0.08 && !p._fl) rig.play('hit');
+              p._fl = p.flash > 0.08;
+              V.label(p.x, 54, p.y, { hp: p.hp / p.maxHp, hpColor: '#ff5a6a', name: p.loot ? '+' + p.loot + ' gold' : null, color: '#ffd66b' });
+            });
+          } else if (ship) ship.visible = false;
+          for (const b of balls) {
+            const m = ballPool.use(b, () => V.shape('sphere', 0, 0, 0, 10, 10, 10, '#1b1b22', { metal: 0.4 }));
+            const k = b.t / b.dur;
+            m.position.set(U.lerp(b.x, b.tx, k), 16 + Math.sin(k * Math.PI) * 60, U.lerp(b.y, b.ty, k));
+          }
+          ballPool.sweep();
+          // people
+          workers.forEach((w, i) => {
+            const rig = V.actor('worker' + i, workerLook(w), { scale: 7 });
+            rig.setPos(w.x, 0, w.y);
+            rig.faceAngle(w.a);
+            rig.set({ move: w.state === 'go' || w.state === 'back' ? 0.8 : 0 });
+            if (w.state === 'work' && Math.random() < 0.08) rig.play('attack');
+            if (!rig._held) { rig.hold('pickaxe', '#9aa5b5'); rig._held = true; }
+            if (w.carry) V.label(w.x, 52, w.y, { name: '+' + w.carry.n + ' ' + RES[w.carry.res].name.toLowerCase(), color: RES[w.carry.res].color });
+          });
+          for (const bt of bots) {
+            const rig = V.actor(bt.bot.id, bt.bot.avatar, { scale: 7.5 });
+            const mv = bt._px != null && dt > 0 ? Math.hypot(bt.x - bt._px, bt.y - bt._py) / dt : 0;
+            bt._px = bt.x; bt._py = bt.y;
+            rig.setPos(bt.x, 0, bt.y);
+            rig.faceAngle(bt.a);
+            rig.set({ move: mv / 130 });
+            V.label(bt.x, 54, bt.y, { name: bt.bot.displayName, color: '#ffffff', bubble: ctx.bubbleText(bt.bot.id) });
+          }
+          const rig = V.actor('me', ctx.player.avatar, { scale: 8 });
+          rig.setPos(me.x, 0, me.y);
+          rig.faceAngle(me.a);
+          const mv = me._px != null && dt > 0 ? Math.hypot(me.x - me._px, me.y - me._py) / dt : 0;
+          me._px = me.x; me._py = me.y;
+          rig.set({ move: mv / T.speed });
+          if (!rig._held) { rig.hold('pickaxe', '#ffc940'); rig._held = true; }
+          if ((me.swing > 0.15 || (gather && Math.random() < 0.12)) && !me._sw) rig.play('attack');
+          me._sw = me.swing > 0.15;
+          V.label(me.x, 58, me.y, { name: ctx.player.name, color: '#ffb454', hp: gather ? gather.t / gather.node.time : null, hpColor: gather ? RES[gather.node.res].color : null, bubble: ctx.bubbleText('me') });
+          V.sweep();
+        };
+      })();
+
       return {
         update(dt) {
           parts.update(dt);
@@ -401,7 +579,7 @@
             }
           } else gather = null;
           if (inp.pointer.pressed) {
-            const w = cam.toWorld(inp.pointer.x, inp.pointer.y);
+            const w = V ? ctx.pointerWorld(0) : cam.toWorld(inp.pointer.x, inp.pointer.y);
             if (panel) closePanel();
             else {
               const st = stations().find((s) => U.dist(s.x, s.y, w.x, w.y) < 70);
@@ -472,7 +650,18 @@
           parts.draw(g);
           floats.draw(g);
           g.restore();
-          // HUD
+          drawHud(g);
+        },
+
+        render3d(dt) { view(dt); },
+        hud(g) { drawHud(g); },
+
+        onBotJoin(b) { addBot(b); },
+        onBotLeave(b) { const i = bots.findIndex((x) => x.bot.id === b.id); if (i >= 0) bots.splice(i, 1); },
+        destroy() { ctx.save(); },
+      };
+
+      function drawHud(g) {
           G.panel(g, 10, 10, 300, 78);
           Object.keys(RES).forEach((k, i) => { G.circle(g, 26 + i * 72, 30, 6, RES[k].color); G.text(g, U.compact(Math.floor(d.res[k] || 0)), 36 + i * 72, 35, { size: 14, weight: 800, color: '#fff' }); });
           G.text(g, 'Net gold', 22, 58, { size: 10, color: '#a1abbb' });
@@ -483,12 +672,7 @@
           G.panel(g, W - 220, 10, 210, 44);
           G.text(g, raid ? (raid.over ? 'Pirates retreating' : 'RAID! ' + raid.pirates.length + ' pirates ashore') : nextRaid != null ? 'Next raid in ' + U.fmtClock(nextRaid - time) : 'No more raids today', W - 208, 30, { size: 13, weight: 800, color: raid ? '#ff8b98' : '#fff' });
           G.text(g, 'Cannons ' + d.levels.cannons + '/3 · workers ' + d.workers + '/' + maxWorkers(), W - 208, 47, { size: 11, color: '#a1abbb' });
-        },
-
-        onBotJoin(b) { addBot(b); },
-        onBotLeave(b) { const i = bots.findIndex((x) => x.bot.id === b.id); if (i >= 0) bots.splice(i, 1); },
-        destroy() { ctx.save(); },
-      };
+      }
     },
   });
 })((window.BF = window.BF || {}));

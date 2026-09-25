@@ -89,16 +89,20 @@
   }
 
   BF.GameModules.register('miner', {
-    maxBots: 5,
+    three: true,
+    maxBots: 6,
     feedTop: 0.2,
     actions: { jump: ['Space', 'KeyW', 'ArrowUp'], down: ['KeyS', 'ArrowDown'], recall: ['KeyR'], use: ['KeyE'] },
     controls: { joystick: true, buttons: [{ act: 'jump', label: 'Jump', icon: 'chevronUp' }, { act: 'down', label: 'Dig down', icon: 'chevronDown' }, { act: 'recall', label: 'Surface', icon: 'home' }] },
     create(ctx) {
       const W = ctx.W, H = ctx.H;
-      const parts = new BF.Particles(500);
-      const floats = new BF.Floaters();
+      const V = ctx.g3;
+      // side view in 3D: X = x, Y = -y, the rock face sits on Z = 0
+      const parts = V ? V.particles2d(0, (x, y) => [x, -y, 20]) : new BF.Particles(500);
+      const floats = V ? V.floaters2d(0, (x, y) => [x, -y, 26]) : new BF.Floaters();
       const cam = new BF.Camera(W, H);
       cam.bounds = { x: 0, y: -260, w: COLS * TS, h: ROWS * TS + 260 };
+      let mapVer = 0;
       const custom = !!ctx.config.custom;
       const diffK = custom ? { easy: 0.8, normal: 1, hard: 1.25 }[ctx.difficulty] || 1 : 1;
       const world = genWorld(custom ? 'miner:' + (ctx.config.seed || 9) : 'mega-miners:' + Math.floor(Date.now() / 1000), diffK);
@@ -132,6 +136,7 @@
       function breakTile(tx, ty) {
         const t = tileAt(tx, ty);
         map[ty * COLS + tx] = AIR;
+        mapVer++;
         mined++;
         ctx.addStat('blocks', 1);
         ctx.playerStat('blocksMined', 1);
@@ -217,7 +222,7 @@
           bt.t = 0;
           const below = tileAt(bt.col, row);
           if (row - SURF >= bt.maxDepth || below === BEDROCK || below === COREROCK || below === LAVA || below === COREGEM) { bt.up = true; return; }
-          if (solid(below)) { const t = below; map[row * COLS + bt.col] = AIR; if (TILES[t].value && t >= GOLD && Math.random() < 0.25) ctx.feed(bt.bot.displayName + ' found ' + (t === DIAMOND ? 'a diamond' : 'some ' + TILES[t].name.toLowerCase()) + '!', 'star', TILES[t].ore); }
+          if (solid(below)) { const t = below; map[row * COLS + bt.col] = AIR; mapVer++; if (TILES[t].value && t >= GOLD && Math.random() < 0.25) ctx.feed(bt.bot.displayName + ' found ' + (t === DIAMOND ? 'a diamond' : 'some ' + TILES[t].name.toLowerCase()) + '!', 'star', TILES[t].ore); }
           bt.y = (row + 1) * TS;
         }
       }
@@ -234,6 +239,97 @@
         }
         return false;
       }
+
+      // ------------------------------------------------------------ 3D view
+      const view = !V ? null : (() => {
+        const CAP = 1400, D = TS;
+        const tileMesh = new THREE.InstancedMesh(BF.g3d.geo('box'), V.mat('#ffffff', { rough: 0.9 }), CAP);
+        const oreMesh = new THREE.InstancedMesh(BF.g3d.geo('box'), V.mat('#ffffff', { rough: 0.3, metal: 0.3 }), CAP);
+        const lavaMesh = new THREE.InstancedMesh(BF.g3d.geo('box'), V.mat('#ff5a1f', { glow: 1.3 }), 300);
+        for (const m of [tileMesh, oreMesh, lavaMesh]) { m.frustumCulled = false; m.count = 0; m.receiveShadow = true; V.scene.add(m); }
+        tileMesh.castShadow = true;
+        V.own(tileMesh); V.own(oreMesh); V.own(lavaMesh);
+        const m4 = new THREE.Matrix4(), q0 = new THREE.Quaternion(), p3 = new THREE.Vector3(), s3 = new THREE.Vector3(), c3 = new THREE.Color();
+        // back wall behind mined tunnels, sky and scenery above
+        V.box(COLS * TS / 2, -ROWS * TS, -D / 2 - 2, COLS * TS, (ROWS - SURF) * TS, 4, '#1b1620', { shadow: false });
+        V.ground(-2400, -1600, COLS * TS + 2400, 0, '#4ab35a', { y: -SURF * TS + 0.5 });
+        const r = U.rng('mm3d');
+        const hills = [], trees = [], crowns = [];
+        for (let i = 0; i < 30; i++) hills.push({ x: -900 + r() * (COLS * TS + 1800), y: -SURF * TS - 40, z: -200 - r() * 900, w: 200 + r() * 300, h: 120 + r() * 200, d: 200, color: r() < 0.5 ? '#6fbf5f' : '#5aa84e', rot: r() });
+        for (let i = 0; i < 26; i++) { const x = -500 + r() * (COLS * TS + 1000), z = -60 - r() * 300; if (x > 0 && x < COLS * TS && z > -80) continue; trees.push({ x, y: -SURF * TS, z, w: 10, h: 30, d: 10, color: '#7a4a2a' }); crowns.push({ x, y: -SURF * TS + 22, z, w: 50, h: 60, d: 50, color: '#2f9a47' }); }
+        V.boxes(hills, { geo: 'sphereLo', shadow: false });
+        V.boxes(trees, { geo: 'cylLo' });
+        V.boxes(crowns, { geo: 'cone' });
+        const shop = V.group(); shop.position.set(SHOP.x, -SURF * TS, 0);
+        V.box(0, 0, -30, 120, 70, 60, '#8b5a2b', { parent: shop });
+        V.box(0, 70, -30, 132, 14, 70, '#b07a45', { parent: shop });
+        V.box(0, 0, 0.5, 28, 36, 2, '#3a2a1e', { parent: shop });
+        V.sign("Miner's Outpost", SHOP.x, -SURF * TS + 104, -20, { h: 20 });
+        const core = V.shape('octa', world.core.x, -world.core.y, 0, 70, 70, 70, '#ffd66b', { glow: 1.6 });
+        const crack = V.box(0, 0, 0, TS, TS, 1, '#000000', { basic: true, opacity: 0.45, shadow: false });
+        const lamp = new THREE.PointLight('#ffe9c4', 0, 380, 1.3);
+        V.scene.add(lamp);
+        let builtVer = -1, builtRow = -999, cave = false;
+
+        function rebuild(row0) {
+          builtVer = mapVer; builtRow = row0;
+          let n = 0, no = 0, nl = 0;
+          for (let y = Math.max(0, row0); y < Math.min(ROWS, row0 + 34); y++) for (let x = 0; x < COLS; x++) {
+            const tt = map[y * COLS + x];
+            if (tt === AIR) continue;
+            const cx = x * TS + TS / 2, cy = -(y * TS + TS / 2);
+            if (tt === LAVA) { if (nl < 300) { m4.compose(p3.set(cx, cy, 0), q0, s3.set(TS, TS, D - 4)); lavaMesh.setMatrixAt(nl++, m4); } continue; }
+            if (n >= CAP) continue;
+            const info = TILES[tt];
+            m4.compose(p3.set(cx, cy, 0), q0, s3.set(TS, TS, D));
+            tileMesh.setMatrixAt(n, m4);
+            tileMesh.setColorAt(n++, c3.set(tt === GRASS ? info.dark : tt === COREGEM ? '#ff7a2e' : U.shade(info.color, ((x * 7 + y * 13) % 5) * 0.02 - 0.04)));
+            if (tt === GRASS && no < CAP) { m4.compose(p3.set(cx, cy + TS / 2 - 4, 0), q0, s3.set(TS + 0.5, 9, D + 0.5)); oreMesh.setMatrixAt(no, m4); oreMesh.setColorAt(no++, c3.set(info.color)); }
+            if (info.ore) for (const [ox, oy] of [[-6, 5], [6, -2], [-2, -8]]) { if (no >= CAP) break; m4.compose(p3.set(cx + ox, cy + oy, D / 2 + 1), q0, s3.set(7, 7, 4)); oreMesh.setMatrixAt(no, m4); oreMesh.setColorAt(no++, c3.set(info.ore)); }
+          }
+          tileMesh.count = n; oreMesh.count = no; lavaMesh.count = nl;
+          for (const m of [tileMesh, oreMesh]) { m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true; }
+          lavaMesh.instanceMatrix.needsUpdate = true;
+        }
+
+        return function sync(dt) {
+          const t = ctx.time;
+          const row0 = Math.floor(me.y / TS) - 16 - (Math.floor(me.y / TS) % 4);
+          if (mapVer !== builtVer || row0 !== builtRow) rebuild(row0);
+          const depth = Math.max(0, (me.y - SURF * TS) / TS);
+          const deep = depth > 5;
+          if (deep !== cave) { cave = deep; V.preset(deep ? 'cave' : 'day', { fogNear: deep ? 500 : 1400, fogFar: deep ? 1400 : 4200 }); V.shadowSize(420); }
+          lamp.intensity = deep ? 1.6 : 0;
+          lamp.position.set(me.x, -me.y + 30, 60);
+          V.look(me.x, -me.y + 50, 0, { dist: 480, pitch: 0.12, yaw: -0.22, fov: 45, lerp: 0.14 }, dt);
+          lavaMesh.material.emissiveIntensity = 1.1 + Math.sin(t * 4) * 0.3;
+          core.rotation.y = t;
+          core.scale.setScalar(70 + Math.sin(t * 4) * 6);
+          crack.visible = !!mine;
+          if (mine) { const k = mine.t / mine.need; crack.position.set(mine.tx * TS + TS / 2, -(mine.ty * TS + TS / 2), D / 2 + 0.8); crack.scale.set(TS * (0.3 + k * 0.7), TS * (0.3 + k * 0.7), 1); }
+          const atShop = Math.abs(me.x - SHOP.x) < 70 && me.y <= SURF * TS + 2;
+          if (atShop) V.label(SHOP.x, -SURF * TS + 130, -20, { name: '[E] Sell and upgrade', color: '#ffd66b' });
+          bots.forEach((bt, i) => {
+            if (Math.abs(bt.y - me.y) > 700) return;
+            const rig = V.actor(bt.bot.id, bt.bot.avatar, { scale: 5.2 });
+            rig.setPos(bt.x, -bt.y, -8 + (i % 3) * 5);
+            rig.faceAngle(Math.PI / 2);
+            rig.set({ air: bt.up, move: 0 });
+            if (!rig._held) { rig.hold('pickaxe', '#9aa5b5'); rig._held = true; }
+            if (bt.t < 0.1 && !bt.up) rig.play('attack');
+            V.label(bt.x, -bt.y + 38, 0, { name: bt.bot.displayName, color: '#ffffff', bubble: ctx.bubbleText(bt.bot.id) });
+          });
+          const rig = V.actor('me', ctx.player.avatar, { scale: 5.2 });
+          rig.setPos(me.x, -me.y, 4);
+          rig.faceAngle(mine && mine.ty > Math.floor((me.y - 1) / TS) ? Math.PI / 2 : me.facing > 0 ? 0.35 : Math.PI - 0.35);
+          rig.set({ move: me.ground ? Math.abs(me.vx) / T.speed : 0, air: !me.ground });
+          if (rig._pick !== d.pick) { rig.hold('pickaxe', ['#b07a45', '#9aa5b5', '#c9ced8', '#e8ecf3', '#8fd3ff', '#ff4f9a', '#ff7a2e'][d.pick] || '#ffc940'); rig._pick = d.pick; }
+          if (mine && Math.floor(t * 5) !== Math.floor((t - dt) * 5)) rig.play('attack');
+          rig.group.visible = !(me.hurtT > 0 && Math.sin(t * 40) > 0.5);
+          V.label(me.x, -me.y + 40, 0, { name: ctx.player.name, color: '#ffb454', bubble: ctx.bubbleText('me') });
+          V.sweep();
+        };
+      })();
 
       return {
         update(dt) {
@@ -356,10 +452,23 @@
           parts.draw(g);
           floats.draw(g);
           g.restore();
+          drawHud(g);
+        },
+
+        render3d(dt) { view(dt); },
+        hud(g) { drawHud(g); },
+
+        onBotJoin(b) { addBot(b); },
+        onBotLeave(b) { const i = bots.findIndex((x) => x.bot.id === b.id); if (i >= 0) bots.splice(i, 1); },
+        destroy() { ctx.best('maxDepth', deepest, 'max'); ctx.save(); },
+      };
+
+      function drawHud(g) {
           // darkness with headlamp
           const depth = Math.max(0, (me.y - SURF * TS) / TS);
           if (depth > 4) {
-            const sx = me.x - cam.x, sy = me.y - 14 - cam.y;
+            let sx = me.x - cam.x, sy = me.y - 14 - cam.y;
+            if (V) { const p = V.toScreen(me.x, -me.y + 16, 0); sx = p.x; sy = p.y; }
             const dark = Math.min(0.88, 0.25 + depth / 160);
             const lamp = g.createRadialGradient(sx, sy, 40, sx, sy, 300);
             lamp.addColorStop(0, 'rgba(0,0,0,0)'); lamp.addColorStop(1, 'rgba(5,4,10,' + dark + ')');
@@ -385,12 +494,7 @@
           G.circle(g, W - 22, 76 + k * 388, 6, '#ffb454');
           G.circle(g, W - 22, 464, 5, '#ff7a2e');
           G.text(g, 'CORE', W - 22, 486, { size: 9, align: 'center', color: '#ff7a2e', weight: 800 });
-        },
-
-        onBotJoin(b) { addBot(b); },
-        onBotLeave(b) { const i = bots.findIndex((x) => x.bot.id === b.id); if (i >= 0) bots.splice(i, 1); },
-        destroy() { ctx.best('maxDepth', deepest, 'max'); ctx.save(); },
-      };
+      }
     },
   });
 })((window.BF = window.BF || {}));

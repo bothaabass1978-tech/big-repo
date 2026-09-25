@@ -262,6 +262,38 @@
     return g;
   }
 
+  // ----------------------------------------------------------------- ships
+
+  const shipCache = new Map();
+  /**
+   * A small sailing warship as one merged mesh, bow towards +X, waterline at y = 0.
+   * @param {{team?:string, sail?:string, hull?:string}} o team = accent colour
+   */
+  function ship(o) {
+    o = o || {};
+    const hull = o.hull || '#7a4a2a', team = o.team || '#46a8ff', sail = o.sail || '#f4f1ea';
+    const key = [hull, team, sail].join('|');
+    let geo = shipCache.get(key);
+    if (!geo) {
+      const P = [];
+      P.push({ k: 'box', p: [0, 2, 0], s: [52, 12, 22], c: hull });
+      P.push({ k: 'cone4', p: [34, 3, 0], s: [22, 18, 12], r: [0, 0, -Math.PI / 2], c: hull });
+      P.push({ k: 'box', p: [0, 8.5, 0], s: [50, 1, 20], c: U.shade(hull, 0.25) });
+      for (const sd of [-1, 1]) P.push({ k: 'box', p: [0, 5, sd * 11.1], s: [50, 2.6, 0.4], c: team });
+      P.push({ k: 'box', p: [-19, 12, 0], s: [12, 8, 18], c: U.shade(hull, 0.1) });
+      for (const x of [-8, 2, 12]) for (const sd of [-1, 1]) P.push({ k: 'box', p: [x, 10.5, sd * 11], s: [5, 3.5, 6], c: '#2a2f3a' });
+      P.push({ k: 'box', p: [4, 28, 0], s: [2.4, 40, 2.4], c: '#3a2a1e' });
+      P.push({ k: 'box', p: [5.5, 30, 0], s: [1.5, 24, 30], c: sail });
+      P.push({ k: 'box', p: [5.6, 30, 0], s: [1.6, 5, 30.4], c: team });
+      P.push({ k: 'box', p: [4, 50, 4], s: [1, 5, 8], c: team });
+      geo = merge(P);
+      shipCache.set(key, geo);
+    }
+    const m = new THREE.Mesh(geo, vcMat());
+    m.castShadow = true;
+    return m;
+  }
+
   BF.pet3d = { build, face, merge, TAU };
-  BF.props3d = { car, merge, pet: build, zombie };
+  BF.props3d = { car, merge, pet: build, zombie, ship };
 })((window.BF = window.BF || {}));

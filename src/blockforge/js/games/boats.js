@@ -31,14 +31,16 @@
   const TEAM = { blue: { color: '#46a8ff', sail: '#dff0ff', name: 'Blue fleet' }, red: { color: '#ff5a6a', sail: '#ffe3e6', name: 'Red fleet' } };
 
   BF.GameModules.register('boats', {
-    maxBots: 7,
+    three: true,
+    maxBots: 9,
     feedTop: 0.14,
     actions: { port: ['KeyQ'], starboard: ['KeyE'] },
     controls: { joystick: true, buttons: [{ act: 'port', label: 'Fire left', icon: 'arrowLeft' }, { act: 'starboard', label: 'Fire right', icon: 'arrowRight' }] },
     create(ctx) {
       const W = ctx.W, H = ctx.H;
-      const parts = new BF.Particles(600);
-      const floats = new BF.Floaters();
+      const V = ctx.g3;
+      const parts = V ? V.particles2d(10) : new BF.Particles(600);
+      const floats = V ? V.floaters2d(60) : new BF.Floaters();
       const cam = new BF.Camera(W, H);
       cam.bounds = { x: 0, y: 0, w: MW, h: MH };
       const hullMax = T.hull * (ctx.hasPass('ironclad') ? 1.5 : 1);
@@ -196,6 +198,103 @@
 
       ctx.banner('BATTLE STATIONS!', 'Q / E fire broadsides · sink boats and forts', 1800);
 
+      // ------------------------------------------------------------ 3D view
+      const view = !V ? null : (() => {
+        V.preset('day', { fogNear: 1300, fogFar: 3600 });
+        V.shadowSize(620);
+        const waveTex = V.own(new THREE.CanvasTexture((() => { const c = document.createElement('canvas'); c.width = c.height = 128; const g2 = c.getContext('2d'); g2.fillStyle = '#1576b0'; g2.fillRect(0, 0, 128, 128); g2.strokeStyle = 'rgba(255,255,255,.18)'; g2.lineWidth = 3; for (let y = 16; y < 128; y += 32) { g2.beginPath(); for (let x = 0; x <= 128; x += 8) g2.lineTo(x, y + Math.sin((x / 128) * Math.PI * 4) * 5); g2.stroke(); } return c; })()));
+        waveTex.wrapS = waveTex.wrapT = THREE.RepeatWrapping;
+        waveTex.repeat.set(60, 40);
+        waveTex.colorSpace = THREE.SRGBColorSpace;
+        V.ground(-2500, -2000, MW + 2500, MH + 2000, '#ffffff', { map: waveTex, rough: 0.35, metal: 0.1 });
+        // arena edge buoys
+        const buoys = [];
+        for (let x = 0; x <= MW; x += 100) buoys.push({ x, z: 0 }, { x, z: MH });
+        for (let y = 100; y < MH; y += 100) buoys.push({ x: 0, z: y }, { x: MW, z: y });
+        V.boxes(buoys.map((b, i) => ({ x: b.x, y: -2, z: b.z, w: 10, h: 14, d: 10, color: i % 2 ? '#ffffff' : '#ff5a6a' })), { geo: 'cylLo' });
+        // islands with palms
+        const palms = [], fronds = [];
+        const r = U.rng('bb3d');
+        for (const is of ISLANDS) {
+          V.shape('cyl', is.x, -2, is.y, (is.r + 12) * 2, 10, (is.r + 12) * 2, '#e8d08a');
+          V.shape('cyl', is.x, 4, is.y, (is.r - 2) * 2, 6, (is.r - 2) * 2, '#5fae52');
+          const n = Math.max(1, Math.round(is.r / 35));
+          for (let i = 0; i < n; i++) { const a = r() * TAU, dd = r() * is.r * 0.55; const x = is.x + Math.cos(a) * dd, z = is.y + Math.sin(a) * dd; palms.push({ x, y: 6, z, w: 7, h: 46, d: 7, color: '#8b5a2b' }); for (let k = 0; k < 4; k++) fronds.push({ x: x + Math.cos(k * 1.57) * 12, y: 50, z: z + Math.sin(k * 1.57) * 12, w: 30, h: 4, d: 10, color: '#2f9a47', rot: k * 1.57 }); }
+          V.shape('dodeca', is.x + is.r * 0.3, 10, is.y + is.r * 0.2, is.r * 0.5, is.r * 0.35, is.r * 0.45, '#8a909c', { flat: true });
+        }
+        V.boxes(palms, { geo: 'cylLo' });
+        V.boxes(fronds);
+        // lighthouse forts
+        const fortMeshes = forts.map((f) => {
+          const g = V.group();
+          g.position.set(f.x, 0, f.y);
+          V.shape('cyl', 0, 2, 0, 90, 14, 90, '#9aa5b5', { parent: g });
+          const alive = V.group(g);
+          V.shape('cyl', 0, 45, 0, 44, 76, 44, '#f4f1ea', { parent: alive });
+          for (const y of [26, 56]) V.shape('cyl', 0, y, 0, 45, 10, 45, TEAM[f.team].color, { parent: alive });
+          V.shape('cyl', 0, 90, 0, 30, 14, 30, '#fff6c8', { parent: alive, glow: 1.1 });
+          V.shape('cone', 0, 108, 0, 38, 20, 38, TEAM[f.team].color, { parent: alive });
+          const beam = V.group(alive); beam.position.y = 90;
+          const cone = V.shape('cone', 90, 0, 0, 40, 180, 40, '#fff6c8', { parent: beam, basic: true, opacity: 0.16, depthWrite: false, shadow: false });
+          cone.rotation.z = Math.PI / 2;
+          const rubble = V.group(g);
+          for (let i = 0; i < 6; i++) V.box(Math.cos(i) * 18, 8, Math.sin(i * 1.7) * 18, 14, 10 + (i % 3) * 8, 12, '#6a707c', { parent: rubble });
+          return { f, g, alive, rubble, beam };
+        });
+        const boatPool = V.pool(), ballPool = V.pool();
+        const arcGeo = V.own(new THREE.RingGeometry(0.2, 1, 16, 1, 0, 0.7));
+        const arcs = ['port', 'starboard'].map(() => { const m = new THREE.Mesh(arcGeo, V.mat('#ffffff', { basic: true, opacity: 0.25, side: 2, depthWrite: false })); m.rotation.x = -Math.PI / 2; m.position.y = 1.5; V.scene.add(m); return m; });
+
+        return function sync(dt) {
+          const t = ctx.time;
+          waveTex.offset.set((t * 0.01) % 1, (t * 0.02) % 1);
+          V.look(me.x + Math.cos(me.a) * me.v * 0.4, 0, me.y + Math.sin(me.a) * me.v * 0.4 + 20, { dist: 640, pitch: 0.92, fov: 45, lerp: 0.1 }, dt);
+          for (const fm of fortMeshes) {
+            fm.alive.visible = !fm.f.dead;
+            fm.rubble.visible = fm.f.dead;
+            fm.beam.rotation.y = -(t * 1.2 + (fm.f.team === 'red' ? 1 : 0));
+            if (!fm.f.dead && Math.abs(fm.f.x - me.x) < 900) V.label(fm.f.x, 130, fm.f.y, { hp: fm.f.hp / T.fortHp, hpColor: TEAM[fm.f.team].color });
+          }
+          for (const b of boats) {
+            const sinking = b.dead && b.dead > T.respawn - 1.5;
+            if (b.dead && !sinking) continue;
+            const m = boatPool.use(b, () => {
+              const g = V.group();
+              g.add(BF.props3d.ship({ team: TEAM[b.team].color, sail: TEAM[b.team].sail }));
+              const av = b.isMe ? ctx.player.avatar : b.bot && b.bot.avatar;
+              if (av) { const rig = BF.char3d.build(av); rig.group.scale.setScalar(3.2); rig.group.position.set(-19, 16, 0); rig.group.rotation.y = Math.PI / 2; rig.tick(0.016); g.add(rig.group); g.userData.rig = rig; }
+              V.scene.add(g);
+              return g;
+            });
+            const k = sinking ? 1 - (b.dead - (T.respawn - 1.5)) / 1.5 : 0;
+            m.scale.setScalar(1.3);
+            m.position.set(b.x, Math.sin(t * 2 + b.x * 0.01) * 1.5 - k * 40, b.y);
+            m.rotation.set(Math.sin(t * 1.7 + b.y) * 0.04 + k * 0.6, -b.a, Math.sin(t * 1.3 + b.x) * 0.03);
+            if (m.userData.rig) m.userData.rig.tick(dt);
+            if (!b.dead) V.label(b.x, 70, b.y, { name: b.name, color: b.isMe ? '#ffb454' : TEAM[b.team].color, hp: b.hp / b.max, hpColor: TEAM[b.team].color, bubble: b.bot ? ctx.bubbleText(b.bot.id) : b.isMe ? ctx.bubbleText('me') : null });
+          }
+          boatPool.sweep();
+          for (const b of balls) {
+            const m = ballPool.use(b, () => V.shape('sphere', 0, 0, 0, 10, 10, 10, '#1b1b22', { metal: 0.4 }));
+            const k = b.t / T.ballLife;
+            m.position.set(b.x, 14 + Math.sin(k * Math.PI) * 26, b.y);
+          }
+          ballPool.sweep();
+          [['port', -1], ['starboard', 1]].forEach(([side, sgn], i) => {
+            const arc = arcs[i];
+            arc.visible = !me.dead;
+            if (!arc.visible) return;
+            const ready = me.cd[side] <= 0;
+            const dir = me.a + sgn * Math.PI / 2;
+            arc.position.set(me.x, 1.5, me.y);
+            arc.scale.set(100, 100, 1);
+            arc.rotation.z = -(dir + 0.35);
+            arc.material = V.mat(ready ? '#ffffff' : '#cfd6e2', { basic: true, opacity: ready ? 0.28 : 0.08, side: 2, depthWrite: false });
+          });
+          V.sweep();
+        };
+      })();
+
       return {
         update(dt) {
           parts.update(dt);
@@ -210,7 +309,7 @@
           if (!me.dead) {
             if (inp.actPressed('port')) fire(me, 'port');
             if (inp.actPressed('starboard')) fire(me, 'starboard');
-            if (inp.pointer.pressed) { const w = cam.toWorld(inp.pointer.x, inp.pointer.y); const rel = U.wrapAngle(U.angleTo(me.x, me.y, w.x, w.y) - me.a); fire(me, rel > 0 ? 'starboard' : 'port'); }
+            if (inp.pointer.pressed) { const w = V ? ctx.pointerWorld(0) : cam.toWorld(inp.pointer.x, inp.pointer.y); const rel = U.wrapAngle(U.angleTo(me.x, me.y, w.x, w.y) - me.a); fire(me, rel > 0 ? 'starboard' : 'port'); }
           }
           for (const b of boats) if (!b.isMe) { const c = b.dead ? { throttle: 0, steer: 0 } : botControl(b, dt); stepBoat(b, dt, c.throttle, c.steer); }
           // boat collisions
@@ -291,7 +390,17 @@
           parts.draw(g);
           floats.draw(g);
           g.restore();
-          // HUD
+          drawHud(g);
+        },
+
+        render3d(dt) { view(dt); },
+        hud(g) { drawHud(g); },
+
+        onBotJoin(b) { addBot(b); },
+        onBotLeave(b) { const i = boats.findIndex((x) => x.bot && x.bot.id === b.id); if (i >= 0) { const bt = boats[i]; boats.splice(i, 1); if (bt.team === 'blue') blueCount--; else redCount--; } },
+      };
+
+      function drawHud(g) {
           G.panel(g, W / 2 - 150, 10, 300, 52);
           G.text(g, String(score.blue), W / 2 - 60, 46, { size: 28, weight: 900, align: 'center', color: TEAM.blue.color });
           G.text(g, String(score.red), W / 2 + 60, 46, { size: 28, weight: 900, align: 'center', color: TEAM.red.color });
@@ -310,11 +419,7 @@
           for (const is of ISLANDS) G.circle(g, mx + is.x * k, my + is.y * k, Math.max(2, is.r * k), '#5fae52');
           for (const f of forts) if (!f.dead) G.circle(g, mx + f.x * k, my + f.y * k, 3.5, TEAM[f.team].color);
           for (const b of boats) if (!b.dead) G.circle(g, mx + b.x * k, my + b.y * k, b.isMe ? 3.5 : 2.2, b.isMe ? '#ffffff' : TEAM[b.team].color);
-        },
-
-        onBotJoin(b) { addBot(b); },
-        onBotLeave(b) { const i = boats.findIndex((x) => x.bot && x.bot.id === b.id); if (i >= 0) { const bt = boats[i]; boats.splice(i, 1); if (bt.team === 'blue') blueCount--; else redCount--; } },
-      };
+      }
     },
   });
 })((window.BF = window.BF || {}));

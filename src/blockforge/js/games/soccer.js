@@ -25,14 +25,18 @@
   const FORMATION = { gk: [0.06, 0.5], def: [0.28, 0.35], fwd: [0.42, 0.65], me: [0.38, 0.5] };
 
   BF.GameModules.register('soccer', {
+    three: true,
     maxBots: 5,
     feedTop: 0.13,
     actions: { kick: ['Space', 'KeyJ'], sprint: ['ShiftLeft', 'ShiftRight', 'KeyK'] },
     controls: { joystick: true, buttons: [{ act: 'kick', label: 'Kick (hold)', icon: 'ball' }, { act: 'sprint', label: 'Sprint', icon: 'run' }] },
     create(ctx) {
       const W = ctx.W, H = ctx.H;
-      const parts = new BF.Particles(300);
-      const floats = new BF.Floaters();
+      const V = ctx.g3;
+      const parts = V ? V.particles2d(8) : new BF.Particles(300);
+      const floats = V ? V.floaters2d(60) : new BF.Floaters();
+      /** Pointer on the pitch (ground-picked in 3D). */
+      const ptr = () => (V ? ctx.pointerWorld(8) : ctx.input.pointer);
       const powerBoots = ctx.hasPass('power_boots');
       const superSprint = ctx.hasPass('super_sprint');
 
@@ -190,6 +194,104 @@
         }
       }
 
+      // ------------------------------------------------------------ 3D view
+      const view = !V ? null : (() => {
+        V.preset('day', { fogNear: 1500, fogFar: 3800 });
+        V.shadowSize(600);
+        const PW = X1 - X0, PH = Y1 - Y0;
+        const pitch = BF.g3d.canvasTex('soccer-pitch', 1024, 512, (g2, w, h) => {
+          for (let i = 0; i < 12; i++) { g2.fillStyle = i % 2 ? '#3a9a4a' : '#35914a'; g2.fillRect((i * w) / 12, 0, w / 12 + 1, h); }
+          const kx = w / PW, ky = h / PH;
+          g2.strokeStyle = 'rgba(255,255,255,.85)'; g2.lineWidth = 4;
+          g2.strokeRect(3, 3, w - 6, h - 6);
+          g2.beginPath(); g2.moveTo(w / 2, 0); g2.lineTo(w / 2, h); g2.stroke();
+          g2.beginPath(); g2.arc(w / 2, h / 2, 60 * kx, 0, TAU); g2.stroke();
+          g2.strokeRect(0, (CY - 110 - Y0) * ky, 110 * kx, 220 * ky); g2.strokeRect(w - 110 * kx, (CY - 110 - Y0) * ky, 110 * kx, 220 * ky);
+          g2.fillStyle = '#fff'; g2.beginPath(); g2.arc(w / 2, h / 2, 5, 0, TAU); g2.fill();
+        });
+        V.ground(X0, Y0, X1, Y1, '#ffffff', { map: pitch, y: 0.5 });
+        V.ground(-1600, -1400, W + 1600, H + 1400, '#2a7a3a', { map: BF.g3d.gridTex('#2f8040', 'rgba(0,0,0,0)', 1, { repeat: [30, 20], noise: true }) });
+        // ad boards around the pitch
+        const games = BF.catalog ? BF.catalog.all().slice(0, 12) : [];
+        const boards = [];
+        for (let x = X0; x < X1; x += 72) boards.push({ x: x + 36, z: Y0 - 22, rot: 0 }, { x: x + 36, z: Y1 + 22, rot: 0 });
+        boards.forEach((b, i) => {
+          const gm = games[i % Math.max(1, games.length)];
+          const m = V.box(b.x, 0, b.z, 70, 16, 4, '#ffffff', { map: BF.g3d.canvasTex('ad:' + (gm ? gm.id : i), 256, 64, (g2, w, h) => { g2.fillStyle = gm && gm.color ? gm.color : i % 2 ? '#1f5f9a' : '#9a2a3a'; g2.fillRect(0, 0, w, h); g2.fillStyle = '#fff'; g2.font = '800 28px Rubik, system-ui, sans-serif'; g2.textAlign = 'center'; g2.textBaseline = 'middle'; g2.fillText(gm ? gm.name.toUpperCase() : 'BLOCKFORGE', w / 2, h / 2 + 2, w - 20); }) });
+          m.rotation.y = b.rot;
+        });
+        // stands with a crowd
+        const r = U.rng('px3d');
+        const steps = [], crowd = [];
+        const stand = (x0, x1, z, dir) => {
+          for (let row = 0; row < 7; row++) {
+            const zz = z + dir * (row * 22 + 30);
+            steps.push({ x: (x0 + x1) / 2, y: 0, z: zz, w: x1 - x0, h: 12 + row * 12, d: 22, color: row % 2 ? '#6a707c' : '#7a8494' });
+            for (let x = x0 + 10; x < x1 - 6; x += 16) if (r() < 0.8) crowd.push({ x: x + r() * 4, y: 12 + row * 12, z: zz, w: 9, h: 14, d: 9, color: r() < 0.5 ? (r() < 0.5 ? TEAMS.blue.color : TEAMS.red.color) : U.pick(['#ffd66b', '#f4f1ea', '#4ad17f', '#b67cff', '#ff7a2e'], r) });
+          }
+        };
+        stand(X0 - 40, X1 + 40, Y0 - 30, -1);
+        stand(X0 - 40, X1 + 40, Y1 + 30, 1);
+        V.boxes(steps);
+        const crowdMesh = V.boxes(crowd, { shadow: false });
+        // goals
+        for (const [gx, team] of [[X0, 'blue'], [X1, 'red']]) {
+          const back = gx === X0 ? gx - GD : gx + GD;
+          for (const gy of [GY0, GY1]) V.box(gx, 0, gy, 5, 48, 5, '#ffffff', { rough: 0.3 });
+          V.box(gx, 46, (GY0 + GY1) / 2, 5, 5, GY1 - GY0 + 5, '#ffffff', { rough: 0.3 });
+          V.box((gx + back) / 2, 0, (GY0 + GY1) / 2, 1, 46, GY1 - GY0, '#ffffff', { opacity: 0.25, shadow: false, depthWrite: false }).position.x = back;
+          V.box((gx + back) / 2, 44, (GY0 + GY1) / 2, GD, 1, GY1 - GY0, '#ffffff', { opacity: 0.2, shadow: false, depthWrite: false });
+          for (const gy of [GY0, GY1]) V.box((gx + back) / 2, 0, gy, GD, 46, 1, '#ffffff', { opacity: 0.2, shadow: false, depthWrite: false });
+          V.box(gx, 0, GY0 - 8, 10, 3, 10, TEAMS[team].color, { glow: 0.5, shadow: false });
+          V.box(gx, 0, GY1 + 8, 10, 3, 10, TEAMS[team].color, { glow: 0.5, shadow: false });
+        }
+        // floodlights
+        for (const [x, z] of [[X0 - 80, Y0 - 190], [X1 + 80, Y0 - 190], [X0 - 80, Y1 + 190], [X1 + 80, Y1 + 190]]) {
+          V.box(x, 0, z, 10, 240, 10, '#39414f');
+          V.box(x, 240, z, 60, 30, 10, '#fff6c8', { glow: 1.1 });
+        }
+        const ballTex = BF.g3d.canvasTex('soccer-ball', 128, 64, (g2, w, h) => { g2.fillStyle = '#ffffff'; g2.fillRect(0, 0, w, h); g2.fillStyle = '#1b1b22'; for (const [x, y] of [[16, 16], [48, 40], [80, 16], [112, 40], [16, 52], [80, 52]]) { g2.beginPath(); for (let k = 0; k < 5; k++) { const a = (k / 5) * TAU; g2.lineTo(x + Math.cos(a) * 8, y + Math.sin(a) * 8); } g2.fill(); } });
+        const ballMesh = V.shape('sphere', 0, 0, 0, T.br * 2.4, T.br * 2.4, T.br * 2.4, '#ffffff', { map: ballTex, rough: 0.5 });
+        const aimLine = V.box(0, 0, 0, 1, 2, 3, '#ffffff', { basic: true, opacity: 0.6, shadow: false });
+        const ringPool = V.pool();
+        const axis = new THREE.Vector3(), qb = new THREE.Quaternion();
+
+        return function sync(dt) {
+          const t = ctx.time;
+          V.look(CX + (ball.x - CX) * 0.45, 0, CY + 60 + (ball.y - CY) * 0.2, { dist: 660, pitch: 0.92, fov: 45, lerp: 0.06 }, dt);
+          if (crowdMesh) crowdMesh.position.y = phase === 'goal' || Math.abs(ball.x - CX) > 380 ? Math.abs(Math.sin(t * 12)) * 3 : 0;
+          // ball roll
+          const sp = Math.hypot(ball.vx, ball.vy);
+          ballMesh.position.set(ball.x, T.br * 1.2, ball.y);
+          if (sp > 1) { axis.set(ball.vy, 0, -ball.vx).normalize(); qb.setFromAxisAngle(axis, (sp * dt) / (T.br * 1.2)); ballMesh.quaternion.premultiply(qb); }
+          for (const pl of players) {
+            const id = pl.isMe ? 'me' : pl.bot ? pl.bot.id : 'npc' + players.indexOf(pl);
+            const rig = V.actor(id, pl.isMe ? ctx.player.avatar : pl.bot ? pl.bot.avatar : pl.look, { scale: 8 });
+            rig.setPos(pl.x, 0, pl.y);
+            rig.faceAngle(pl.a);
+            rig.set({ move: Math.min(1.5, Math.hypot(pl.vx, pl.vy) / T.speed) });
+            if (pl.kickCd > 0.2 && !pl._k) rig.play('attack');
+            pl._k = pl.kickCd > 0.2;
+            const ring = ringPool.use(id, () => { const m = V.shape('ring', 0, 1.2, 0, 1, 1, 1, '#ffffff', { basic: true, side: 2, shadow: false }); m.rotation.x = -Math.PI / 2; return m; });
+            ring.position.set(pl.x, 1.2, pl.y);
+            ring.scale.set(34, 34, 1);
+            ring.material = V.mat(pl.role === 'gk' ? '#ffd66b' : TEAMS[pl.team].color, { basic: true, side: 2, opacity: 0.9 });
+            V.label(pl.x, 58, pl.y, { name: pl.name, color: pl.isMe ? '#ffb454' : TEAMS[pl.team].color, hp: pl.isMe && me.charge > 0 ? me.charge / T.charge : null, hpColor: me.charge >= T.charge ? '#ff5a6a' : '#ffd66b', bubble: pl.bot ? ctx.bubbleText(pl.bot.id) : pl.isMe ? ctx.bubbleText('me') : null });
+          }
+          ringPool.sweep();
+          aimLine.visible = me.charge > 0;
+          if (aimLine.visible) {
+            const q = ptr();
+            const a = me.aimMouse ? Math.atan2(q.y - ball.y, q.x - ball.x) : me.a;
+            const len = 40 + me.charge * 60;
+            aimLine.scale.set(len, 2, 3);
+            aimLine.position.set(ball.x + Math.cos(a) * len / 2, 2, ball.y + Math.sin(a) * len / 2);
+            aimLine.rotation.y = -a;
+          }
+          V.sweep();
+        };
+      })();
+
       return {
         update(dt) {
           parts.update(dt);
@@ -209,12 +311,13 @@
           const p = inp.pointer;
           if (p.moved) me.aimMouse = true;
           if (Math.hypot(ax.x, ax.y) > 0.3 && !p.down) me.aimMouse = me.aimMouse && p.moved;
-          if (me.aimMouse) me.a = Math.atan2(p.y - me.y, p.x - me.x);
+          const q = ptr();
+          if (me.aimMouse) me.a = Math.atan2(q.y - me.y, q.x - me.x);
           stepPlayer(me, dt, inp.act('sprint'));
           const holding = inp.act('kick') || p.down;
           if (holding) me.charge = Math.min(T.charge, me.charge + dt);
           else if (me.charge > 0) {
-            if (U.dist(me.x, me.y, ball.x, ball.y) < T.reach + 6 && me.kickCd <= 0) kick(me, me.aimMouse ? Math.atan2(p.y - ball.y, p.x - ball.x) : me.a, T.kickMin + (T.kickMax - T.kickMin) * (me.charge / T.charge));
+            if (U.dist(me.x, me.y, ball.x, ball.y) < T.reach + 6 && me.kickCd <= 0) kick(me, me.aimMouse ? Math.atan2(q.y - ball.y, q.x - ball.x) : me.a, T.kickMin + (T.kickMax - T.kickMin) * (me.charge / T.charge));
             me.charge = 0;
           }
           for (const pl of players) if (!pl.isMe) { botThink(pl, dt); stepPlayer(pl, dt, pl.role !== 'gk' && U.dist(pl.x, pl.y, ball.x, ball.y) < 160 && pl.stamina > 30); }
@@ -274,18 +377,11 @@
           g.restore();
           parts.draw(g);
           floats.draw(g);
-          // HUD
-          G.panel(g, W / 2 - 150, 8, 300, 50);
-          G.text(g, String(score.blue), W / 2 - 70, 44, { size: 28, weight: 900, align: 'center', color: TEAMS.blue.color });
-          G.text(g, String(score.red), W / 2 + 70, 44, { size: 28, weight: 900, align: 'center', color: TEAMS.red.color });
-          G.text(g, (overtime ? 'OT ' : '') + U.fmtClock(Math.max(0, clock)), W / 2, 38, { size: 17, weight: 800, align: 'center', color: overtime ? '#ffd66b' : '#fff' });
-          G.text(g, 'BLUE', W / 2 - 115, 36, { size: 10, weight: 800, align: 'center', color: TEAMS.blue.color });
-          G.text(g, 'RED', W / 2 + 115, 36, { size: 10, weight: 800, align: 'center', color: TEAMS.red.color });
-          G.panel(g, 10, H - 30, 200, 22);
-          G.text(g, 'Stamina', 18, H - 14, { size: 10, color: '#a1abbb' });
-          G.bar(g, 64, H - 23, 138, 8, me.stamina / T.stamina, me.stamina < 25 ? '#ff5a6a' : '#7fe7ff');
-          if (phase === 'kickoff') G.display(g, 'Kick-off', W / 2, H / 2 - 60, 30, '#ffffff');
+          drawHud(g);
         },
+
+        render3d(dt) { view(dt); },
+        hud(g) { drawHud(g); },
 
         onBotJoin(b) {
           // replace an AI filler with the joining bot
@@ -301,6 +397,19 @@
           p.bot = null; p.npc = true; p.name = (p.team === 'blue' ? 'Blue' : 'Red') + ' Sub (AI)'; p.skill = 0.45;
         },
       };
+
+      function drawHud(g) {
+          G.panel(g, W / 2 - 150, 8, 300, 50);
+          G.text(g, String(score.blue), W / 2 - 70, 44, { size: 28, weight: 900, align: 'center', color: TEAMS.blue.color });
+          G.text(g, String(score.red), W / 2 + 70, 44, { size: 28, weight: 900, align: 'center', color: TEAMS.red.color });
+          G.text(g, (overtime ? 'OT ' : '') + U.fmtClock(Math.max(0, clock)), W / 2, 38, { size: 17, weight: 800, align: 'center', color: overtime ? '#ffd66b' : '#fff' });
+          G.text(g, 'BLUE', W / 2 - 115, 36, { size: 10, weight: 800, align: 'center', color: TEAMS.blue.color });
+          G.text(g, 'RED', W / 2 + 115, 36, { size: 10, weight: 800, align: 'center', color: TEAMS.red.color });
+          G.panel(g, 10, H - 30, 200, 22);
+          G.text(g, 'Stamina', 18, H - 14, { size: 10, color: '#a1abbb' });
+          G.bar(g, 64, H - 23, 138, 8, me.stamina / T.stamina, me.stamina < 25 ? '#ff5a6a' : '#7fe7ff');
+          if (phase === 'kickoff') G.display(g, 'Kick-off', W / 2, H / 2 - 60, 30, '#ffffff');
+      }
     },
   });
 })((window.BF = window.BF || {}));

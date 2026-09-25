@@ -60,14 +60,16 @@
   const COLLECTORS = { main: { layer: 0, x: 760, y: 480 }, east: { layer: 0, x: 1340, y: 480 }, upper: { layer: 1, x: 760, y: 480 } };
 
   BF.GameModules.register('factory', {
-    maxBots: 4,
+    three: true,
+    maxBots: 6,
     feedTop: 0.17,
     actions: { use: ['KeyE'] },
     controls: { joystick: true, buttons: [{ act: 'use', label: 'Use', icon: 'cursor' }] },
     create(ctx) {
       const W = ctx.W, H = ctx.H;
-      const parts = new BF.Particles(400);
-      const floats = new BF.Floaters();
+      const V = ctx.g3;
+      const parts = V ? V.particles2d(24) : new BF.Particles(400);
+      const floats = V ? V.floaters2d(60) : new BF.Floaters();
       const cam = new BF.Camera(W, H);
       const d = ctx.data;
       d.owned = d.owned || ['d1'];
@@ -242,6 +244,190 @@
         G.text(g, '$' + U.fmt(it.price), x, y + 14, { size: 12, align: 'center', color: can ? '#4ad17f' : '#ff8b98', weight: 900 });
       }
 
+      // ------------------------------------------------------------ 3D view
+      const view = !V ? null : (() => {
+        let builtKey = null, plant = null, belts = [], lamps = [], dropLights = [], upgRings = [], furnaceGlow = [];
+        const oreMesh = new THREE.InstancedMesh(BF.g3d.geo('box'), V.mat('#ffffff', { rough: 0.35, metal: 0.2 }), 240);
+        oreMesh.castShadow = true;
+        oreMesh.frustumCulled = false; // bounds change every frame
+        oreMesh.count = 0;
+        V.scene.add(oreMesh);
+        const m4 = new THREE.Matrix4(), q4 = new THREE.Quaternion(), p3 = new THREE.Vector3(), s3 = new THREE.Vector3(), c3 = new THREE.Color();
+        const padPool = V.pool();
+        const upColor = (it) => (it.mult >= 5 ? '#ff7a2e' : it.mult >= 3 ? '#ffd66b' : it.mult >= 2 ? '#b67cff' : '#46a8ff');
+
+        function beltTex(len) {
+          const c = document.createElement('canvas');
+          c.width = 64; c.height = 32;
+          const g2 = c.getContext('2d');
+          g2.fillStyle = '#22262f'; g2.fillRect(0, 0, 64, 32);
+          g2.fillStyle = '#3a414f'; g2.fillRect(0, 0, 26, 32); g2.fillRect(32, 0, 26, 32);
+          const tex = V.own(new THREE.CanvasTexture(c));
+          tex.wrapS = THREE.RepeatWrapping;
+          tex.repeat.set(len / 48, 1);
+          tex.colorSpace = THREE.SRGBColorSpace;
+          return tex;
+        }
+
+        function rebuild() {
+          builtKey = layer + '|' + d.owned.join(',') + '|' + auto;
+          if (plant) V.remove(plant);
+          plant = V.group();
+          belts = []; lamps = []; dropLights = []; upgRings = []; furnaceGlow = [];
+          V.preset('indoor', { fogNear: 1400, fogFar: 3400 });
+          V.shadowSize(620);
+          const eastOpen = layer === 0 && owns('east');
+          const x1 = layer === 0 ? (eastOpen ? 1400 : 840) : 840;
+          const tiles = [];
+          for (let y = 60; y < 760; y += 40) for (let x = 40; x < x1; x += 40) {
+            const east = x >= 840;
+            tiles.push({ x: x + 20, y: -4, z: y + 20, w: 39.5, h: 4, d: 39.5, color: layer === 1 ? ((x + y) / 40 % 2 ? '#3a3350' : '#352f4a') : east ? ((x + y) / 40 % 2 ? '#3d4450' : '#39404c') : ((x + y) / 40 % 2 ? '#4a5160' : '#454c5a') });
+          }
+          V.boxes(tiles, { parent: plant });
+          V.ground(-1200, -1200, 2600, 2000, '#12151c', { parent: plant, y: -6, basic: true });
+          const wallCol = owns('walls') ? '#6a4a8a' : '#2a2f3a';
+          const wh = 90;
+          V.boxes([
+            { x: (30 + x1 + 10) / 2, z: 56, w: x1 - 20, h: wh, d: 12, color: wallCol },
+            { x: 36, z: 410, w: 12, h: wh, d: 720, color: wallCol },
+            { x: x1 + 4, z: 410, w: 12, h: wh, d: 720, color: wallCol },
+            { x: (30 + x1 + 10) / 2, z: 764, w: x1 - 20, h: 14, d: 12, color: wallCol },
+          ], { parent: plant });
+          if (layer === 0 && !eastOpen) {
+            V.box(842, 0, 410, 12, wh, 720, '#2a2f3a', { parent: plant });
+            V.sign('EAST WING', 1000, 60, 410, { parent: plant, h: 30, color: 'rgba(255,255,255,.5)' });
+          }
+          if (owns('lights')) for (let x = 80; x < x1; x += 120) { const c = ['#ff4f9a', '#39f3ff', '#b67cff'][(x / 120) % 3 | 0]; lamps.push(V.box(x, 70, 63, 60, 6, 3, c, { parent: plant, glow: 1.2, shadow: false })); }
+          if (owns('plants')) for (const [px, py] of [[70, 720], [800, 720], [70, 100]]) { V.box(px, 0, py, 20, 16, 20, '#8b5a2b', { parent: plant }); V.shape('sphereLo', px, 28, py, 32, 30, 32, '#3fb35a', { parent: plant }); }
+          // lines
+          for (const key of Object.keys(LINES)) {
+            const ln = LINES[key];
+            if (ln.layer !== layer) continue;
+            if (key === 'east' && !eastOpen) continue;
+            if (key === 'upper' && !owns('stairs')) continue;
+            const len = ln.x1 - ln.x0 + 20;
+            V.box(ln.x0 - 10 + len / 2, 0, ln.y, len, 12, 38, '#1b1e26', { parent: plant });
+            const tex = beltTex(len);
+            const top = V.box(ln.x0 - 10 + len / 2, 12, ln.y, len, 1, 30, '#ffffff', { parent: plant, map: tex, shadow: false });
+            top.receiveShadow = true;
+            belts.push(tex);
+            for (let x = ln.x0; x < ln.x1; x += 80) for (const sd of [-1, 1]) V.box(x, 0, ln.y + sd * 17, 4, 12, 4, '#6a707c', { parent: plant, shadow: false });
+            // furnace
+            const fx = ln.x1 + 40;
+            V.box(fx, 0, ln.y, 80, 70, 88, '#5a3a2a', { parent: plant });
+            V.box(fx, 70, ln.y, 60, 30, 60, '#4a2e22', { parent: plant });
+            V.box(fx - 10, 100, ln.y - 14, 14, 30, 14, '#3a2a20', { parent: plant });
+            V.box(fx - 40.5, 8, ln.y, 1, 40, 56, '#1b1b22', { parent: plant, shadow: false });
+            furnaceGlow.push(V.box(fx - 40, 12, ln.y, 2, 26, 44, '#ff7a2e', { parent: plant, glow: 1.6, shadow: false }));
+            V.sign('FURNACE', fx, 130, ln.y, { parent: plant, h: 16, color: '#ffb454' });
+            const c = COLLECTORS[key];
+            V.box(c.x, 0, c.y, 60, 6, 44, auto ? '#2a3a2a' : '#1f6b3a', { parent: plant });
+            V.box(c.x, 6, c.y, 48, 3, 32, auto ? '#3a4a3a' : '#3fd08a', { parent: plant, glow: auto ? 0 : 0.35, shadow: false });
+          }
+          // machines
+          for (const it of ITEMS) {
+            if (!owns(it.id) || layerOf(it) !== layer) continue;
+            if (it.line === 'east' && !eastOpen) continue;
+            const ln = LINES[it.line];
+            if (it.kind === 'dropper') {
+              const ore = ORES[it.ore];
+              for (const [dx, dz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) V.box(it.x + dx * 20, 0, ln.y + dz * 24, 5, 58, 5, '#39414f', { parent: plant });
+              V.box(it.x, 58, ln.y, 50, 34, 56, '#4a5160', { parent: plant });
+              V.box(it.x, 92, ln.y, 40, 14, 44, U.shade(ore.color, -0.2), { parent: plant });
+              V.box(it.x, 46, ln.y, 18, 12, 18, '#2a2f3a', { parent: plant });
+              dropLights.push({ it, m: V.box(it.x + 18, 92, ln.y + 22.5, 6, 6, 2, '#1f3a2a', { parent: plant, shadow: false }) });
+            } else if (it.kind === 'upgrader') {
+              const col = upColor(it);
+              for (const sd of [-1, 1]) V.box(it.x, 0, ln.y + sd * 30, 12, 64, 12, '#39414f', { parent: plant });
+              V.box(it.x, 64, ln.y, 16, 12, 72, col, { parent: plant, glow: 0.6 });
+              const ring = V.shape('torus', it.x, 32, ln.y, 60, 60, 30, col, { parent: plant, glow: 1, opacity: 0.8, shadow: false });
+              ring.rotation.y = Math.PI / 2;
+              upgRings.push(ring);
+            }
+          }
+          if (layer === 1 && owns('monument')) {
+            V.box(700, 0, 620, 90, 24, 90, '#b8860b', { parent: plant, metal: 0.6, rough: 0.3 });
+            V.box(700, 24, 620, 40, 110, 40, '#ffd66b', { parent: plant, metal: 0.7, rough: 0.25, glow: 0.2 });
+            lamps.push(V.shape('sphere', 700, 160, 620, 40, 40, 40, '#ffe9a8', { parent: plant, glow: 1.2 }));
+            V.sign('GOLDEN FORGE', 700, 210, 620, { parent: plant, h: 22, color: '#ffd66b' });
+          }
+          if (owns('stairs')) {
+            const st = STAIRS.find((s2) => s2.layer === layer);
+            for (let i = 0; i < 5; i++) V.box(st.x, 0, st.y - 30 + i * 12, 56, layer ? 40 - i * 8 : 8 + i * 8, 12, U.shade('#9aa5b5', -i * 0.08), { parent: plant });
+          }
+        }
+
+        return function sync(dt) {
+          const t = ctx.time;
+          const key = layer + '|' + d.owned.join(',') + '|' + auto;
+          if (key !== builtKey) rebuild();
+          V.look(me.x, 0, me.y - 50, { dist: 560, pitch: 0.95, fov: 45, lerp: 0.12 }, dt);
+          for (const tex of belts) tex.offset.x = -((t * T.beltSpeed) / 48) % 1;
+          lamps.forEach((l, i) => { l.material.emissiveIntensity = 0.9 + Math.sin(t * 3 + i) * 0.3; });
+          furnaceGlow.forEach((f, i) => { f.scale.y = 26 * (0.8 + Math.sin(t * 12 + i) * 0.2); });
+          upgRings.forEach((r2, i) => { r2.rotation.x = t * 2 + i; });
+          for (const dl of dropLights) dl.m.material = V.mat((timers.get(dl.it.id) || 0) < 0.2 ? '#4ad17f' : '#1f3a2a', { glow: (timers.get(dl.it.id) || 0) < 0.2 ? 1.2 : 0 });
+          // ore blocks
+          let n = 0;
+          for (const b of blocks) {
+            if (LINES[b.line].layer !== layer || n >= 240) continue;
+            const y = 13 + (b.drop > 0 ? b.drop * 150 : 0);
+            p3.set(b.x, y + 8, b.y);
+            q4.setFromAxisAngle(p3.clone().set(0, 1, 0), b.x * 0.02);
+            const sc = b.passed.size ? 16 + b.passed.size * 2 : 16;
+            m4.compose(p3, q4, s3.set(sc, sc, sc));
+            oreMesh.setMatrixAt(n, m4);
+            oreMesh.setColorAt(n, c3.set(b.passed.size ? U.mix(b.color, '#ffffff', 0.15 * b.passed.size) : b.color));
+            n++;
+          }
+          oreMesh.count = n;
+          oreMesh.instanceMatrix.needsUpdate = true;
+          if (oreMesh.instanceColor) oreMesh.instanceColor.needsUpdate = true;
+          // labels for machines near the player
+          for (const it of ITEMS) {
+            if (!owns(it.id) || layerOf(it) !== layer || !it.line) continue;
+            if (Math.abs(it.x - me.x) > 520) continue;
+            if (it.kind === 'dropper') V.label(it.x, 120, LINES[it.line].y, { name: it.name.replace(' Dropper', ''), color: '#cfd6e2' });
+            if (it.kind === 'upgrader') V.label(it.x, 96, LINES[it.line].y, { name: 'x' + it.mult, color: upColor(it) });
+          }
+          for (const k of Object.keys(COLLECTORS)) {
+            const c = COLLECTORS[k];
+            if (c.layer !== layer) continue;
+            if (!auto && pending[k] >= 1) V.label(c.x, 30, c.y, { name: '$' + U.fmt(Math.floor(pending[k])) + ' waiting', color: '#4ad17f' });
+            else if (auto) V.label(c.x, 30, c.y, { name: 'AUTO', color: '#9aa5b5' });
+          }
+          // buy pads
+          for (const it of ITEMS) {
+            if (!available(it) || (it.id === 'east' && layer !== 0)) continue;
+            const can = d.cash >= it.price;
+            const m = padPool.use(it.id + (can ? 'y' : 'n'), () => { const g = V.group(); V.box(0, 0, 0, 84, 3, 56, can ? '#3fd08a' : '#ff5a6a', { parent: g, basic: true, opacity: 0.35, depthWrite: false, shadow: false }); V.box(0, 3, 0, 78, 1, 50, can ? '#3fd08a' : '#ff5a6a', { parent: g, basic: true, opacity: 0.6, shadow: false }); return g; });
+            m.position.set(it.pad[0], 0, it.pad[1]);
+            const on = hold && hold.item === it;
+            V.label(it.pad[0], 26, it.pad[1], { name: it.name + ' · $' + U.fmt(it.price), color: can ? '#4ad17f' : '#ff8b98', hp: on ? Math.min(1, hold.t / T.buyHold) : null, hpColor: '#ffffff' });
+          }
+          padPool.sweep();
+          if (owns('stairs')) { const st = STAIRS.find((s2) => s2.layer === layer); V.label(st.x, 70, st.y, { name: layer ? 'Down' : 'Upstairs', color: '#ffffff' }); }
+          // people
+          for (const bt of bots) {
+            const rig = V.actor(bt.bot.id, bt.bot.avatar, { scale: 7.5 });
+            rig.setPos(bt.x, 0, bt.y);
+            rig.faceAngle(bt.a);
+            const mv = bt._px != null && dt > 0 ? Math.hypot(bt.x - bt._px, bt.y - bt._py) / dt : 0;
+            bt._px = bt.x; bt._py = bt.y;
+            rig.set({ move: mv / 90 });
+            V.label(bt.x, 54, bt.y, { name: bt.bot.displayName, color: '#ffffff', bubble: ctx.bubbleText(bt.bot.id) });
+          }
+          const rig = V.actor('me', ctx.player.avatar, { scale: 8 });
+          rig.setPos(me.x, 0, me.y);
+          rig.faceAngle(me.a);
+          const mv = me._px != null && dt > 0 ? Math.hypot(me.x - me._px, me.y - me._py) / dt : 0;
+          me._px = me.x; me._py = me.y;
+          rig.set({ move: mv / T.speed });
+          V.label(me.x, 58, me.y, { name: ctx.player.name, color: '#ffb454', bubble: ctx.bubbleText('me') });
+          V.sweep();
+        };
+      })();
+
       return {
         update(dt) {
           parts.update(dt);
@@ -369,7 +555,18 @@
           parts.draw(g);
           floats.draw(g);
           g.restore();
-          // HUD
+          drawHud(g);
+        },
+
+        render3d(dt) { view(dt); },
+        hud(g) { drawHud(g); },
+
+        onBotJoin(b) { addBot(b); },
+        onBotLeave(b) { const i = bots.findIndex((x) => x.bot.id === b.id); if (i >= 0) bots.splice(i, 1); },
+        destroy() { for (const k of Object.keys(pending)) if (pending[k] > 0) d.cash += Math.floor(pending[k]); ctx.save(); },
+      };
+
+      function drawHud(g) {
           G.panel(g, 10, 10, 270, 84);
           G.text(g, '$' + U.fmt(Math.floor(d.cash)), 22, 40, { size: 24, weight: 800, color: '#4ad17f' });
           G.text(g, '$' + U.fmt(Math.round(rate())) + '/s', 268, 32, { size: 12, align: 'right', color: '#cfd6e2' });
@@ -383,12 +580,7 @@
           rows.forEach((r, i) => { G.text(g, r.name, W - 188, 45 + i * 17, { size: 11.5, color: r.me ? '#ffb454' : '#e8ecf3' }); G.text(g, '$' + U.compact(Math.floor(r.v)), W - 20, 45 + i * 17, { size: 11.5, align: 'right', color: '#4ad17f', weight: 800 }); });
           const next = ITEMS.find((it) => !owns(it.id) && (it.req || []).every(owns));
           if (next) G.text(g, 'Next: ' + next.name + ' · $' + U.fmt(next.price) + (layerOf(next) !== layer ? (layer ? ' (downstairs)' : ' (upstairs)') : ''), W / 2, H - 14, { size: 12, align: 'center', color: '#cfd6e2', stroke: 'rgba(0,0,0,.6)', strokeW: 3 });
-        },
-
-        onBotJoin(b) { addBot(b); },
-        onBotLeave(b) { const i = bots.findIndex((x) => x.bot.id === b.id); if (i >= 0) bots.splice(i, 1); },
-        destroy() { for (const k of Object.keys(pending)) if (pending[k] > 0) d.cash += Math.floor(pending[k]); ctx.save(); },
-      };
+      }
     },
   });
 
