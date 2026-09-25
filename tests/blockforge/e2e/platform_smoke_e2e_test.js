@@ -58,6 +58,10 @@ async function signIn(page) {
   await page.keyboard.press('Escape');
   const header = await page.evaluate(() => ({ bal: BF.economy.balance(), text: (document.querySelector('.coin-chip, .fc-chip, [data-act="wallet"]') || {}).textContent || '' }));
   check('signed in as ForgePlayer with a ForgeCoin balance', header.bal >= 1500, JSON.stringify(header));
+  await page.click('#coin-pill');
+  await page.waitForTimeout(350);
+  const walletHash = await page.evaluate(() => location.hash);
+  check('clicking the ForgeCoins balance opens the wallet', walletHash === '#/wallet', walletHash);
 
   // ------------------------------------------------------------ routes
   const routes = ['#/home', '#/discover', '#/games', '#/game/block-battlegrounds', '#/game/block-battlegrounds/servers', '#/game/block-battlegrounds/store', '#/shop', '#/shop/accessories', '#/shop/bundles', '#/inventory', '#/inventory/passes', '#/avatar', '#/friends', '#/messages', '#/notifications', '#/create', '#/create/new', '#/profile', '#/profile/badges', '#/settings', '#/settings/appearance', '#/settings/data', '#/wallet', '#/quests', '#/achievements', '#/leaderboards', '#/search?q=block'];
