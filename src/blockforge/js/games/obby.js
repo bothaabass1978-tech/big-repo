@@ -117,7 +117,8 @@
   }
 
   BF.GameModules.register('obby', {
-    maxBots: 6,
+    three: true,
+    maxBots: 8,
     feedTop: 0.18,
     actions: { jump: ['Space', 'KeyW', 'ArrowUp'], respawn: ['KeyR'] },
     controls: { joystick: true, buttons: [{ act: 'jump', label: 'Jump', icon: 'chevronUp' }, { act: 'respawn', label: 'Respawn', icon: 'refresh' }] },
@@ -126,8 +127,10 @@
       const custom = !!ctx.config.custom;
       const diff = custom ? ctx.difficulty : 'normal';
       const course = custom ? genCourse('obby:' + (ctx.config.seed || 7), T.stages[diff] || 8, diff) : genCourse('sky-obby-v1', 10, 'normal');
-      const parts = new BF.Particles(400);
-      const floats = new BF.Floaters();
+      const V = ctx.g3;
+      // side view in 3D: game x -> X, game y (down) -> -Y, the course runs along Z = 0
+      const parts = V ? V.particles2d(0, (x, y) => [x, -y + 6, 0]) : new BF.Particles(400);
+      const floats = V ? V.floaters2d(0, (x, y) => [x, -y, 30]) : new BF.Floaters();
       const cam = new BF.Camera(W, H);
       const doubleJump = ctx.hasPass('double_jump');
       const speed = T.speed * (ctx.hasPass('speed') ? T.speedCoil : 1);
@@ -375,6 +378,133 @@
         g.globalAlpha = 1;
       }
 
+      // ------------------------------------------------------------ 3D view
+      const view = !V ? null : (() => {
+        const DEPTH = 90;
+        V.preset('day', { fogNear: 1400, fogFar: 4200 });
+        V.shadowSize(700);
+        const colors = (p) => {
+          if (p.kind === 'checkpoint') return ['#ffffff', '#b7c0cf'];
+          if (p.kind === 'finish') return ['#ffd66b', '#e0a800'];
+          if (p.kind === 'move') return ['#7fe7ff', '#2f7fb8'];
+          if (p.kind === 'fall') return ['#f0d38c', '#b48a4a'];
+          if (p.kind === 'blink') return ['#d7a8ff', '#7a4bd6'];
+          return custom ? [U.shade(theme, 0.25), U.shade(theme, -0.35)] : ['#6bd35a', '#8a6a4a'];
+        };
+        // static platforms are batched; moving / falling / blinking ones get their own meshes
+        const statics = [], tops = [];
+        const dyn = [];
+        for (const p of course.plats) {
+          const [top, side] = colors(p);
+          if (p.kind === 'static' || p.kind === 'checkpoint' || p.kind === 'finish') {
+            statics.push({ x: p.x + p.w / 2, y: -p.y - p.h, z: 0, w: p.w, h: p.h - 6, d: DEPTH, color: side });
+            tops.push({ x: p.x + p.w / 2, y: -p.y - 6, z: 0, w: p.w + 2, h: 6, d: DEPTH + 2, color: top });
+            if (p.kind === 'static') for (let i = 0; i < Math.floor(p.w / 70); i++) tops.push({ x: p.x + 20 + i * 70 + (i * 13) % 30, y: -p.y - p.h - 14, z: ((i * 37) % 60) - 30, w: 16, h: 14, d: 16, color: side });
+          } else {
+            const g = V.group();
+            V.box(0, -p.h, 0, p.w, p.h - 6, DEPTH, side, { parent: g, opacity: p.kind === 'blink' ? 0.95 : 1 });
+            V.box(0, -6, 0, p.w + 2, 6, DEPTH + 2, top, { parent: g, opacity: p.kind === 'blink' ? 0.95 : 1 });
+            if (p.kind === 'move') for (let i = 8; i < p.w - 4; i += 16) V.box(-p.w / 2 + i + 3, -12, DEPTH / 2 + 1, 6, 3, 1, '#ffffff', { parent: g, shadow: false });
+            dyn.push({ p, g, mats: g.children.map((c) => c.material) });
+          }
+        }
+        V.boxes(statics);
+        V.boxes(tops);
+        // hazards
+        const lavaMat = new THREE.MeshStandardMaterial({ color: '#ff3d5a', emissive: new THREE.Color('#ff3d5a'), emissiveIntensity: 0.8 });
+        V.own(lavaMat);
+        for (const kz of course.kills) V.box(kz.x + kz.w / 2, -kz.y - kz.h, 0, kz.w, kz.h + 2, DEPTH - 10, null, { material: lavaMat });
+        const spinners = course.spinners.map((sp) => {
+          V.box(sp.x, -sp.y - 42, -DEPTH / 2 + 12, 8, 42, 8, '#39414f');
+          const g = V.group();
+          g.position.set(sp.x, -sp.y, 0);
+          V.shape('box', 0, 0, 0, sp.len * 2, 12, 12, '#ff3d5a', { parent: g, glow: 0.35 });
+          V.shape('cyl', 0, 0, 0, 16, 18, 16, '#39414f', { parent: g }).rotation.x = Math.PI / 2;
+          return { sp, g };
+        });
+        const pads = course.pads.map((pd) => {
+          V.box(pd.x, -pd.y, 0, 44, 4, 44, '#2f8f47');
+          const top = V.box(pd.x, -pd.y + 4, 0, 34, 7, 34, '#4ad17f', { glow: 0.3 });
+          return { pd, top };
+        });
+        const flags = course.flags.map((f) => {
+          V.box(f.x, -f.y, -DEPTH / 2 + 10, 4, 74, 4, '#39414f');
+          const flag = V.box(f.x + 20, -f.y + 52, -DEPTH / 2 + 10, 38, 22, 2, '#ff5a6a', { shadow: false });
+          return { f, flag };
+        });
+        let portal = null;
+        if (course.portal) {
+          const g = V.group();
+          g.position.set(course.portal.x, -course.portal.y, 0);
+          const rings = ['#ffd66b', '#ffb52e', '#fff3c4'].map((c, i) => V.shape('torus', 0, 0, 0, 72 - i * 16, 72 - i * 16, 40, c, { parent: g, glow: 0.7, metal: 0.4 }));
+          V.shape('disc', 0, 0, 0, 58, 58, 1, '#ffe9a8', { parent: g, basic: true, opacity: 0.45, side: 2, depthWrite: false });
+          portal = { g, rings };
+        }
+        // scenery: floating islands and clouds far behind, a cloud sea below
+        const r = U.rng('obby3d');
+        const isl = [], islTop = [], cl = [];
+        for (let x = course.minX - 600; x < course.maxX + 900; x += 160 + r() * 200) {
+          const z = -500 - r() * 1300, y = -300 + r() * 700, w = 80 + r() * 220;
+          isl.push({ x, y: y - 60, z, w, h: 60, d: w * 0.8, color: '#8a6a4a', rot: r() });
+          islTop.push({ x, y, z, w: w + 4, h: 10, d: w * 0.8 + 4, color: '#6bd35a', rot: isl[isl.length - 1].rot });
+        }
+        for (let i = 0; i < 90; i++) {
+          const x = course.minX - 800 + r() * (course.maxX - course.minX + 1800), z = -200 - r() * 1600, y = -500 + r() * 1100, s = 40 + r() * 70;
+          for (let k = 0; k < 3; k++) cl.push({ x: x + (k - 1) * s * 0.8, y: y + (k === 1 ? s * 0.2 : 0), z, w: s * (k === 1 ? 1.3 : 1), h: s * 0.7, d: s, color: '#ffffff' });
+        }
+        V.boxes(isl, { shadow: false });
+        V.boxes(islTop, { shadow: false });
+        V.boxes(cl, { geo: 'sphereLo', shadow: false, basic: true });
+        V.ground(course.minX - 3000, -3000, course.maxX + 3000, 3000, '#f4f8ff', { y: -980, map: BF.g3d.gridTex('#eef5ff', 'rgba(0,0,0,0)', 1, { repeat: [60, 20], noise: true }) });
+
+        return function sync(dt) {
+          const t = ctx.time;
+          const look = me.facing * 110;
+          V.look(me.x + look, -me.y + 70, 0, { dist: 640, pitch: 0.2, yaw: -0.32, fov: 45, lerp: 0.12 }, dt);
+          for (const d of dyn) {
+            const p = d.p;
+            const shake = p.kind === 'fall' && p.trig && p.trig < T.fallDelay ? Math.sin(t * 70) * 2 : 0;
+            d.g.position.set(p.x + p.w / 2 + shake, -p.y, 0);
+            if (p.kind === 'blink') {
+              const on = isOn(p);
+              const phaseT = (t + p.off) % T.blinkPeriod;
+              const alpha = on ? (phaseT > T.blinkOn - 0.45 && Math.sin(t * 30) > 0 ? 0.45 : 0.95) : 0.14;
+              const [top, side] = colors(p);
+              d.g.children[0].material = V.mat(side, { opacity: alpha });
+              d.g.children[1].material = V.mat(top, { opacity: alpha });
+              d.g.children[0].castShadow = d.g.children[1].castShadow = on;
+            }
+          }
+          lavaMat.emissiveIntensity = 0.55 + Math.sin(t * 8) * 0.35;
+          for (const s of spinners) s.g.rotation.z = -s.sp.a;
+          for (const pd of pads) { const sq = pd.pd.t > 0 ? 0.45 : 1; pd.top.scale.y = 7 * sq; pd.top.position.y = -pd.pd.y + 4 + 3.5 * sq; }
+          for (const f of flags) {
+            f.flag.material = V.mat(f.f.cp <= cp ? '#3fd08a' : '#ff5a6a');
+            f.flag.rotation.y = Math.sin(t * 4 + f.f.x) * 0.15;
+          }
+          if (portal) {
+            portal.rings.forEach((m, i) => { m.rotation.z = t * (0.8 + i * 0.4) * (i % 2 ? -1 : 1); m.rotation.y = Math.sin(t + i) * 0.3; });
+            V.label(course.portal.x, -course.portal.y + 60, 0, { name: 'FINISH', color: '#ffd66b' });
+          }
+          bots.forEach((bt, i) => {
+            const rig = V.actor(bt.bot.id, bt.bot.avatar, { scale: 8 });
+            const z = -26 + (i % 5) * 13;
+            rig.setPos(bt.x, -bt.y, z);
+            rig.faceAngle(bt.facing > 0 ? 0.35 : Math.PI - 0.35);
+            rig.set({ air: !!bt.to || bt.fallT > 0, move: bt.to ? 0 : 0 });
+            if (bt.doneT > 0 && Math.random() < 0.01) rig.emote('cheer', 1.5);
+            V.label(bt.x, -bt.y + 58, z, { name: bt.bot.displayName, color: '#ffffff', bubble: ctx.bubbleText(bt.bot.id) });
+          });
+          const rig = V.actor('me', ctx.player.avatar, { scale: 8 });
+          rig.setPos(me.x, -me.y, 18);
+          rig.faceAngle(me.facing > 0 ? 0.35 : Math.PI - 0.35);
+          rig.set({ air: !me.ground, move: me.ground ? Math.min(1, Math.abs(me.vx) / speed) : 0 });
+          rig.group.visible = !(me.fadeT > 0 && Math.sin(t * 40) < 0);
+          V.label(me.x, -me.y + 60, 18, { name: ctx.player.name, color: '#ffb454', bubble: ctx.bubbleText('me') });
+          V.sweep();
+        };
+      })();
+
       return {
         update(dt) {
           parts.update(dt);
@@ -467,8 +597,17 @@
           parts.draw(g);
           floats.draw(g);
           g.restore();
+          drawHud(g);
+        },
 
-          // HUD
+        render3d(dt) { view(dt); },
+        hud(g) { drawHud(g); },
+
+        onBotJoin(b) { addBot(b); },
+        onBotLeave(b) { const i = bots.findIndex((x) => x.bot.id === b.id); if (i >= 0) bots.splice(i, 1); },
+      };
+
+      function drawHud(g) {
           G.panel(g, 10, 10, 230, 76);
           G.text(g, 'Checkpoint', 22, 31, { size: 11, color: '#a1abbb' });
           G.text(g, cp + ' / ' + (course.stages - 1), 22, 58, { size: 24, weight: 800, color: '#7fe7ff' });
@@ -485,11 +624,7 @@
           });
           if (phase === 'countdown') G.display(g, countT > 0.1 ? String(Math.ceil(countT)) : 'GO', W / 2, H / 2 - 40, 84, '#ffffff');
           if (doubleJump || ctx.hasPass('speed')) G.text(g, [doubleJump ? 'Double Jump' : '', ctx.hasPass('speed') ? 'Speed Coil' : ''].filter(Boolean).join(' · '), 22, 102, { size: 11, color: '#ffd66b' });
-        },
-
-        onBotJoin(b) { addBot(b); },
-        onBotLeave(b) { const i = bots.findIndex((x) => x.bot.id === b.id); if (i >= 0) bots.splice(i, 1); },
-      };
+      }
     },
   });
 

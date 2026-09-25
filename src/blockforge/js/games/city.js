@@ -136,14 +136,16 @@
   }
 
   BF.GameModules.register('city', {
-    maxBots: 7,
+    three: true,
+    maxBots: 9,
     feedTop: 0.2,
     actions: { use: ['KeyE'], exit: ['KeyQ'] },
     controls: { joystick: true, buttons: [{ act: 'use', label: 'Enter', icon: 'door' }, { act: 'exit', label: 'Exit car', icon: 'arrowLeft' }] },
     create(ctx) {
       const W = ctx.W, H = ctx.H;
-      const parts = new BF.Particles(300);
-      const floats = new BF.Floaters();
+      const V = ctx.g3;
+      const parts = V ? V.particles2d(10) : new BF.Particles(300);
+      const floats = V ? V.floaters2d(50) : new BF.Floaters();
       const cam = new BF.Camera(W, H);
       cam.bounds = { x: 0, y: 0, w: MW * TS, h: MH * TS };
       const d = ctx.data;
@@ -554,6 +556,178 @@
         }
       }
 
+      // ------------------------------------------------------------ 3D view
+      const view = !V ? null : (() => {
+        const CW = MW * TS, CH = MH * TS;
+        V.preset('day', { fogNear: 1100, fogFar: 3200 });
+        V.shadowSize(640);
+        // ground: the tile map painted once into a texture
+        const PX = 16;
+        const tex = BF.g3d.canvasTex('city-ground', MW * PX, MH * PX, (g2) => {
+          for (let y = 0; y < MH; y++) for (let x = 0; x < MW; x++) {
+            const tt = CITY.map[y * MW + x], px = x * PX, py = y * PX;
+            g2.fillStyle = tt === ROAD ? '#3a3f4b' : tt === WALK ? '#c9ced8' : tt === LOT ? '#5a606c' : tt === BLD ? '#8a909c' : tt === PARK || tt === TREE || tt === WATER ? ((x + y) % 2 ? '#5fb85a' : '#58b052') : ((x + y) % 2 ? '#79c76a' : '#72bf63');
+            g2.fillRect(px, py, PX, PX);
+            if (tt === ROAD) {
+              const vr = V_ROADS.includes(x) || V_ROADS.includes(x - 1), hr = H_ROADS.includes(y) || H_ROADS.includes(y - 1);
+              g2.fillStyle = 'rgba(255,214,107,.85)';
+              if (vr && !hr && V_ROADS.includes(x) && y % 2 === 0) g2.fillRect(px + PX - 1, py + 3, 2, 8);
+              if (hr && !vr && H_ROADS.includes(y) && x % 2 === 0) g2.fillRect(px + 3, py + PX - 1, 8, 2);
+              if (vr && hr) { g2.fillStyle = 'rgba(255,255,255,.35)'; for (let k = 0; k < 4; k++) g2.fillRect(px + 1 + k * 4, py + 1, 2, PX - 2); }
+            }
+            if (tt === LOT && y % 3 === 0) { g2.fillStyle = 'rgba(255,255,255,.6)'; g2.fillRect(px, py, PX, 1); }
+          }
+        });
+        V.ground(0, 0, CW, CH, '#ffffff', { map: tex });
+        V.ground(-2600, -2600, CW + 2600, CH + 2600, '#5a9a4a', { y: -1, map: BF.g3d.gridTex('#5fa34f', 'rgba(0,0,0,0)', 1, { repeat: [40, 40], noise: true }) });
+        // curbs, trees, lamps
+        const curbs = [], trunks = [], crowns = [], poles = [], lamps = [];
+        const r = U.rng('city3d');
+        for (let y = 0; y < MH; y++) for (let x = 0; x < MW; x++) {
+          const tt = CITY.map[y * MW + x];
+          const cx = x * TS + TS / 2, cz = y * TS + TS / 2;
+          if (tt === WALK) curbs.push({ x: cx, z: cz, w: TS, h: 3, d: TS, color: (x + y) % 2 ? '#d3d8e1' : '#c9ced8' });
+          if (tt === TREE) { trunks.push({ x: cx, z: cz, w: 8, h: 26, d: 8, color: '#7a4a2a' }); crowns.push({ x: cx, y: 18, z: cz, w: 40 + r() * 8, h: 42 + r() * 12, d: 40, color: r() < 0.5 ? '#2f8f47' : '#3fa052' }); }
+        }
+        for (const b of CITY.blocks) {
+          for (let x = b.c0; x <= b.c1; x += 4) for (const yy of [b.r0, b.r1]) { poles.push({ x: x * TS + 6, z: yy * TS + (yy === b.r0 ? 6 : TS - 6), w: 3, h: 58, d: 3, color: '#39414f' }); lamps.push({ x: x * TS + 6, y: 56, z: yy * TS + (yy === b.r0 ? 6 : TS - 6), w: 8, h: 5, d: 8, color: '#fff3c4' }); }
+        }
+        V.boxes(curbs, { shadow: false });
+        V.boxes(trunks, { geo: 'cylLo' });
+        V.boxes(crowns, { geo: 'sphereLo' });
+        V.boxes(poles, { geo: 'cylLo' });
+        V.boxes(lamps, { glow: true, shadow: false });
+        // buildings
+        const HEIGHT = { pizza: 96, cafe: 84, taxi: 110, boutique: 124, dealer: 76, kiosk: 40 };
+        const bodies = [], windows = [], roofs = [], trims = [];
+        for (const b of CITY.buildings) {
+          const x = b.x0 * TS, z = b.y0 * TS, w = (b.x1 - b.x0 + 1) * TS, d = (b.y1 - b.y0 + 1) * TS, h = HEIGHT[b.id] || 80;
+          bodies.push({ x: x + w / 2, z: z + d / 2, w: w - 6, h, d: d - 6, color: U.shade(b.color, -0.2) });
+          trims.push({ x: x + w / 2, y: h, z: z + d / 2, w: w - 2, h: 5, d: d - 2, color: U.shade(b.color, -0.45) });
+          for (let wx = x + 22; wx < x + w - 22; wx += 26) for (let wy = 30; wy < h - 12; wy += 24) windows.push({ x: wx, y: wy, z: z + d - 2.5, w: 14, h: 12, d: 2, color: '#bfe6ff' });
+          trims.push({ x: x + w / 2, y: 0, z: z + d - 1, w: Math.min(w - 20, 150), h: 22, d: 6, color: b.color });
+          trims.push({ x: b.door.x, y: 0, z: z + d - 2, w: 20, h: 28, d: 4, color: '#1b1b22' });
+          for (let k = 0; k < 2; k++) roofs.push({ x: x + 24 + k * 34 + r() * 10, y: h, z: z + 24 + r() * (d - 48), w: 18, h: 12, d: 14, color: '#9aa5b5' });
+          V.sign(b.name, b.door.x, h + 26, z + d, { h: 22, color: b.id === 'taxi' ? '#1b1b22' : '#ffffff', bg: b.id === 'taxi' ? '#ffc940' : U.shade(b.color, -0.1), px: 56 });
+        }
+        const houseRoofs = [];
+        for (const hh of CITY.houses) {
+          const x = hh.x0 * TS, z = hh.y0 * TS, w = (hh.x1 - hh.x0 + 1) * TS, d = (hh.y1 - hh.y0 + 1) * TS;
+          bodies.push({ x: x + w / 2, z: z + d / 2, w: w - 12, h: 38, d: d - 12, color: hh.color });
+          houseRoofs.push({ x: x + w / 2, y: 38, z: z + d / 2, w: (w - 4) * 0.75, h: 32, d: (d - 4) * 1.35, color: hh.roof, rot: Math.PI / 4 });
+          const fz = hh.top ? z + 6 : z + d - 6;
+          trims.push({ x: hh.door.x, y: 0, z: fz, w: 12, h: 22, d: 2, color: U.shade(hh.roof, 0.1) });
+          for (const sd of [-1, 1]) windows.push({ x: hh.door.x + sd * 36, y: 14, z: fz, w: 14, h: 12, d: 2, color: '#dff4ff' });
+        }
+        V.boxes(bodies);
+        V.boxes(trims);
+        V.boxes(windows, { shadow: false, rough: 0.2 });
+        V.boxes(roofs);
+        const hr = V.boxes(houseRoofs, { geo: 'cone4' });
+        if (hr) hr.castShadow = true;
+        // fountain
+        if (CITY.fountain) {
+          const f = CITY.fountain;
+          V.shape('cyl', f.x, 6, f.y, 76, 12, 76, '#9aa5b5');
+          V.shape('cyl', f.x, 12.5, f.y, 64, 1, 64, '#46a8ff', { rough: 0.1, metal: 0.2 });
+          V.shape('cyl', f.x, 22, f.y, 10, 30, 10, '#d7dde6');
+          V.shape('cyl', f.x, 36, f.y, 26, 4, 26, '#d7dde6');
+        }
+        // dealership price tags
+        for (const lc of CITY.lotCars) {
+          const m = BF.props3d.car({ color: CARS[lc.id].color, long: CARS[lc.id].long });
+          m.position.set(lc.x, 0, lc.y);
+          V.scene.add(m);
+        }
+
+        const carPool = V.pool(), litterPool = V.pool();
+        const marker = V.group();
+        const markRing = V.shape('ring', 0, 1.5, 0, 90, 90, 1, '#4ad17f', { parent: marker, basic: true, opacity: 0.9, side: 2, shadow: false });
+        markRing.rotation.x = -Math.PI / 2;
+        const beam = V.shape('cylLo', 0, 60, 0, 70, 120, 70, '#4ad17f', { parent: marker, basic: true, opacity: 0.18, depthWrite: false, shadow: false });
+        let sprayT = 0;
+        const nearMe = (x, y, r2) => Math.abs(x - me.x) < r2 && Math.abs(y - me.y) < r2 * 0.8;
+
+        function placeCar(key, def, x, y, a) {
+          const m = carPool.use(key + ':' + def.color, () => { const c = BF.props3d.car(def); V.scene.add(c); return c; });
+          m.position.set(x, 0, y);
+          m.rotation.y = -a;
+          return m;
+        }
+
+        return function sync(dt) {
+          const t = ctx.time;
+          V.look(me.x, 0, me.y, { dist: car ? 660 : 520, pitch: 0.92, fov: 45, lerp: 0.12 }, dt);
+          // fountain spray
+          sprayT -= dt;
+          if (CITY.fountain && sprayT <= 0 && nearMe(CITY.fountain.x, CITY.fountain.y, 700)) { sprayT = 0.12; V.fx.emit(CITY.fountain.x, 40, CITY.fountain.y, { count: 3, color: '#dff4ff', speed: 60, life: 0.7, size: 4, gravity: 260, up: 1 }); }
+          for (const c of traffic) { const p = carPos(c); placeCar('t' + traffic.indexOf(c), { color: c.taxi ? '#ffc940' : c.color, taxi: c.taxi }, p.x, p.y, p.a); }
+          for (const p of parked) {
+            placeCar('p' + p.id, { color: p.def.color, long: p.def.long, taxi: p.def.company }, p.x, p.y, p.a);
+            if (!car && U.dist(p.x, p.y, me.x, me.y) < 60) V.label(p.x, 34, p.y, { name: '[E] Drive ' + p.def.name, color: '#ffd66b' });
+          }
+          for (const lc of CITY.lotCars) if (nearMe(lc.x, lc.y, 500)) V.label(lc.x, 34, lc.y, { name: CARS[lc.id].name + ' · $' + U.fmt(CARS[lc.id].price), color: '#ffffff' });
+          if (car) {
+            placeCar('me', { color: car.def.color, long: car.def.long, taxi: car.def.company }, car.x, car.y, car.a);
+          }
+          peds.forEach((p, i) => {
+            const q = ringPoint(p.block, p.t);
+            if (!nearMe(q.x, q.y, 650)) return;
+            const rig = V.actor('ped' + i, p.look, { scale: 7.5 });
+            rig.setPos(q.x, 3, q.y);
+            rig.faceAngle(q.a + (p.v < 0 ? Math.PI : 0));
+            rig.set({ move: Math.abs(p.v) / 90 });
+          });
+          for (const bt of bots) {
+            if (bt.drive) { placeCar('b' + bt.bot.id, { color: bt.color }, bt.x, bt.y, bt.a); if (nearMe(bt.x, bt.y, 700)) V.label(bt.x, 40, bt.y, { name: bt.bot.displayName, color: '#ffffff', bubble: ctx.bubbleText(bt.bot.id) }); continue; }
+            if (!nearMe(bt.x, bt.y, 700)) continue;
+            const rig = V.actor(bt.bot.id, bt.bot.avatar, { scale: 8 });
+            rig.setPos(bt.x, 3, bt.y);
+            rig.faceAngle(bt.a);
+            rig.set({ move: Math.abs(bt.v) / 90 });
+            V.label(bt.x, 58, bt.y, { name: bt.bot.displayName, color: '#ffffff', bubble: ctx.bubbleText(bt.bot.id) });
+          }
+          carPool.sweep();
+          // job marker, passenger and litter
+          marker.visible = !!(job && job.target);
+          if (job && job.target) {
+            const col = job.kind === 'taxi' ? '#ffc940' : '#4ad17f';
+            marker.position.set(job.target.x, 0, job.target.y);
+            markRing.material = V.mat(col, { basic: true, opacity: 0.9, side: 2 });
+            beam.material = V.mat(col, { basic: true, opacity: 0.16 + Math.sin(t * 4) * 0.05, depthWrite: false });
+            markRing.scale.set(80 + Math.sin(t * 4) * 6, 80 + Math.sin(t * 4) * 6, 1);
+            if (job.kind === 'taxi' && job.stage === 'pickup') {
+              const rig = V.actor('passenger', job.passenger.look, { scale: 7.5 });
+              rig.setPos(job.target.x, 3, job.target.y);
+              rig.faceAngle(Math.PI / 2);
+              if (Math.random() < 0.01) rig.emote('wave', 1.2);
+              V.label(job.target.x, 58, job.target.y, { name: 'Waiting for a taxi', color: '#ffc940' });
+            } else V.label(job.target.x, 110, job.target.y, { name: job.target.label, color: col });
+          }
+          if (job && job.kind === 'cleanup') {
+            for (const l of job.litter) {
+              const m = litterPool.use(l, () => (l.kind === 0 ? V.box(0, 0, 0, 7, 12, 7, '#e03e5a', {}) : l.kind === 1 ? V.shape('sphere', 0, 5, 0, 10, 10, 10, '#f8fafc', {}) : V.box(0, 0, 0, 14, 6, 10, '#c8a46a', {})));
+              m.position.set(l.x, 0, l.y);
+              m.rotation.y = l.x;
+            }
+          }
+          litterPool.sweep();
+          // me
+          if (!car) {
+            const rig = V.actor('me:' + (d.style || ''), d.style && d.outfits.includes(d.style) ? myLook : ctx.player.avatar, { scale: 8 });
+            rig.setPos(me.x, 3, me.y);
+            rig.faceAngle(me.a);
+            const mv = me._px != null && dt > 0 ? Math.hypot(me.x - me._px, me.y - me._py) / dt : 0;
+            rig.set({ move: mv / T.walk });
+            const door = nearestDoor(56);
+            if (door && door.id !== 'house') V.label(door.door.x, 70, door.door.y, { name: '[E] ' + door.name, color: '#ffd66b' });
+          }
+          me._px = me.x; me._py = me.y;
+          V.label(me.x, car ? 44 : 60, me.y, { name: ctx.player.name, color: '#ffb454', bubble: ctx.bubbleText('me') });
+          V.sweep();
+        };
+      })();
+
       return {
         update(dt) {
           parts.update(dt);
@@ -615,7 +789,7 @@
           }
           if (inp.pointer.pressed && panel) closePanel();
           else if (inp.pointer.pressed && !car) {
-            const w = cam.toWorld(inp.pointer.x, inp.pointer.y);
+            const w = V ? ctx.pointerWorld(0) : cam.toWorld(inp.pointer.x, inp.pointer.y);
             const b = CITY.buildings.find((q) => q.id !== 'house' && w.x > q.x0 * TS && w.x < (q.x1 + 1) * TS && w.y > q.y0 * TS && w.y < (q.y1 + 1) * TS);
             if (b) { if (U.dist(b.door.x, b.door.y, me.x, me.y) < 140) openBuilding(b); else floats.add(w.x, w.y, 'Walk to the door first', '#cfd6e2', 12); }
             const c = parked.find((q) => U.dist(q.x, q.y, w.x, w.y) < 26);
@@ -671,10 +845,23 @@
           parts.draw(g);
           floats.draw(g);
           g.restore();
+          drawHud(g);
+        },
 
+        render3d(dt) { view(dt); },
+        hud(g) { drawHud(g); },
+
+        onBotJoin(b) { addBot(b); },
+        onBotLeave(b) { const i = bots.findIndex((x) => x.bot.id === b.id); if (i >= 0) bots.splice(i, 1); },
+        destroy() { ctx.save(); },
+      };
+
+      function drawHud(g) {
+          const t = ctx.time;
           // job arrow
           if (job && job.target) {
-            const sx = job.target.x - cam.x, sy = job.target.y - cam.y;
+            let sx = job.target.x - cam.x, sy = job.target.y - cam.y;
+            if (V) { const p = V.toScreen(job.target.x, 0, job.target.y); sx = p.x; sy = p.y; if (p.z > 1) { sx = W - sx; sy = H * 2; } }
             if (sx < 20 || sy < 20 || sx > W - 20 || sy > H - 20) {
               const a = Math.atan2(sy - H / 2, sx - W / 2);
               const ex = W / 2 + Math.cos(a) * (W / 2 - 40), ey = H / 2 + Math.sin(a) * (H / 2 - 40);
@@ -704,12 +891,7 @@
           g.drawImage(miniMap(mw, mh), mx, my, mw, mh);
           if (job && job.target) G.circle(g, mx + job.target.x * k, my + job.target.y * k, 4 + Math.sin(t * 6), job.kind === 'taxi' ? '#ffc940' : '#4ad17f');
           G.circle(g, mx + me.x * k, my + me.y * k, 3.5, '#ffffff');
-        },
-
-        onBotJoin(b) { addBot(b); },
-        onBotLeave(b) { const i = bots.findIndex((x) => x.bot.id === b.id); if (i >= 0) bots.splice(i, 1); },
-        destroy() { ctx.save(); },
-      };
+      }
     },
   });
 })((window.BF = window.BF || {}));

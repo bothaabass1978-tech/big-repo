@@ -109,15 +109,27 @@
     return { rooms: list, start, byKey: rooms, key };
   }
 
+  // 3D looks for the dungeon's foes (full avatar specs for BF.char3d)
+  const FOE_LOOK = {
+    skeleton: { skin: '#efeae0', equipped: { face: { style: 'fangs' }, shirt: { style: 'plain', c1: '#e8ecf3', c2: '#cfd6e2' }, pants: { style: 'plain', c1: '#d7dde6' }, shoes: { style: 'sneaker', c1: '#cfd6e2', c2: '#cfd6e2' } } },
+    archer: { skin: '#efeae0', equipped: { face: { style: 'fangs' }, shirt: { style: 'plain', c1: '#4a7a3a', c2: '#2f5a2a' }, pants: { style: 'plain', c1: '#3a3f2a' }, hat: { style: 'hood', c1: '#2f5a2a' } } },
+    knight: { skin: '#8a94a6', equipped: { face: { style: 'robot' }, shirt: { style: 'plain', c1: '#8a94a6', c2: '#6a707c' }, pants: { style: 'armor', c1: '#6a707c', c2: '#9aa5b5' }, hat: { style: 'helmet', c1: '#9aa5b5' }, shoulder: { style: 'pads', c1: '#6a707c' } } },
+    warden: { skin: '#3a3f4b', equipped: { face: { style: 'determined' }, shirt: { style: 'plain', c1: '#2a2f3a', c2: '#6a707c' }, pants: { style: 'armor', c1: '#1b1e26', c2: '#6a707c' }, hat: { style: 'horns', c1: '#c9ced8' }, back: { style: 'cape', c1: '#8a1f2e' }, shoulder: { style: 'pads', c1: '#6a707c' } } },
+  };
+  const FOE_SCALE = { skeleton: 7.5, archer: 7.5, knight: 8.6, warden: 17 };
+
   BF.GameModules.register('dungeon', {
+    three: true,
     maxBots: 1,
     feedTop: 0.16,
     actions: { attack: ['KeyJ', 'Space'], dash: ['ShiftLeft', 'ShiftRight', 'KeyK'], potion: ['KeyQ'] },
     controls: { joystick: true, buttons: [{ act: 'attack', label: 'Attack', icon: 'sword' }, { act: 'dash', label: 'Dash', icon: 'run' }, { act: 'potion', label: 'Potion', icon: 'heart' }] },
     create(ctx) {
       const W = ctx.W, H = ctx.H;
-      const parts = new BF.Particles(500);
-      const floats = new BF.Floaters();
+      const V = ctx.g3;
+      // 3D uses room coordinates directly (X = x, Z = y); floating texts arrive in screen space
+      const parts = V ? V.particles2d(14) : new BF.Particles(500);
+      const floats = V ? V.floaters2d(0, (x, y) => [x - OX, 56, y - OY + 20]) : new BF.Floaters();
       const d = ctx.data;
       const kit = ctx.hasPass('heroes_kit');
       const runSeed = 'df:' + Date.now();
@@ -434,6 +446,7 @@
         const p = ctx.input.pointer;
         if (p.moved || p.down) me.useMouse = true;
         if (Math.hypot(ctx.input.axis().x, ctx.input.axis().y) > 0.2 && !p.down) me.useMouse = false;
+        if (me.useMouse && V) { const w = ctx.pointerWorld(20); return Math.atan2(w.y - me.y, w.x - me.x); }
         return me.useMouse ? Math.atan2(p.y - OY - me.y, p.x - OX - me.x) : Math.atan2(me.dy, me.dx);
       }
       function swing() {
@@ -577,6 +590,230 @@
 
       enterRoom(floor.start);
 
+      // ------------------------------------------------------------ 3D view
+      const view = !V ? null : (() => {
+        let built = null, builtOpen = null, roomGroup = null, flames = [], lights = [];
+        const foePool = V.pool(), fxPool = V.pool(), shotPool = V.pool(), chestPool = V.pool();
+        const swingGeo = V.own(new THREE.RingGeometry(0.62, 1, 18, 1, 0, T.arc * 2));
+        const allyArcGeo = V.own(new THREE.RingGeometry(0.62, 1, 14, 1, 0, 1.6));
+        const arc = new THREE.Mesh(swingGeo, V.mat('#ffffff', { basic: true, opacity: 0.55, side: 2, depthWrite: false }));
+        arc.rotation.x = -Math.PI / 2;
+        V.scene.add(arc);
+        const allyArc = new THREE.Mesh(allyArcGeo, V.mat('#ffffff', { basic: true, opacity: 0.45, side: 2, depthWrite: false }));
+        allyArc.rotation.x = -Math.PI / 2;
+        V.scene.add(allyArc);
+        const rich = V.q !== 'low';
+        const isOpen = () => room.cleared || room.kind === 'start' || room.kind === 'treasure';
+
+        function rebuild() {
+          built = room; builtOpen = isOpen();
+          if (roomGroup) V.remove(roomGroup);
+          for (const l of lights) V.remove(l);
+          lights = []; flames = [];
+          roomGroup = V.group();
+          const tint = U.shade(['#4a4238', '#3b4150', '#3a2f45'][floorN - 1], 0.18);
+          V.preset(room.kind === 'boss' ? 'dusk' : 'cave', { fogNear: 1400, fogFar: 3000 });
+          V.shadowSize(520);
+          const r = U.rng(room.seed || 1);
+          const stairs = room.kind === 'stairs' && room.cleared;
+          const tiles = [], walls = [], caps = [];
+          for (let y = 0; y < RH; y++) for (let x = 0; x < RW; x++) {
+            const edge = x === 0 || y === 0 || x === RW - 1 || y === RH - 1;
+            const v = r();
+            const cx = x * TS + TS / 2, cz = y * TS + TS / 2;
+            if (edge) {
+              if (doorAt(x, y) || ((y === 0 || y === RH - 1) && (x === 10 || x === 11) && (y === 0 ? room.doors.n : room.doors.s)) || ((x === 0 || x === RW - 1) && y >= 4 && y <= 6 && (x === 0 ? room.doors.w : room.doors.e))) {
+                tiles.push({ x: cx, y: -10, z: cz, w: TS, h: 10, d: TS, color: U.shade(tint, -0.25) });
+                continue;
+              }
+              const h = y === RH - 1 ? 22 : y === 0 ? 96 : 64;
+              walls.push({ x: cx, z: cz, w: TS, h, d: TS, color: U.shade(tint, -0.3 + v * 0.1) });
+              caps.push({ x: cx, y: h, z: cz, w: TS + 1, h: 4, d: TS + 1, color: U.shade(tint, 0.05) });
+            } else {
+              if (stairs && Math.abs(cx - PW / 2) < TS && Math.abs(cz - PH / 2) < TS) continue;
+              tiles.push({ x: cx, y: -10, z: cz, w: TS - 1.5, h: 10 + (v > 0.9 ? 1.5 : 0), d: TS - 1.5, color: U.shade(tint, v * 0.12 - 0.02) });
+            }
+          }
+          V.boxes(tiles, { parent: roomGroup });
+          V.boxes(walls, { parent: roomGroup });
+          V.boxes(caps, { parent: roomGroup, shadow: false });
+          V.ground(-900, -900, PW + 900, PH + 900, '#060708', { parent: roomGroup, y: -12, basic: true });
+          // doors: dark corridors, bars while the room is locked
+          const door = (x, z, w, d, horiz, bx, bz) => {
+            V.box(x, -10, z, w, 2, d, '#050608', { parent: roomGroup, basic: true });
+            if (!builtOpen) for (let i = 6; i < (horiz ? w : d); i += 12) V.box(horiz ? x - w / 2 + i : bx, 0, horiz ? bz : z - d / 2 + i, 4, 70, 4, '#9aa5b5', { parent: roomGroup, metal: 0.6, rough: 0.4 });
+          };
+          if (room.doors.n) door(11 * TS, -TS / 2, 2 * TS, TS * 2, true, 0, TS / 2);
+          if (room.doors.s) door(11 * TS, PH + TS / 2, 2 * TS, TS * 2, true, 0, PH - TS / 2);
+          if (room.doors.w) door(-TS / 2, 5.5 * TS, TS * 2, 3 * TS, false, TS / 2, 0);
+          if (room.doors.e) door(PW + TS / 2, 5.5 * TS, TS * 2, 3 * TS, false, PW - TS / 2, 0);
+          // obstacles
+          V.boxes(room.blocks.map((b) => ({ x: b[0] * TS + TS / 2, z: b[1] * TS + TS / 2, w: TS - 4, h: 44, d: TS - 4, color: U.shade(tint, -0.2) })), { parent: roomGroup });
+          V.boxes(room.blocks.map((b) => ({ x: b[0] * TS + TS / 2, y: 44, z: b[1] * TS + TS / 2, w: TS - 8, h: 4, d: TS - 8, color: U.shade(tint, 0.1) })), { parent: roomGroup, shadow: false });
+          // stairs down
+          if (stairs) {
+            for (let i = 0; i < 5; i++) V.box(PW / 2 - TS + i * 16 + 8, -14 - i * 12, PH / 2, 16, 4, TS * 2, U.shade('#6a707c', -i * 0.12), { parent: roomGroup });
+            V.box(PW / 2, -80, PH / 2, TS * 2, 2, TS * 2, '#050608', { parent: roomGroup, basic: true });
+          }
+          // torches on the back and side walls
+          for (const [tx, tz] of [[4 * TS + 20, TS + 2], [17 * TS + 20, TS + 2], [TS + 2, 2.5 * TS], [PW - TS - 2, 2.5 * TS]]) {
+            V.box(tx, 48, tz, 6, 16, 6, '#3a2a20', { parent: roomGroup, shadow: false });
+            const f = V.shape('cone', tx, 66, tz, 10, 16, 10, '#ffb454', { parent: roomGroup, glow: 1.6, shadow: false });
+            flames.push(f);
+            if (rich && lights.length < 3) {
+              const l = new THREE.PointLight('#ffb454', 1.2, 420, 1.4);
+              l.position.set(tx, 80, tz + 30);
+              V.scene.add(l);
+              lights.push(l);
+            }
+          }
+          if (room.kind === 'boss') {
+            const rr = V.shape('ring', PW / 2, 0.5, PH / 2, 360, 360, 1, '#ff3d5a', { parent: roomGroup, basic: true, opacity: 0.25, side: 2, shadow: false });
+            rr.rotation.x = -Math.PI / 2;
+          }
+        }
+
+        function foeModel(e) {
+          if (FOE_LOOK[e.kind]) return null;
+          const g = V.group();
+          if (e.kind === 'slime') {
+            g.userData.body = V.box(0, 0, 0, 30, 26, 30, '#6be675', { parent: g, opacity: 0.88, rough: 0.2 });
+            V.box(0, 4, 0, 14, 12, 14, '#2f8f47', { parent: g, shadow: false });
+            for (const sd of [-1, 1]) V.box(sd * 7, 14, 15.2, 5, 7, 1, '#1b1b22', { parent: g, shadow: false });
+          } else if (e.kind === 'bat') {
+            V.shape('sphere', 0, 0, 0, 16, 16, 16, '#4b2a8a', { parent: g });
+            for (const sd of [-1, 1]) V.box(sd * 4, 2, 7, 3, 3, 1, '#ff5a6a', { parent: g, glow: 1, shadow: false });
+            g.userData.wings = [-1, 1].map((sd) => { const w = V.group(g); w.position.x = sd * 6; V.box(sd * 12, -1, 0, 24, 2, 14, '#7a4bd6', { parent: w }); return w; });
+          }
+          return g;
+        }
+
+        function chestModel(c) {
+          const g = V.group();
+          V.box(0, 0, 0, 38, 20, 26, '#8b5a2b', { parent: g });
+          V.box(0, 8, 13.2, 6, 8, 1, '#ffd66b', { parent: g, glow: 0.3, shadow: false });
+          const lid = V.group(g);
+          lid.position.set(0, 20, -13);
+          V.box(0, 0, 13, 40, 8, 28, '#a86b3c', { parent: lid });
+          g.userData.lid = lid;
+          return g;
+        }
+
+        return function sync(dt) {
+          const t = ctx.time;
+          if (built !== room || builtOpen !== isOpen()) rebuild();
+          V.look(PW / 2 + (me.x - PW / 2) * 0.55, 0, PH / 2 + 30 + (me.y - PH / 2) * 0.45, { dist: 580, pitch: 1.0, fov: 45, lerp: 0.08 }, dt);
+          flames.forEach((f, i) => { const k = 1 + Math.sin(t * 14 + i * 2) * 0.15; f.scale.set(10 * k, 16 * (2 - k), 10 * k); });
+          lights.forEach((l, i) => { l.intensity = 1.1 + Math.sin(t * 9 + i) * 0.15; });
+          // foes
+          for (const e of room.enemies) {
+            if (!e._id) e._id = U.uid('foe');
+            const sc = FOE_SCALE[e.kind];
+            if (sc) {
+              const rig = V.actor(e._id, FOE_LOOK[e.kind], { scale: sc });
+              const mv = e._px != null && dt > 0 ? Math.hypot(e.x - e._px, e.y - e._py) / dt : 0;
+              e._px = e.x; e._py = e.y;
+              rig.setPos(e.x, 0, e.y);
+              rig.faceAngle(e.face);
+              rig.set({ move: e.charge && e.charge.t <= 0.7 ? 1.5 : mv / 90 });
+              if (!rig._held) { rig.hold(e.kind === 'warden' ? 'hammer' : e.kind === 'archer' ? null : 'sword', e.kind === 'knight' ? '#c9ced8' : '#b7a88a'); rig._held = true; }
+              if (e.flash > 0.08 && !e._fl) rig.play('hit');
+              e._fl = e.flash > 0.08;
+              if (e.swingShow > 0 && !e._sw) rig.play('attack');
+              e._sw = e.swingShow > 0;
+              if (e.kind === 'warden' && e.wind > 0 && Math.random() < 0.05) rig.play('attack');
+            } else {
+              const m = foePool.use(e, () => foeModel(e));
+              if (e.kind === 'slime') {
+                const sq = e.hop > 0 ? 0.75 : 1 + Math.sin(t * 6 + e.x) * 0.06;
+                m.position.set(e.x, e.hop > 0 ? Math.sin((e.hop / 0.35) * Math.PI) * 18 : 0, e.y);
+                m.scale.set(1 / sq, sq, 1 / sq);
+                m.userData.body.material = V.mat(e.flash > 0 ? '#ffffff' : '#6be675', { opacity: 0.88, rough: 0.2 });
+              } else {
+                m.position.set(e.x, 34 + Math.sin(t * 5 + e.x) * 6, e.y);
+                const flap = Math.sin(t * 22 + e.x) * 0.7;
+                m.userData.wings[0].rotation.z = flap; m.userData.wings[1].rotation.z = -flap;
+              }
+              m.rotation.y = Math.PI / 2 - e.face;
+            }
+            // telegraphs
+            if (e.wind > 0 && e.kind !== 'warden') {
+              const w = fxPool.use('w' + e._id, () => { const m = V.shape('disc', 0, 1.5, 0, 36, 36, 1, '#ff3d5a', { basic: true, opacity: 0.45, depthWrite: false, shadow: false }); m.rotation.x = -Math.PI / 2; return m; });
+              w.position.set(e.x + Math.cos(e.swingA || e.face) * 30, 1.5, e.y + Math.sin(e.swingA || e.face) * 30);
+            }
+            if (e.kind === 'warden' && e.wind > 0) {
+              const w = fxPool.use('ww', () => { const m = V.shape('disc', 0, 1.5, 0, 380, 380, 1, '#ff3d5a', { basic: true, opacity: 0.25, depthWrite: false, shadow: false }); m.rotation.x = -Math.PI / 2; return m; });
+              w.position.set(e.x, 1.5, e.y);
+            }
+            if (e.charge && e.charge.t > 0.7) {
+              const c = fxPool.use('wc', () => V.box(0, 0, 0, 400, 1, e.r * 1.6, '#ff3d5a', { basic: true, opacity: 0.3, depthWrite: false, shadow: false }));
+              c.position.set(e.x + Math.cos(e.charge.a) * 200, 1.5, e.y + Math.sin(e.charge.a) * 200);
+              c.rotation.y = -e.charge.a;
+            }
+            if (e.hp < e.maxHp && e.kind !== 'warden') V.label(e.x, e.kind === 'bat' ? 62 : (sc ? sc * 6.6 : 40), e.y, { hp: e.hp / e.maxHp, hpColor: '#ff5a6a' });
+          }
+          foePool.sweep();
+          for (const w of waves) {
+            const m = fxPool.use(w, () => { const r = V.shape('ring', 0, 2, 0, 1, 1, 1, '#ff7a2e', { basic: true, opacity: 0.8, side: 2, shadow: false }); r.rotation.x = -Math.PI / 2; return r; });
+            m.position.set(w.x, 2, w.y);
+            m.scale.set(w.r * 2, w.r * 2, 1);
+          }
+          fxPool.sweep();
+          for (const sh of shots) {
+            const m = shotPool.use(sh, () => V.box(0, 0, 0, 22, 2, 2, '#e8d3a8', { shadow: false }));
+            m.position.set(sh.x, 28, sh.y);
+            m.rotation.y = -Math.atan2(sh.vy, sh.vx);
+          }
+          shotPool.sweep();
+          for (const c of room.chests) {
+            const m = chestPool.use(c, () => chestModel(c));
+            m.position.set(c.x, 0, c.y);
+            m.userData.lid.rotation.x = c.open ? -1.9 : 0;
+            if (!c.open && U.dist(c.x, c.y, me.x, me.y) < 70) V.label(c.x, 44, c.y, { name: 'Attack to open', color: '#ffd66b' });
+          }
+          chestPool.sweep();
+          if (room.kind === 'stairs' && room.cleared) V.label(PW / 2, 40, PH / 2 - 30, { name: 'Stairs down', color: '#ffffff' });
+          // ally
+          allyArc.visible = false;
+          if (allyRef) {
+            const al = allyRef;
+            const rig = V.actor(al.bot.id, al.bot.avatar, { scale: 8 });
+            rig.setPos(al.x, 0, al.y);
+            rig.faceAngle(al.a);
+            const mv = al._px != null && dt > 0 ? Math.hypot(al.x - al._px, al.y - al._py) / dt : 0;
+            al._px = al.x; al._py = al.y;
+            rig.set({ move: mv / 160, mode: al.down ? 'ko' : 'idle' });
+            if (!rig._held) { rig.hold('sword', '#c9ced8'); rig._held = true; }
+            if (al.swingT > 0.18 && !al._sw) rig.play('attack');
+            al._sw = al.swingT > 0.18;
+            if (al.swingT > 0) { allyArc.visible = true; allyArc.position.set(al.x, 22, al.y); allyArc.scale.set(46, 46, 1); allyArc.rotation.z = -(al.a + 0.8); }
+            V.label(al.x, 56, al.y, { name: al.bot.displayName, color: '#8fd3ff', hp: al.hp / al.maxHp, hpColor: '#3fd08a', bubble: ctx.bubbleText(al.bot.id) });
+          }
+          // me
+          const rig = V.actor('me', ctx.player.avatar, { scale: 8.2 });
+          rig.setPos(me.x, 0, me.y);
+          rig.faceAngle(me.a);
+          const mv = me._px != null && dt > 0 ? Math.hypot(me.x - me._px, me.y - me._py) / dt : 0;
+          me._px = me.x; me._py = me.y;
+          rig.set({ move: me.dashT > 0 ? 1.4 : mv / T.speed, mode: phase === 'revive' ? 'ko' : 'idle' });
+          if (rig._sword !== me.sword) { rig.hold('sword', SWORDS[me.sword].color); rig._sword = me.sword; }
+          if (me.swingT > T.swingTime - 0.03 && !me._sw) rig.play('attack');
+          me._sw = me.swingT > T.swingTime - 0.03;
+          if (me.flash > 0.15 && !me._fl) rig.play('hit');
+          me._fl = me.flash > 0.15;
+          rig.group.visible = !(me.inv > 0 && Math.sin(t * 40) > 0.3);
+          arc.visible = me.swingT > 0;
+          if (arc.visible) {
+            arc.position.set(me.x, 22, me.y);
+            arc.scale.set(T.reach, T.reach, 1);
+            arc.rotation.z = -(me.swingA + T.arc);
+            arc.material = V.mat(SWORDS[me.sword].color, { basic: true, opacity: 0.55, side: 2, depthWrite: false });
+          }
+          V.label(me.x, 56, me.y, { name: ctx.player.name, color: '#ffb454', bubble: ctx.bubbleText('me') });
+          V.sweep();
+        };
+      })();
+
       return {
         update(dt) {
           parts.update(dt);
@@ -639,9 +876,25 @@
           parts.draw(g);
           g.restore();
           floats.draw(g);
-          if (fade > 0) { g.fillStyle = 'rgba(0,0,0,' + Math.min(1, (0.25 - Math.abs(fade - 0.125)) * 8) + ')'; g.fillRect(0, 0, W, H); }
+          drawHud(g);
+        },
 
-          // HUD
+        render3d(dt) { view(dt); },
+        hud(g) { drawHud(g); },
+
+        /** Automated-test hooks (not used by gameplay). */
+        _test: {
+          state: () => ({ floor: floorN, room: room.kind, enemies: room.enemies.length, hp: me.hp, kills, chests: chestsOpened, lvl: me.lvl, phase }),
+          goto(kind) { const rm = floor.rooms.find((r) => r.kind === kind && !r.visited) || floor.rooms.find((r) => r.kind === kind); if (rm) enterRoom(rm, 'w'); return !!rm; },
+          nextFloor() { nextFloor(); },
+          heal() { me.hp = me.maxHp; },
+        },
+        onBotJoin(b) { if (!allyRef) { allyRef = makeAlly(b); allyRef.x = me.x - 40; allyRef.y = me.y; ctx.feed(b.displayName + ' joined your party.', 'join', '#8fd3ff'); } },
+        onBotLeave(b) { if (allyRef && allyRef.bot.id === b.id) { allyRef = null; ctx.feed(b.displayName + ' left the party.', 'leave', '#cfd6e2'); } },
+      };
+
+      function drawHud(g) {
+          if (fade > 0) { g.fillStyle = 'rgba(0,0,0,' + Math.min(1, (0.25 - Math.abs(fade - 0.125)) * 8) + ')'; g.fillRect(0, 0, W, H); }
           G.panel(g, 10, 8, 330, 68);
           G.text(g, 'HP', 22, 30, { size: 11, color: '#a1abbb' });
           G.bar(g, 46, 20, 170, 12, me.hp / me.maxHp, me.hp / me.maxHp < 0.3 ? '#ff5a6a' : '#3fd08a');
@@ -666,18 +919,7 @@
             g.fillStyle = rm === room ? '#ffb454' : rm.visited ? (rm.kind === 'stairs' || rm.kind === 'boss' ? '#ff5a6a' : rm.kind === 'treasure' ? '#ffd66b' : '#9aa5b5') : 'rgba(154,165,181,.3)';
             g.fillRect(mx + rm.gx * cs + 1, my + rm.gy * cs + 1, cs - 3, cs - 3);
           }
-        },
-
-        /** Automated-test hooks (not used by gameplay). */
-        _test: {
-          state: () => ({ floor: floorN, room: room.kind, enemies: room.enemies.length, hp: me.hp, kills, chests: chestsOpened, lvl: me.lvl, phase }),
-          goto(kind) { const rm = floor.rooms.find((r) => r.kind === kind && !r.visited) || floor.rooms.find((r) => r.kind === kind); if (rm) enterRoom(rm, 'w'); return !!rm; },
-          nextFloor() { nextFloor(); },
-          heal() { me.hp = me.maxHp; },
-        },
-        onBotJoin(b) { if (!allyRef) { allyRef = makeAlly(b); allyRef.x = me.x - 40; allyRef.y = me.y; ctx.feed(b.displayName + ' joined your party.', 'join', '#8fd3ff'); } },
-        onBotLeave(b) { if (allyRef && allyRef.bot.id === b.id) { allyRef = null; ctx.feed(b.displayName + ' left the party.', 'leave', '#cfd6e2'); } },
-      };
+      }
     },
   });
 })((window.BF = window.BF || {}));

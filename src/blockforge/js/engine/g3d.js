@@ -533,10 +533,10 @@
         },
         sweep() {
           for (const [k, e] of map) {
-            if (!e.seen) { world.remove(e.obj); map.delete(k); } else e.seen = false;
+            if (!e.seen) { world.remove(e.obj); if (e.obj.userData && e.obj.userData.dispose) e.obj.userData.dispose(); map.delete(k); } else e.seen = false;
           }
         },
-        clear() { for (const e of map.values()) world.remove(e.obj); map.clear(); },
+        clear() { for (const e of map.values()) { world.remove(e.obj); if (e.obj.userData && e.obj.userData.dispose) e.obj.userData.dispose(); } map.clear(); },
         get size() { return map.size; },
       };
     },
