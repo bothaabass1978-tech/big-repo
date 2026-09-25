@@ -37,14 +37,18 @@
   const STARS = (() => { const r = U.rng('ec-stars'); return Array.from({ length: 90 }, () => ({ x: r() * 960, y: r() * 540, s: r() * 1.6 + 0.4, t: r() * 6 })); })();
 
   BF.GameModules.register('elemental', {
-    maxBots: 5,
+    three: true,
+    maxBots: 7,
     feedTop: 0.12,
     actions: { a1: ['KeyJ', 'Digit1'], a2: ['KeyK', 'Digit2'], a3: ['KeyL', 'Digit3'] },
     controls: { joystick: true, buttons: [{ act: 'a1', label: '1', icon: 'sparkle' }, { act: 'a2', label: '2', icon: 'bolt' }, { act: 'a3', label: '3', icon: 'star' }] },
     create(ctx) {
       const W = ctx.W, H = ctx.H;
-      const parts = new BF.Particles(700);
-      const floats = new BF.Floaters();
+      const V = ctx.g3;
+      const parts = V ? V.particles2d(22) : new BF.Particles(700);
+      const floats = V ? V.floaters2d(60) : new BF.Floaters();
+      /** Pointer in arena coordinates (ground-picked in 3D). */
+      const ptr = () => (V ? ctx.pointerWorld(20) : ctx.input.pointer);
       const d = ctx.data;
       d.elementWins = d.elementWins || {};
       let chosen = d.lastElement && (ELEMENTS[d.lastElement] && (!ELEMENTS[d.lastElement].pass || ctx.hasPass('void'))) ? d.lastElement : 'fire';
@@ -155,7 +159,9 @@
         if (p.moved || p.down) f.useMouse = true;
         const ax = ctx.input.axis();
         if (Math.hypot(ax.x, ax.y) > 0.2 && !p.down && !f.useMouse) f.a = Math.atan2(ax.y, ax.x);
-        return f.useMouse ? Math.atan2(p.y - f.y, p.x - f.x) : f.a;
+        if (!f.useMouse) return f.a;
+        const q = ptr();
+        return Math.atan2(q.y - f.y, q.x - f.x);
       }
       function shoot(f, a, o) {
         shots.push(Object.assign({ x: f.x + Math.cos(a) * 16, y: f.y + Math.sin(a) * 16, vx: Math.cos(a) * o.speed, vy: Math.sin(a) * o.speed, owner: f, life: o.life || 1.4, hit: new Set() }, o));
@@ -196,8 +202,9 @@
         }
       }
       function ptrDist(f) {
-        const p = ctx.input.pointer;
-        return f.useMouse ? U.dist(p.x, p.y, f.x, f.y) : 220;
+        if (!f.useMouse) return 220;
+        const q = ptr();
+        return U.dist(q.x, q.y, f.x, f.y);
       }
 
       // --------------------------------------------------------------- bots
@@ -316,6 +323,163 @@
         for (const w of walls) if (P.distToSeg(s.x, s.y, w.x1, w.y1, w.x2, w.y2) < s.r + 5) return true;
         return false;
       }
+
+      // ------------------------------------------------------------ 3D view
+      const view = !V ? null : (() => {
+        V.preset('space', { fogNear: 1400, fogFar: 3400 });
+        V.stars(500);
+        V.shadowSize(560);
+        // floating islands and bridges
+        for (const dd of DISCS) {
+          V.shape('cyl', dd.x, -7, dd.y, dd.r * 2, 14, dd.r * 2, '#747c98', { rough: 0.9 });
+          V.shape('cyl', dd.x, 0.5, dd.y, dd.r * 2 - 16, 1, dd.r * 2 - 16, '#848cab', { rough: 0.9, shadow: false });
+          const c = V.shape('cone', dd.x, -14 - dd.r * 0.55, dd.y, dd.r * 2, dd.r * 1.1, dd.r * 2, '#3a3354', { flat: true });
+          c.rotation.x = Math.PI;
+          const rg = V.shape('ring', dd.x, 1.2, dd.y, dd.r * 1.25, dd.r * 1.25, 1, '#b8c0da', { basic: true, opacity: 0.22, shadow: false });
+          rg.rotation.x = -Math.PI / 2;
+        }
+        for (const b of BRIDGES) {
+          const len = Math.hypot(b.x2 - b.x1, b.y2 - b.y1), a = Math.atan2(b.y2 - b.y1, b.x2 - b.x1);
+          const m = V.box((b.x1 + b.x2) / 2, -10, (b.y1 + b.y2) / 2, len, 10, b.w * 2, '#6a6f86');
+          m.rotation.y = -a;
+          const rail = V.box((b.x1 + b.x2) / 2, 0, (b.y1 + b.y2) / 2, len, 1, b.w * 2 - 10, '#7f86a0', { shadow: false });
+          rail.rotation.y = -a;
+        }
+        const core = V.shape('cyl', 480, 1, 290, 52, 2, 52, '#8a92ae', { shadow: false });
+        const coreRing = V.shape('ring', 480, 2.5, 290, 70, 70, 1, '#b67cff', { basic: true, opacity: 0.7, side: 2, shadow: false });
+        coreRing.rotation.x = -Math.PI / 2;
+        core.receiveShadow = true;
+        const r = U.rng('ec3d');
+        const rocks = [];
+        for (let i = 0; i < 40; i++) { const a = r() * TAU, dist = 560 + r() * 700, s = 10 + r() * 40; rocks.push({ x: 480 + Math.cos(a) * dist, y: -120 - r() * 300, z: 290 + Math.sin(a) * dist * 0.7, w: s, h: s, d: s, color: r() < 0.5 ? '#3a3354' : '#4a4468', rot: r() * 6 }); }
+        const rockMesh = V.boxes(rocks, { geo: 'dodeca', flat: true, shadow: false });
+
+        const auraPool = V.pool(), shotPool = V.pool(), zonePool = V.pool(), wallPool = V.pool();
+        const waveGeo = V.own(new THREE.RingGeometry(0.05, 1, 20, 1, 0, 1.5));
+        const reticle = V.shape('ring', 0, 2, 0, 22, 22, 1, '#ffffff', { basic: true, side: 2, shadow: false });
+        reticle.rotation.x = -Math.PI / 2;
+
+        function shotModel(s) {
+          if (s.kind === 'rock') return V.shape('dodeca', 0, 0, 0, s.r * 2.2, s.r * 2.2, s.r * 2.2, '#7a5a34', { flat: true });
+          if (s.kind === 'air') { const m = V.shape('torus', 0, 0, 0, 30, 30, 10, s.color, { glow: 0.8, opacity: 0.8, shadow: false }); m.rotation.x = Math.PI / 2; const g = V.group(); g.add(m); return g; }
+          const g = V.group();
+          V.shape('sphere', 0, 0, 0, s.r * 2, s.r * 2, s.r * 2, '#ffffff', { parent: g, basic: true, shadow: false });
+          V.shape('sphere', 0, 0, 0, s.r * 3.6, s.r * 3.6, s.r * 3.6, s.color, { parent: g, basic: true, opacity: 0.45, depthWrite: false, shadow: false });
+          return g;
+        }
+        function zoneModel(z) {
+          const g = V.group();
+          if (z.kind === 'meteor') {
+            const ring = V.shape('ring', 0, 1.5, 0, z.r * 2, z.r * 2, 1, '#ff7a2e', { parent: g, basic: true, side: 2, shadow: false }); ring.rotation.x = -Math.PI / 2;
+            const fill = V.shape('disc', 0, 1, 0, 1, 1, 1, '#ff3d5a', { parent: g, basic: true, opacity: 0.3, depthWrite: false, shadow: false }); fill.rotation.x = -Math.PI / 2;
+            g.userData.fill = fill;
+            g.userData.rock = V.shape('dodeca', 0, 0, 0, 36, 36, 36, '#ff7a2e', { parent: g, glow: 1, flat: true });
+          } else if (z.kind === 'quake') {
+            const ring = V.shape('cyl', 0, 4, 0, z.r * 2, 8, z.r * 2, '#b48a4a', { parent: g, opacity: 0.5, shadow: false, depthWrite: false });
+            g.userData.fill = ring;
+          } else if (z.kind === 'wave') {
+            const m = new THREE.Mesh(waveGeo, V.mat('#46a8ff', { basic: true, opacity: 0.55, side: 2, depthWrite: false }));
+            m.rotation.x = -Math.PI / 2; m.position.y = 10;
+            g.add(m); g.userData.fill = m;
+          } else if (z.kind === 'cyclone') {
+            g.userData.rings = [0, 1, 2, 3].map((k) => { const m = V.shape('torus', 0, 10 + k * 14, 0, (z.r - k * 10) * 2, (z.r - k * 10) * 2, 18, '#e6fffa', { parent: g, basic: true, opacity: 0.4, shadow: false }); m.rotation.x = Math.PI / 2; return m; });
+          } else if (z.kind === 'singularity') {
+            const pull = V.shape('disc', 0, 1, 0, z.r * 2, z.r * 2, 1, '#3a1f6a', { parent: g, basic: true, opacity: 0.3, depthWrite: false, shadow: false }); pull.rotation.x = -Math.PI / 2;
+            g.userData.core = V.shape('sphere', 0, 26, 0, 40, 40, 40, '#0b0714', { parent: g, basic: true });
+            g.userData.rings = [V.shape('torus', 0, 26, 0, 64, 64, 30, '#b67cff', { parent: g, glow: 1.2, shadow: false })];
+          }
+          return g;
+        }
+
+        return function sync(dt) {
+          const t = ctx.time;
+          const live = me && !me.dead && phase === 'play';
+          if (live) V.look(480 + (me.x - 480) * 0.45, 0, 290 + (me.y - 290) * 0.4 + 20, { dist: 660, pitch: 0.98, fov: 45, lerp: 0.06 }, dt);
+          else V.look(480, 0, 310, { dist: 820, pitch: 0.9, yaw: phase === 'lobby' ? Math.sin(t * 0.2) * 0.4 : 0, fov: 45, lerp: 0.05 }, dt);
+          coreRing.rotation.z = t * 0.6;
+          coreRing.scale.setScalar(70 + Math.sin(t * 2) * 6);
+          if (rockMesh) rockMesh.rotation.y = t * 0.01;
+          if (phase === 'lobby') {
+            const rig = V.actor('me', ctx.player.avatar, { scale: 10 });
+            rig.setPos(480, 0, 290);
+            rig.group.rotation.y = Math.sin(t * 0.7) * 0.5;
+            rig.set({ move: 0 });
+          }
+          for (const f of fighters) {
+            const id = f.isMe ? 'me' : f.bot.id;
+            const el = ELEMENTS[f.el];
+            if (f.dead) { V.actor(id, f.isMe ? ctx.player.avatar : f.bot.avatar, { scale: 8.5 }).group.visible = false; continue; }
+            const rig = V.actor(id, f.isMe ? ctx.player.avatar : f.bot.avatar, { scale: 8.5 });
+            rig.group.visible = true;
+            const fall = f.falling ? 1 - f.falling / T.fall : 0;
+            rig.setPos(f.x, -fall * fall * 260, f.y);
+            rig.group.scale.setScalar(8.5 * (1 - fall * 0.5));
+            rig.faceAngle(f.a);
+            const mv = f._px != null && dt > 0 ? Math.hypot(f.x - f._px, f.y - f._py) / dt : 0;
+            f._px = f.x; f._py = f.y;
+            rig.set({ move: Math.min(1.4, mv / T.speed), air: !!f.falling, mode: f.stun > 0 ? 'ko' : 'idle' });
+            if (f.cds.some((c, i) => c > ELEMENTS[f.el].abilities[i].cd - 0.05)) rig.play('attack');
+            if (f.flash > 0.1 && !f._fl) rig.play('hit');
+            f._fl = f.flash > 0.1;
+            const au = auraPool.use(id, () => {
+              const g = V.group();
+              g.userData.ring = V.shape('ring', 0, 1.6, 0, 40, 40, 1, el.color, { parent: g, basic: true, opacity: 0.8, side: 2, shadow: false });
+              g.userData.ring.rotation.x = -Math.PI / 2;
+              g.userData.prot = V.shape('sphere', 0, 26, 0, 58, 64, 58, '#ffffff', { parent: g, basic: true, opacity: 0.18, depthWrite: false, shadow: false });
+              g.userData.stars = [0, 1, 2].map(() => V.box(0, 0, 0, 5, 5, 5, '#ffd66b', { parent: g, glow: 1, shadow: false }));
+              g.userData.heal = V.shape('cylLo', 0, 40, 0, 50, 80, 50, '#bfe6ff', { parent: g, basic: true, opacity: 0.15, depthWrite: false, shadow: false });
+              return g;
+            });
+            au.position.set(f.x, -fall * fall * 260, f.y);
+            au.userData.ring.material = V.mat(el.color, { basic: true, opacity: 0.8, side: 2 });
+            au.userData.ring.rotation.z = t * 2;
+            au.userData.prot.visible = f.prot > 0 && !f.falling;
+            au.userData.heal.visible = f.heal > 0;
+            au.userData.stars.forEach((s, k) => { s.visible = f.stun > 0; s.position.set(Math.cos(t * 6 + k * 2) * 12, 52, Math.sin(t * 6 + k * 2) * 12); });
+            rig.group.visible = !(f.dashT > 0 && f.el === 'air' && Math.sin(t * 50) > 0);
+            if (!f.falling) V.label(f.x, 58, f.y, { name: f.name, color: f.isMe ? '#ffb454' : '#ffffff', hp: f.hp / T.hp, hpColor: f.isMe ? '#3fd08a' : '#ff5a6a', bubble: ctx.bubbleText(id) });
+          }
+          auraPool.sweep();
+          for (const s of shots) {
+            const m = shotPool.use(s, () => shotModel(s));
+            m.position.set(s.x, 24, s.y);
+            m.rotation.y = -Math.atan2(s.vy, s.vx);
+            if (s.kind === 'rock') m.rotation.x += dt * 8;
+          }
+          shotPool.sweep();
+          for (const z of zones) {
+            const m = zonePool.use(z, () => zoneModel(z));
+            m.position.set(z.x, 0, z.y);
+            if (z.kind === 'meteor') {
+              const k = Math.min(1, z.t / z.delay);
+              m.userData.fill.scale.set(z.r * 2 * k, z.r * 2 * k, 1);
+              m.userData.rock.visible = !z.done;
+              m.userData.rock.position.set(-(1 - k) * 120, (1 - k) * 420 + 10, -(1 - k) * 80);
+            } else if (z.kind === 'quake') {
+              const k = Math.min(1, z.t * 3);
+              m.userData.fill.scale.set(z.r * 2 * k, 8, z.r * 2 * k);
+              m.userData.fill.material = V.mat('#b48a4a', { opacity: Math.max(0.05, 0.5 - z.t), depthWrite: false });
+            } else if (z.kind === 'wave') {
+              const k = Math.min(1, z.t * 5);
+              m.userData.fill.scale.set(z.r * k, z.r * k, 1);
+              m.userData.fill.rotation.z = -(z.a + z.spread);
+            } else if (z.kind === 'cyclone') m.userData.rings.forEach((rg, k) => { rg.rotation.z = t * (6 + k); rg.position.x = Math.sin(t * 20 + k) * 4; });
+            else if (z.kind === 'singularity') { m.userData.rings[0].rotation.x = t * 3; m.userData.rings[0].rotation.y = t * 2; m.userData.core.scale.setScalar(40 + Math.sin(t * 12) * 6); }
+          }
+          for (const tr of trails) {
+            const m = zonePool.use(tr, () => { const len = Math.hypot(tr.x2 - tr.x1, tr.y2 - tr.y1); const b = V.box(0, 0, 0, len, 6, 22, '#ff7a2e', { glow: 1.2, opacity: 0.8, shadow: false }); b.position.set((tr.x1 + tr.x2) / 2, 0, (tr.y1 + tr.y2) / 2); b.rotation.y = -Math.atan2(tr.y2 - tr.y1, tr.x2 - tr.x1); return b; });
+            m.scale.y = 4 + Math.sin(t * 20) * 2 + Math.min(1, tr.t) * 4;
+          }
+          zonePool.sweep();
+          for (const w of walls) {
+            wallPool.use(w, () => { const len = Math.hypot(w.x2 - w.x1, w.y2 - w.y1); const b = V.box((w.x1 + w.x2) / 2, 0, (w.y1 + w.y2) / 2, len, 46, 16, '#7a5a34', { flat: true }); b.rotation.y = -Math.atan2(w.y2 - w.y1, w.x2 - w.x1); return b; });
+          }
+          wallPool.sweep();
+          reticle.visible = !!(me && me.useMouse && !me.dead && phase === 'play');
+          if (reticle.visible) { const q = ptr(); reticle.position.set(q.x, 2, q.y); reticle.material = V.mat(ELEMENTS[me.el].color, { basic: true, side: 2 }); }
+          V.sweep();
+        };
+      })();
 
       return {
         update(dt) {
@@ -463,8 +627,19 @@
           parts.draw(g);
           floats.draw(g);
           if (me && me.useMouse && !me.dead && phase === 'play') { const p = ctx.input.pointer; G.ring(g, p.x, p.y, 9, ELEMENTS[me.el].color, 2); G.circle(g, p.x, p.y, 2, '#fff'); }
+          drawHud(g);
+        },
+
+        render3d(dt) { view(dt); },
+        hud(g) { drawHud(g); },
+
+        onBotJoin(b) { if (phase === 'play') addBot(b); },
+        onBotLeave(b) { const i = fighters.findIndex((f) => f.bot && f.bot.id === b.id); if (i >= 0) fighters.splice(i, 1); },
+        destroy() { offPass(); },
+      };
+
+      function drawHud(g) {
           if (phase === 'lobby' || !me) return;
-          // HUD
           G.panel(g, 10, 10, 250, 58);
           G.text(g, U.fmtClock(clock), 22, 38, { size: 22, weight: 800, color: clock < 30 ? '#ff8b98' : '#fff' });
           G.text(g, ELEMENTS[me.el].name, 248, 30, { size: 12, align: 'right', color: ELEMENTS[me.el].color, weight: 800 });
@@ -479,12 +654,7 @@
             G.text(g, (i + 1) + '. ' + f.name, W - 178, 31 + i * 18, { size: 12, color: f.isMe ? '#ffb454' : '#e8ecf3' });
             G.text(g, U.fmt(f.score), W - 20, 31 + i * 18, { size: 12, align: 'right', color: '#ffd66b', weight: 800 });
           });
-        },
-
-        onBotJoin(b) { if (phase === 'play') addBot(b); },
-        onBotLeave(b) { const i = fighters.findIndex((f) => f.bot && f.bot.id === b.id); if (i >= 0) fighters.splice(i, 1); },
-        destroy() { offPass(); },
-      };
+      }
     },
   });
 })((window.BF = window.BF || {}));

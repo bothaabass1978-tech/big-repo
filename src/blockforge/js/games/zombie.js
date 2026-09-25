@@ -56,14 +56,16 @@
   const TREES = (() => { const r = U.rng('zo-trees'); const out = []; while (out.length < 26) { const x = r() * 960, y = r() * 540; if (x > HX0 - 70 && x < HX1 + 70 && y > HY0 - 70 && y < HY1 + 70) continue; out.push({ x, y, s: 0.7 + r() * 0.7 }); } return out; })();
 
   BF.GameModules.register('zombie', {
+    three: true,
     maxBots: 3,
     feedTop: 0.19,
     actions: { shoot: ['Space'], reload: ['KeyR'], use: ['KeyE'], medkit: ['KeyQ'], slot1: ['Digit1'], slot2: ['Digit2'] },
     controls: { joystick: true, buttons: [{ act: 'shoot', label: 'Shoot', icon: 'crosshair' }, { act: 'reload', label: 'Reload', icon: 'refresh' }, { act: 'use', label: 'Repair / Buy', icon: 'hammer' }, { act: 'medkit', label: 'Medkit', icon: 'heart' }] },
     create(ctx) {
       const W = ctx.W, H = ctx.H;
-      const parts = new BF.Particles(600);
-      const floats = new BF.Floaters();
+      const V = ctx.g3;
+      const parts = V ? V.particles2d(26) : new BF.Particles(600);
+      const floats = V ? V.floaters2d(60) : new BF.Floaters();
       const d = ctx.data;
       const plankHp = T.plankHp * (ctx.hasPass('fortified') ? 2 : 1);
       const windows = WINDOWS.map((w) => Object.assign({}, w, { planks: T.planks, hp: plankHp, busy: 0 }));
@@ -371,6 +373,125 @@
 
       ctx.banner('Board up!', 'The first wave arrives in ' + T.prep + ' seconds', 1800);
 
+      // ------------------------------------------------------------ 3D view
+      const view = !V ? null : (() => {
+        V.preset('night', { fogNear: 700, fogFar: 1900 });
+        V.shadowSize(560);
+        const wallH = (w) => (w.y > HY1 - WT ? 26 : 74);
+        V.ground(-1600, -1400, W + 1600, H + 1400, '#1f3526', { y: -1, map: BF.g3d.gridTex('#1f3526', 'rgba(0,0,0,0)', 1, { repeat: [40, 30], noise: true }) });
+        // dirt paths to each window
+        for (const w of WINDOWS) {
+          const o = OUTWARD[w.side];
+          if (o[0]) V.ground(o[0] < 0 ? -400 : w.x, w.y - 22, o[0] < 0 ? w.x : W + 400, w.y + 22, '#4a3a2a', { y: 0.2 });
+          else V.ground(w.x - 22, o[1] < 0 ? -400 : w.y, w.x + 22, o[1] < 0 ? w.y : H + 400, '#4a3a2a', { y: 0.2 });
+        }
+        const floorTex = BF.g3d.canvasTex('zo-floor', 128, 128, (g2) => { g2.fillStyle = '#6b4b2a'; g2.fillRect(0, 0, 128, 128); g2.fillStyle = 'rgba(0,0,0,.18)'; for (let y = 0; y < 128; y += 16) g2.fillRect(0, y, 128, 2); for (let y = 0; y < 128; y += 16) g2.fillRect(((y * 37) % 100) + 10, y, 2, 16); }, { repeat: [(HX1 - HX0) / 96, (HY1 - HY0) / 96] });
+        V.ground(HX0, HY0, HX1, HY1, '#ffffff', { y: 0.5, map: floorTex });
+        V.boxes(WALLS.map((w) => ({ x: w.x + w.w / 2, z: w.y + w.h / 2, w: w.w, h: wallH(w), d: w.h, color: '#5a4030' })));
+        V.boxes(WALLS.map((w) => ({ x: w.x + w.w / 2, y: wallH(w), z: w.y + w.h / 2, w: w.w + 2, h: 4, d: w.h + 4, color: '#3a2a1e' })), { shadow: false });
+        // furniture
+        for (const f of FURNITURE) {
+          const cx = f.x + f.w / 2, cz = f.y + f.h / 2;
+          if (f.kind === 'table') { V.box(cx, 22, cz, f.w, 6, f.h, '#a86b3c'); for (const [dx, dz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) V.box(cx + dx * (f.w / 2 - 6), 0, cz + dz * (f.h / 2 - 6), 6, 22, 6, '#6b4226'); V.shape('cylLo', cx, 34, cz, 8, 18, 8, '#e8d3a8', { glow: 0.3 }); }
+          else if (f.kind === 'couch') { V.box(cx, 0, cz, f.w, 16, f.h, '#7a3b4a'); V.box(cx, 16, f.y + 6, f.w, 18, 10, '#9a4b5a'); }
+          else { V.box(cx, 0, cz, f.w, 80, f.h, '#4a3a2a'); for (let k = 0; k < 3; k++) V.box(cx, 18 + k * 22, cz, f.w - 4, 3, f.h + 1, '#2a2018'); }
+        }
+        // wall buys: weapon boards and perk machines
+        for (const b of BUYS) {
+          if (b.kind === 'gun') { V.box(b.x, 30, b.y, 44, 22, 8, '#3a2a1e'); V.box(b.x, 38, b.y, 30, 5, 10, '#9aa5b5', { metal: 0.6 }); }
+          else { V.box(b.x, 0, b.y, 30, 58, 22, '#4b2a8a'); V.box(b.x, 30, b.y + (b.y > 300 ? -11.5 : 11.5), 22, 20, 1, '#b67cff', { glow: 0.9, shadow: false }); }
+        }
+        // pines outside
+        V.boxes(TREES.map((tr) => ({ x: tr.x, z: tr.y, w: 8 * tr.s, h: 30 * tr.s, d: 8 * tr.s, color: '#3a2a1e' })), { geo: 'cylLo' });
+        V.boxes(TREES.map((tr) => ({ x: tr.x, y: 18 * tr.s, z: tr.y, w: 46 * tr.s, h: 80 * tr.s, d: 46 * tr.s, color: '#1a4a2a' })), { geo: 'cone' });
+        const r = U.rng('zo3d');
+        const far = [];
+        for (let i = 0; i < 60; i++) { const a = r() * TAU, dd = 700 + r() * 900, s = 0.8 + r() * 1.2; far.push({ x: 480 + Math.cos(a) * dd, y: 0, z: 280 + Math.sin(a) * dd * 0.8, w: 50 * s, h: 110 * s, d: 50 * s, color: '#12301e' }); }
+        V.boxes(far, { geo: 'cone', shadow: false });
+        if (V.q !== 'low') { const lamp = new THREE.PointLight('#ffcf8a', 1.4, 520, 1.2); lamp.position.set(480, 90, 270); V.scene.add(lamp); }
+        const moon = V.shape('sphere', 1300, 900, -1400, 160, 160, 160, '#f4f1ea', { basic: true, shadow: false });
+        moon.material = V.mat('#f4f1ea', { basic: true });
+
+        const plankPools = windows.map(() => []);
+        windows.forEach((w, wi) => {
+          const horiz = w.side === 'n' || w.side === 's';
+          const h = w.side === 's' ? 26 : 74;
+          for (let i = 0; i < T.planks; i++) {
+            const y = 6 + i * ((h - 12) / (T.planks - 1));
+            const m = V.box(w.x, y, w.y, horiz ? WINW + 8 : 6, 6, horiz ? 6 : WINW + 8, '#c8a46a');
+            m.rotation[horiz ? 'z' : 'x'] = ((i % 2) - 0.5) * 0.12;
+            plankPools[wi].push(m);
+          }
+        });
+        const zPool = V.pool(), trPool = V.pool();
+        let chopperG = null;
+
+        function person(p, id, av) {
+          const rig = V.actor(id, av, { scale: 8 });
+          rig.setPos(p.x, 0.5, p.y);
+          rig.faceAngle(p.a);
+          const mv = p._px != null ? Math.hypot(p.x - p._px, p.y - p._py) : 0;
+          p._px = p.x; p._py = p.y;
+          rig.set({ move: Math.min(1, mv * 20 / T.speed * 3), mode: p.down ? 'ko' : 'idle' });
+          const gid = p.isMe ? gun().id : p.gun;
+          if (rig._g !== gid) { rig.hold('blaster', gid === 'shotgun' ? '#8b5a2b' : gid === 'rifle' ? '#39414f' : gid === 'smg' ? '#6a707c' : '#2a2f3a'); rig._g = gid; }
+          return rig;
+        }
+
+        return function sync(dt) {
+          const t = ctx.time;
+          V.look(480 + (me.x - 480) * 0.4, 0, 285 + (me.y - 285) * 0.35 + 24, { dist: 660, pitch: 1.04, fov: 45, lerp: 0.07 }, dt);
+          windows.forEach((w, wi) => plankPools[wi].forEach((m, i) => {
+            m.visible = i < w.planks;
+            m.material = V.mat(i === w.planks - 1 && w.hp < plankHp ? '#a86b3c' : '#c8a46a');
+          }));
+          for (const b of BUYS) if (U.dist(b.x, b.y, me.x, me.y) < 90) {
+            const label = b.kind === 'gun' ? GUNS[b.id].name : PERKS[b.id].name;
+            const price = b.kind === 'gun' ? (me.guns.some((x) => x.id === b.id) ? 'Ammo ' + Math.round(GUNS[b.id].price / 2) : GUNS[b.id].price) : me.perks[b.id] ? 'Active' : PERKS[b.id].price;
+            V.label(b.x, 70, b.y, { name: label + ' · ' + price, color: b.kind === 'perk' ? '#d7b8ff' : '#ffffff' });
+          }
+          for (const z of zombies) {
+            const m = zPool.use(z, () => { const g = BF.props3d.zombie(z.brute ? { skin: '#6a8a4a', shirt: '#4a3a5a', eyes: '#ff3d5a' } : { skin: U.pick(['#8fbf6a', '#9ac77a', '#7fae5e']), shirt: U.pick(['#5a6a7a', '#6a5040', '#4a5a4a', '#7a4a4a']) }); V.scene.add(g); return g; });
+            const climb = z.stage === 'climb' ? Math.sin(Math.min(1, z.climb / 0.8) * Math.PI) * (z.win.side === 's' ? 22 : 30) : 0;
+            m.position.set(z.x, climb, z.y);
+            m.rotation.y = Math.PI / 2 - (z.a || 0);
+            m.scale.setScalar(z.brute ? 1.45 : 1);
+            m.userData.tick(t, z.stage !== 'attack', z.flash > 0);
+            if (z.stage === 'attack') m.rotation.x = Math.sin(z.atkT * 6) * 0.12;
+            if (z.hp < z.maxHp) V.label(z.x, z.brute ? 86 : 62, z.y, { hp: z.hp / z.maxHp, hpColor: '#ff5a6a' });
+          }
+          zPool.sweep();
+          for (const tr of tracers) {
+            const m = trPool.use(tr, () => { const len = Math.hypot(tr.x2 - tr.x1, tr.y2 - tr.y1); const b = V.box(0, 0, 0, len, 1.6, 1.6, tr.me ? '#ffe9a8' : '#cfd6e2', { basic: true, shadow: false }); b.position.set((tr.x1 + tr.x2) / 2, 30, (tr.y1 + tr.y2) / 2); b.rotation.y = -Math.atan2(tr.y2 - tr.y1, tr.x2 - tr.x1); return b; });
+            m.visible = tr.t > 0.02;
+          }
+          trPool.sweep();
+          for (const mt of squad) {
+            person(mt, mt.bot.id, mt.bot.avatar);
+            V.label(mt.x, 58, mt.y, { name: mt.down ? mt.name + ' · DOWN' : mt.name, color: mt.down ? '#ff8b98' : '#8fd3ff', hp: mt.down ? (mt.reviveT || 0) / T.reviveT : mt.hp / mt.maxHp, hpColor: mt.down ? '#8fd3ff' : '#3fd08a', bubble: ctx.bubbleText(mt.bot.id) });
+          }
+          const rig = person(me, 'me', ctx.player.avatar);
+          if (me.flash > 0.15 && !me._fl) rig.play('hit');
+          me._fl = me.flash > 0.15;
+          V.label(me.x, 58, me.y, { name: ctx.player.name, color: '#ffb454', bubble: ctx.bubbleText('me') });
+          if (chopper) {
+            if (!chopperG) {
+              chopperG = V.group();
+              V.box(0, 0, 0, 90, 34, 40, '#3a4a3a', { parent: chopperG });
+              V.box(-60, 12, 0, 60, 10, 10, '#3a4a3a', { parent: chopperG });
+              V.box(28, 8, 0, 26, 20, 36, '#8fd3ff', { parent: chopperG, opacity: 0.7 });
+              for (const sd of [-1, 1]) V.box(0, -12, sd * 18, 80, 3, 3, '#1b1b22', { parent: chopperG });
+              chopperG.userData.rotor = V.box(0, 38, 0, 170, 2, 8, '#1b1b22', { parent: chopperG, shadow: false });
+              chopperG.userData.tail = V.box(-90, 14, 4, 4, 30, 2, '#1b1b22', { parent: chopperG, shadow: false });
+            }
+            chopperG.position.set(chopper.x, 40 + (280 - Math.min(280, chopper.y)) * 1.2 + 20, 280 + (chopper.y - 280) * 0.2);
+            chopperG.userData.rotor.rotation.y = t * 25;
+            chopperG.userData.tail.rotation.x = t * 30;
+          }
+          V.sweep();
+        };
+      })();
+
       return {
         update(dt) {
           parts.update(dt);
@@ -406,7 +527,7 @@
             if (Math.hypot(ax.x, ax.y) > 0.1) { moveInside(me, ax.x * T.speed, ax.y * T.speed, dt); me.walk += dt * 12; }
             const p = inp.pointer;
             if (p.moved || p.down) me.useMouse = true;
-            if (me.useMouse) me.a = Math.atan2(p.y - me.y, p.x - me.x);
+            if (me.useMouse) { const q = V ? ctx.pointerWorld(28) : p; me.a = Math.atan2(q.y - me.y, q.x - me.x); }
             else {
               let near = null, bd = 340;
               for (const z of zombies) { const zd = U.dist(z.x, z.y, me.x, me.y); if (zd < bd && !blockedShot(me.x, me.y, z.x, z.y)) { bd = zd; near = z; } }
@@ -516,12 +637,25 @@
           const vg = g.createRadialGradient(W / 2, H / 2, 200, W / 2, H / 2, 620);
           vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,10,.55)');
           g.fillStyle = vg; g.fillRect(0, 0, W, H);
+          drawHud(g);
+        },
+
+        render3d(dt) { view(dt); },
+        hud(g) { drawHud(g); },
+
+        onBotJoin(b) { addMate(b); },
+        onBotLeave(b) { const i = squad.findIndex((m) => m.bot.id === b.id); if (i >= 0) squad.splice(i, 1); },
+      };
+
+      function drawHud(g) {
           // prompts
           if (!me.down) {
             const b = nearBuy(46), w = nearWindow(me, 64);
             const downMate = squad.find((m) => m.down && U.dist(m.x, m.y, me.x, me.y) < 40);
             const msg = downMate ? 'Hold E to revive ' + downMate.name : b ? 'E  Buy ' + (b.kind === 'gun' ? GUNS[b.id].name : PERKS[b.id].name) : w && w.planks < T.planks ? 'Hold E to repair window ' + w.id : '';
-            if (msg) G.text(g, msg, me.x, me.y + 34, { size: 12, align: 'center', color: '#0b0e13', weight: 900, stroke: '#ffd66b', strokeW: 8 });
+            let px = me.x, py = me.y;
+            if (V) { const sp = V.toScreen(me.x, 0, me.y); px = sp.x; py = sp.y; }
+            if (msg) G.text(g, msg, px, py + 34, { size: 12, align: 'center', color: '#0b0e13', weight: 900, stroke: '#ffd66b', strokeW: 8 });
           }
           // HUD
           const gs = gun(), gd = GUNS[gs.id];
@@ -536,11 +670,7 @@
           if (me.perks.jug || me.perks.quick) G.text(g, [me.perks.jug ? 'Jug' : '', me.perks.quick ? 'Quick' : ''].filter(Boolean).join(' · '), W - 22, H - 18, { size: 11, align: 'right', color: '#b67cff' });
           if (me.down) { g.fillStyle = 'rgba(80,0,0,.35)'; g.fillRect(0, 0, W, H); G.display(g, 'DOWN', W / 2, H / 2, 48, '#ff8b98'); }
           if (me.useMouse && !me.down) { const p = ctx.input.pointer; G.ring(g, p.x, p.y, 9, '#ffffff', 1.5); G.line(g, p.x - 14, p.y, p.x - 6, p.y, '#fff', 1.5); G.line(g, p.x + 6, p.y, p.x + 14, p.y, '#fff', 1.5); }
-        },
-
-        onBotJoin(b) { addMate(b); },
-        onBotLeave(b) { const i = squad.findIndex((m) => m.bot.id === b.id); if (i >= 0) squad.splice(i, 1); },
-      };
+      }
     },
   });
 })((window.BF = window.BF || {}));

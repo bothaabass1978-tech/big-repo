@@ -214,6 +214,54 @@
     return m;
   }
 
+  // --------------------------------------------------------------- zombies
+
+  const zCache = new Map();
+  let legGeo = null, flashMat = null;
+  /**
+   * A shambling zombie (arms out, facing +Z, feet on y = 0, about 54 units tall):
+   * one merged body mesh plus two swinging legs. Call userData.tick(t, moving, flash).
+   * @param {{skin?:string, shirt?:string, pants?:string, eyes?:string}} o
+   */
+  function zombie(o) {
+    o = o || {};
+    const skin = o.skin || '#8fbf6a', shirt = o.shirt || '#5a6a7a', pants = o.pants || '#3a4250', eyes = o.eyes || '#1b1b22';
+    const key = [skin, shirt, pants, eyes].join('|');
+    let geo = zCache.get(key);
+    if (!geo) {
+      const P = [];
+      P.push({ k: 'box', p: [0, 31, 0], s: [18, 20, 10], c: shirt });
+      P.push({ k: 'box', p: [2, 20, 0], s: [15, 3, 9.6], c: U.shade(shirt, -0.3) });
+      P.push({ k: 'box', p: [0, 48, 2], s: [15, 14, 14], r: [0.18, 0, 0.1], c: skin });
+      for (const sd of [-1, 1]) {
+        P.push({ k: 'box', p: [sd * 4, 49.5, 9.3], s: [3, 3, 0.6], r: [0.18, 0, 0.1], c: eyes });
+        P.push({ k: 'box', p: [sd * 12.5, 37, 1], s: [6.4, 6.4, 7], c: shirt });
+        P.push({ k: 'box', p: [sd * 12.5, 36 - sd, 11], s: [5.6, 5.6, 16], r: [-0.1, 0, 0], c: skin });
+      }
+      P.push({ k: 'box', p: [0, 44.5, 9.1], s: [7, 2, 0.6], r: [0.18, 0, 0.1], c: '#3a1f1f' });
+      geo = merge(P);
+      zCache.set(key, geo);
+    }
+    if (!legGeo) { legGeo = new THREE.BoxGeometry(7, 20, 8); legGeo.translate(0, -10, 0); legGeo.userData.shared = true; }
+    if (!flashMat) { flashMat = new THREE.MeshBasicMaterial({ color: '#ffffff' }); flashMat.userData.shared = true; }
+    const g = new THREE.Group();
+    const body = new THREE.Mesh(geo, vcMat());
+    body.castShadow = true;
+    g.add(body);
+    const legMat = BF.g3d.mat(pants);
+    const legs = [-1, 1].map((sd) => { const l = new THREE.Mesh(legGeo, legMat); l.position.set(sd * 4.6, 21, 0); l.castShadow = true; g.add(l); return l; });
+    const seed = Math.random() * 10;
+    g.userData.tick = (t, moving, flash) => {
+      const k = moving ? 1 : 0.15;
+      legs[0].rotation.x = Math.sin(t * 7 + seed) * 0.6 * k;
+      legs[1].rotation.x = -Math.sin(t * 7 + seed) * 0.6 * k;
+      body.rotation.z = Math.sin(t * 3.5 + seed) * 0.08;
+      body.position.y = Math.abs(Math.sin(t * 7 + seed)) * 1.5 * k;
+      body.material = flash ? flashMat : vcMat();
+    };
+    return g;
+  }
+
   BF.pet3d = { build, face, merge, TAU };
-  BF.props3d = { car, merge, pet: build };
+  BF.props3d = { car, merge, pet: build, zombie };
 })((window.BF = window.BF || {}));
