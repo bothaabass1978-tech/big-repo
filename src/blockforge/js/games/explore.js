@@ -91,13 +91,15 @@
   ];
 
   BF.GameModules.register('explore', {
+    three: true,
     maxBots: 6,
     actions: { use: ['KeyE', 'Space', 'Enter'], sprint: ['ShiftLeft', 'ShiftRight'], map: ['KeyM'] },
     controls: { joystick: true, buttons: [{ act: 'use', label: 'Dig / Talk', icon: 'hammer' }, { act: 'sprint', label: 'Sprint', icon: 'run' }, { act: 'map', label: 'Map', icon: 'mapPin' }] },
     create(ctx) {
       const W = ctx.W, H = ctx.H;
-      const parts = new BF.Particles(400);
-      const floats = new BF.Floaters();
+      const V = ctx.g3;
+      const parts = V ? V.particles2d(12) : new BF.Particles(400);
+      const floats = V ? V.floaters2d(64) : new BF.Floaters();
       const cam = new BF.Camera(W, H);
       cam.bounds = { x: 0, y: 0, w: MW * TS, h: MH * TS };
       const shovel = ctx.hasItem('tool_golden_shovel');
@@ -255,6 +257,103 @@
       }
       let lastIsland = null;
 
+      // ----------------------------------------------------------------- 3D
+
+      const LAND_H = { [SAND]: 6, [GRASS]: 10, [PALM]: 10, [BUSH]: 10, [ROCK]: 6, [BRIDGE]: 3, [SHALLOW]: -3, [DEEP]: -30 };
+      /** Height of the ground under a game point (feet position in 3D). */
+      function groundH(px, py) {
+        const t = tileAtPx(px, py);
+        return t === SHALLOW ? -4 : t === DEEP ? -8 : LAND_H[t];
+      }
+      const view = V && (() => {
+        V.preset('day', { fogNear: 900, fogFar: 2600 });
+        V.shadowSize(460);
+        V.ground(-2000, -2000, MW * TS + 2000, MH * TS + 2000, '#0d4f78', { y: -40 });
+        const water = V.ground(-2000, -2000, MW * TS + 2000, MH * TS + 2000, '#1c93c7', { y: 0, opacity: 0.72, rough: 0.15, metal: 0.05 });
+        water.receiveShadow = false;
+        const land = [], shallow = [], decks = [], trunks = [], crowns = [], rocks = [], bushes = [];
+        for (let y = 0; y < MH; y++) for (let x = 0; x < MW; x++) {
+          const t = MAP[y * MW + x];
+          const cx = x * TS + TS / 2, cz = y * TS + TS / 2;
+          const chk = (x + y) % 2 ? 0.03 : -0.02;
+          if (t === SHALLOW) shallow.push({ x: cx, y: -20, z: cz, w: TS, h: 16, d: TS, color: U.shade('#e8cf8a', -0.05 + chk) });
+          else if (t === BRIDGE) { shallow.push({ x: cx, y: -30, z: cz, w: TS, h: 10, d: TS, color: '#c9ad6a' }); decks.push({ x: cx, y: 0, z: cz, w: TS - 2, h: 3, d: TS - 2, color: (x + y) % 2 ? '#9a6b3c' : '#8a5e33' }); }
+          else if (t !== DEEP) {
+            const grassy = t === GRASS || t === PALM || t === BUSH;
+            land.push({ x: cx, y: -30, z: cz, w: TS, h: 30 + (grassy ? 10 : 6), d: TS, color: grassy ? U.shade('#5aab52', chk) : U.shade('#ead08a', chk) });
+            if (t === PALM) {
+              trunks.push({ x: cx, y: 10, z: cz, w: 6, h: 44, d: 6, color: '#8b5a2b' });
+              crowns.push({ x: cx, y: 46, z: cz, w: 40, h: 12, d: 40, color: U.shade('#2fae62', chk * 3), rot: x });
+            } else if (t === ROCK) rocks.push({ x: cx, y: 4, z: cz, w: 30, h: 24, d: 28, color: U.shade('#7a8494', chk * 2), rot: y });
+            else if (t === BUSH) bushes.push({ x: cx, y: 8, z: cz, w: 34, h: 26, d: 34, color: '#2f8f47' });
+          }
+        }
+        V.boxes(land);
+        V.boxes(shallow, { shadow: false });
+        V.boxes(decks);
+        V.boxes(trunks, { geo: 'cylLo' });
+        V.boxes(crowns, { geo: 'cone4' });
+        V.boxes(rocks, { geo: 'dodeca', flat: true });
+        V.boxes(bushes, { geo: 'sphereLo' });
+        const crystals = [];
+        const isC = ISLANDS[3];
+        for (let i = 0; i < 8; i++) {
+          const cx = (isC.cx - 6 + (i % 4) * 4) * TS, cz = (isC.cy - 4 + Math.floor(i / 4) * 8) * TS;
+          crystals.push(V.shape('octa', cx, 34, cz, 18, 40, 18, '#7fe7ff', { glow: 0.8, opacity: 0.9, rough: 0.1, flat: true }));
+        }
+        const digPool = V.pool(), pickPool = V.pool(), piecePool = V.pool(), npcPool = V.pool();
+        const xMark = (hidden) => {
+          const g = V.group();
+          for (const r of [0.785, -0.785]) { const b = V.box(0, 0, 0, 26, 2, 5, hidden ? '#b08050' : '#7a3b1f', { parent: g, shadow: false }); b.rotation.y = r; }
+          return g;
+        };
+        return function sync(dt) {
+          const explorer = ctx.hasPass('explorer');
+          V.look(me.x, groundH(me.x, me.y) + 10, me.y, { dist: 560, pitch: 0.92, fov: 45, lerp: 0.12 }, dt);
+          crystals.forEach((c, i) => { c.rotation.y += dt * 0.8; c.position.y = 34 + Math.sin(ctx.time * 2 + i) * 4; });
+          for (const sp of digs) {
+            if (sp.done) continue;
+            if (sp.hidden && !explorer) continue;
+            const m = digPool.use(sp.hidden ? 'h' + digs.indexOf(sp) : digs.indexOf(sp), () => xMark(sp.hidden));
+            m.position.set(sp.x, groundH(sp.x, sp.y) + 1, sp.y);
+          }
+          digPool.sweep();
+          if (d.marlow.stage === 1) for (const mp of MAP_PIECES) if (!d.marlow.found.includes(mp.island)) { const m = piecePool.use(mp.island, () => V.box(0, 0, 0, 18, 3, 14, '#f4ecd0', {})); m.position.set(mp.x, groundH(mp.x, mp.y) + 2 + Math.sin(ctx.time * 3) * 2, mp.y); m.rotation.y = ctx.time; }
+          piecePool.sweep();
+          for (const p of pickups) {
+            const m = pickPool.use(p, () => (p.kind === 'shell' ? V.shape('sphere', 0, 0, 0, 14, 8, 14, '#ffb6c9', { rough: 0.4 }) : V.shape('octa', 0, 0, 0, 12, 18, 12, '#7fe7ff', { glow: 0.6, flat: true })));
+            m.position.set(p.x, groundH(p.x, p.y) + 8 + Math.sin(p.t * 3) * 3, p.y);
+            m.rotation.y = p.t * 1.5;
+          }
+          pickPool.sweep();
+          for (const n of npcs) {
+            const rig = V.actor('npc:' + n.id, n.look, { scale: 8.5 });
+            const near = U.dist(n.x, n.y, me.x, me.y) < 160;
+            rig.setPos(n.x, groundH(n.x, n.y), n.y);
+            rig.faceAngle(near ? U.angleTo(n.x, n.y, me.x, me.y) : Math.PI / 2);
+            rig.set({ move: 0 });
+            V.label(n.x, groundH(n.x, n.y) + 60, n.y, { name: (U.dist(n.x, n.y, me.x, me.y) < 56 && !dialog ? '[E] ' : '') + n.name, color: '#ffd66b' });
+          }
+          npcPool.sweep();
+          const place = (id, av, e, name, color) => {
+            const rig = V.actor(id, av, { scale: 8.5 });
+            const gh = groundH(e.x, e.y);
+            const moving = e._px != null && dt > 0 ? Math.hypot(e.x - e._px, e.y - e._py) / dt : 0;
+            e._px = e.x; e._py = e.y;
+            rig.setPos(e.x, gh, e.y);
+            rig.faceAngle(e.a);
+            rig.set({ move: moving / T.speed, mode: gh < 0 ? 'swim' : 'idle' });
+            V.label(e.x, gh + 58, e.y, { name, color, bubble: ctx.bubbleText(id) });
+            return rig;
+          };
+          for (const b of bots) place(b.bot.id, b.bot.avatar, b, b.bot.displayName, '#ffffff');
+          const rig = place('me', ctx.player.avatar, me, ctx.player.name, '#ffb454');
+          if (rig._tool !== shovel) { rig.hold(shovel ? 'shovel' : null, '#ffc940'); rig._tool = shovel; }
+          if (dig) { if (Math.random() < 0.15) rig.play('attack'); V.label(me.x, groundH(me.x, me.y) + 70, me.y, { hp: dig.t / (T.digTime * (shovel ? 0.5 : 1)), hpColor: '#ffd66b' }); }
+          V.sweep();
+        };
+      })();
+
       return {
         update(dt) {
           parts.update(dt);
@@ -399,7 +498,16 @@
           parts.draw(g);
           floats.draw(g);
           g.restore();
-          // HUD
+          drawHud(g);
+        },
+        render3d(dt) { view(dt); },
+        hud(g) { drawHud(g); },
+        onBotJoin(b) { addBot(b); },
+        onBotLeave(b) { const i = bots.findIndex((x) => x.bot.id === b.id); if (i >= 0) bots.splice(i, 1); },
+      };
+
+      function drawHud(g) {
+          const explorer = ctx.hasPass('explorer');
           G.panel(g, 10, 10, 238, 74);
           G.text(g, 'Treasures', 22, 32, { size: 12, color: '#a1abbb' });
           G.text(g, treasures + ' / ' + T.goal, 22, 58, { size: 24, weight: 800, color: treasures >= T.goal ? '#3fd08a' : '#fff' });
@@ -427,10 +535,7 @@
             ISLANDS.forEach((i) => { if (!i.hidden || visitedHermit) G.text(g, i.name, mx + i.cx * TS * sx, my + (i.cy - i.ry - 1) * TS * sy, { size: 12, align: 'center', color: '#fff', stroke: 'rgba(0,0,0,.6)' }); });
             G.text(g, 'Press M to close' + (explorer ? ' · orange = buried treasure (Explorer Pack)' : ''), W / 2, my + mh + 20, { size: 12, align: 'center', color: '#cfd6e2' });
           }
-        },
-        onBotJoin(b) { addBot(b); },
-        onBotLeave(b) { const i = bots.findIndex((x) => x.bot.id === b.id); if (i >= 0) bots.splice(i, 1); },
-      };
+      }
     },
   });
 })((window.BF = window.BF || {}));

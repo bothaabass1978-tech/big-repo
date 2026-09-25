@@ -49,6 +49,7 @@
   }
 
   BF.GameModules.register('towerdefense', {
+    three: true,
     maxBots: 2,
     feedTop: 0.1,
     actions: { next: ['Space'], speed: ['KeyF'], t1: ['Digit1'], t2: ['Digit2'], t3: ['Digit3'], t4: ['Digit4'], cancel: ['KeyX'] },
@@ -57,8 +58,9 @@
       const W = ctx.W, H = ctx.H;
       const custom = !!ctx.config.custom;
       const diff = { easy: 0.75, normal: 1, hard: 1.3 }[ctx.difficulty] || 1;
-      const parts = new BF.Particles(500);
-      const floats = new BF.Floaters();
+      const V = ctx.g3;
+      const parts = V ? V.particles2d(16) : new BF.Particles(500);
+      const floats = V ? V.floaters2d(60) : new BF.Floaters();
       let mapId = custom ? 'custom' : 'greenvale';
       let map, road = new Set(), path = [];
       let phase = 'lobby';
@@ -309,6 +311,186 @@
 
       lobby();
 
+      // ----------------------------------------------------------------- 3D
+
+      const view = V && (() => {
+        let builtMap = null, terrain = null;
+        const towerPool = V.pool(), enemyPool = V.pool(), shotPool = V.pool(), boltPool = V.pool();
+        const hoverTile = V.shape('box', 0, 1, 0, TS - 4, 2, TS - 4, '#ffffff', { basic: true, opacity: 0.3, shadow: false });
+        const rangeRing = V.shape('ring', 0, 2, 0, 1, 1, 1, '#ffffff', { basic: true, opacity: 0.45, shadow: false });
+        rangeRing.rotation.x = -Math.PI / 2;
+        const ENEMY_H = { grunt: 22, runner: 18, knight: 26, brute: 34, boss: 56 };
+
+        function buildTerrain() {
+          const m = map || MAPS.greenvale;
+          builtMap = map;
+          if (terrain) V.remove(terrain);
+          terrain = V.group();
+          const snow = m === MAPS.frostpeak;
+          V.preset(snow ? 'day' : 'sunset', { fogNear: 1300, fogFar: 3600 });
+          V.shadowSize(560);
+          V.ground(-1600, -1200, W + 1600, H + 1200, U.shade(m.grass, -0.2), { parent: terrain, y: -2, map: BF.g3d.gridTex(U.shade(m.grass, -0.2), 'rgba(0,0,0,0)', 1, { repeat: [40, 30], noise: true }) });
+          const tiles = [];
+          const rd = new Set(road);
+          for (let cy = 0; cy < ROWS; cy++) for (let cx = 0; cx < COLS; cx++) {
+            const isRoad = rd.has(cx + ',' + cy);
+            tiles.push({ x: cx * TS + TS / 2, y: isRoad ? -12 : -12, z: TOP + cy * TS + TS / 2, w: TS, h: isRoad ? 8 : 12, d: TS, color: isRoad ? U.shade(m.road, (cx + cy) % 2 ? -0.03 : 0.02) : U.shade(m.grass, (cx + cy) % 2 ? 0.04 : -0.02) });
+          }
+          V.boxes(tiles, { parent: terrain });
+          const r = U.rng('td-deco' + (m.name || ''));
+          const deco = [], trunks = [];
+          for (let i = 0; i < 70; i++) {
+            const side = i % 2;
+            const x = r() * (W + 600) - 300;
+            const z = side ? TOP - 40 - r() * 400 : TOP + ROWS * TS + 40 + r() * 160;
+            if (x < -20 && Math.abs(z - (path[0] ? path[0].y : 0)) < 60) continue;
+            const h = 30 + r() * 40;
+            trunks.push({ x, z, w: 7, h: h * 0.5, d: 7, color: '#6b4226' });
+            deco.push({ x, y: h * 0.35, z, w: h * 0.7, h, d: h * 0.7, color: snow ? U.shade('#2f6b4a', r() * 0.1) : U.shade('#2f8f47', r() * 0.15 - 0.05) });
+          }
+          V.boxes(trunks, { parent: terrain, geo: 'cylLo' });
+          V.boxes(deco, { parent: terrain, geo: 'cone' });
+          if (snow) V.boxes(deco.map((d) => ({ x: d.x, y: d.y + d.h * 0.62, z: d.z, w: d.w * 0.5, h: d.h * 0.4, d: d.d * 0.5, color: '#f4f8ff' })), { parent: terrain, geo: 'cone' });
+          if (path.length) {
+            const a = path[0], e = path[path.length - 1];
+            V.shape('sphere', a.x - 10, 0, a.y, 90, 80, 90, '#4a4a52', { parent: terrain, flat: true });
+            V.shape('disc', a.x + 4, 20, a.y, 44, 44, 1, '#141418', { parent: terrain, basic: true }).rotation.y = Math.PI / 2;
+            const gate = V.group(terrain);
+            gate.position.set(W + 6, 0, e.y);
+            for (const sd of [-1, 1]) { V.box(0, 0, sd * 40, 36, 90, 36, '#8a909c', { parent: gate }); V.box(0, 90, sd * 40, 40, 14, 40, '#6b7383', { parent: gate }); }
+            V.box(0, 60, 0, 30, 20, 50, '#6b7383', { parent: gate });
+            V.box(6, 0, 0, 10, 60, 44, '#3a2a20', { parent: gate });
+            const flag = V.box(0, 104, 40, 2, 30, 2, '#1b1b22', { parent: gate });
+            V.box(0, 118, 50, 1, 14, 20, '#ff7a2e', { parent: gate, glow: 0.3 });
+            flag.castShadow = false;
+            const plat = V.group(terrain);
+            plat.position.set(W + 70, 0, e.y + 110);
+            V.box(0, 0, 0, 110, 30, 90, '#8a909c', { parent: plat });
+            V.box(0, 30, 0, 100, 3, 80, '#6b4a2a', { parent: plat });
+            terrain.userData.plat = plat;
+          }
+        }
+
+        function towerModel(t) {
+          const d = TOWERS[t.type];
+          const g = V.group();
+          g.userData.lv = -1;
+          g.userData.build = () => {
+            while (g.children.length) g.remove(g.children[0]);
+            const base = t.owner ? '#6d7c96' : '#a4abb8';
+            V.box(0, 0, 0, 40, 10, 40, '#6b6f7a', { parent: g });
+            V.box(0, 10, 0, 34, 24 + t.level * 12, 34, base, { parent: g });
+            const top = 34 + t.level * 12;
+            for (let l = 0; l <= t.level; l++) V.box(-10 + l * 10, top, 17.5, 5, 5, 2, '#ffd66b', { parent: g, glow: 0.6, shadow: false });
+            const head = V.group(g);
+            head.position.y = top;
+            g.userData.head = head;
+            if (t.type === 'archer') {
+              V.box(0, 0, 0, 30, 6, 30, '#8b5a2b', { parent: head });
+              V.shape('cone4', 0, 22, 0, 36, 18, 36, d.color, { parent: head }).rotation.y = Math.PI / 4;
+              V.box(10, 8, 0, 18, 4, 4, '#4b3a2a', { parent: head });
+            } else if (t.type === 'cannon') {
+              V.shape('sphere', 0, 8, 0, 26, 18, 26, '#3a3f4b', { parent: head });
+              const b = V.shape('cyl', 14, 10, 0, 10, 26, 10, '#2a2f3a', { parent: head, metal: 0.5 });
+              b.rotation.z = Math.PI / 2;
+              V.shape('torus', 26, 10, 0, 14, 14, 14, d.color, { parent: head }).rotation.y = Math.PI / 2;
+            } else if (t.type === 'frost') {
+              const c = V.shape('octa', 0, 22, 0, 20, 34, 20, d.color, { parent: head, glow: 0.9, opacity: 0.9, flat: true });
+              g.userData.spin = c;
+            } else {
+              for (let k = 0; k < 3; k++) V.shape('torus', 0, 6 + k * 8, 0, 24 - k * 4, 24 - k * 4, 24 - k * 4, '#b88a2e', { parent: head, metal: 0.6 }).rotation.x = Math.PI / 2;
+              g.userData.spin = V.shape('sphere', 0, 32, 0, 14, 14, 14, d.color, { parent: head, glow: 1.3 });
+            }
+            g.userData.lv = t.level;
+          };
+          return g;
+        }
+
+        function enemyModel(e) {
+          const d = ENEMIES[e.type];
+          const g = V.group();
+          const h = ENEMY_H[e.type];
+          const body = V.box(0, 0, 0, h * 0.9, h, h * 0.8, d.color, { parent: g });
+          g.userData.body = body;
+          for (const sd of [-1, 1]) {
+            V.box(h * 0.2 * sd, h * 0.58, h * 0.4, h * 0.22, h * 0.24, 2, '#ffffff', { parent: g, shadow: false });
+            V.box(h * 0.2 * sd, h * 0.58, h * 0.41 + 1, h * 0.1, h * 0.12, 1, '#1b1b22', { parent: g, shadow: false });
+            V.box(h * 0.28 * sd, 0, 0, h * 0.24, h * 0.3, h * 0.3, U.shade(d.color, -0.3), { parent: g });
+          }
+          if (d.armor) { V.box(0, h, 0, h * 0.95, h * 0.28, h * 0.85, '#cfd6df', { parent: g, metal: 0.6, rough: 0.35 }); V.box(0, h * 0.4, h * 0.41, h * 0.7, h * 0.4, 2, '#9aa5b5', { parent: g, metal: 0.6 }); }
+          if (d.boss) for (let k = 0; k < 5; k++) V.shape('cone4', -h * 0.36 + k * h * 0.18, h + 8, 0, 10, 16, 10, '#ffd66b', { parent: g, glow: 0.5 });
+          return g;
+        }
+
+        return function sync(dt) {
+          if (builtMap !== map || !terrain) buildTerrain();
+          V.look(W / 2 + 40, 0, TOP + ROWS * TS / 2 + 40, { dist: 980, pitch: 1.02, fov: 42 }, dt);
+          // hover and range preview
+          const showHover = hover && phase !== 'lobby' && phase !== 'over' && hover.cx >= 0 && hover.cx < COLS && hover.cy >= 0 && hover.cy < ROWS;
+          hoverTile.visible = !!showHover;
+          if (showHover) {
+            const ok = buildable(hover.cx, hover.cy);
+            hoverTile.position.set(hover.cx * TS + TS / 2, 1, TOP + hover.cy * TS + TS / 2);
+            hoverTile.material = V.mat(ok ? '#ffffff' : '#ff5a6a', { basic: true, opacity: 0.3 });
+          }
+          const ringT = selectedTower || (showHover && buildable(hover.cx, hover.cy) ? { x: hover.cx * TS + TS / 2, y: TOP + hover.cy * TS + TS / 2, r: TOWERS[selectedType].levels[0].range } : null);
+          rangeRing.visible = !!ringT;
+          if (ringT) { const rr = ringT.r || stat(ringT).range; rangeRing.position.set(ringT.x, 2, ringT.y); rangeRing.scale.set(rr * 2, rr * 2, 1); }
+          for (const t of towers) {
+            const m = towerPool.use(t, () => towerModel(t));
+            if (m.userData.lv !== t.level) m.userData.build();
+            m.position.set(t.x, 0, t.y);
+            if (m.userData.head && t.type !== 'frost') m.userData.head.rotation.y = -t.aim;
+            if (m.userData.spin) m.userData.spin.rotation.y += dt * 2;
+            if (t.owner) V.label(t.x, 80 + t.level * 12, t.y, { name: t.owner.displayName.slice(0, 12), color: '#dff4ff' });
+          }
+          towerPool.sweep();
+          for (const e of enemies) {
+            const m = enemyPool.use(e, () => enemyModel(e));
+            const h = ENEMY_H[e.type];
+            const nx = path[Math.min(path.length - 1, e.seg + 1)];
+            m.position.set(e.x, Math.abs(Math.sin(e.t * 8)) * 4, e.y);
+            if (nx) m.rotation.y = -Math.atan2(nx.y - e.y, nx.x - e.x) + Math.PI / 2;
+            m.userData.body.material = V.mat(e.slowT > 0 ? U.mix(ENEMIES[e.type].color, '#9fdcff', 0.55) : ENEMIES[e.type].color);
+            V.label(e.x, h + 18, e.y, { hp: e.hp / e.max, hpColor: e.boss ? '#ffd66b' : '#3fd08a' });
+          }
+          enemyPool.sweep();
+          for (const sh of shots) {
+            const m = shotPool.use(sh, () => (sh.kind === 'arrow' ? V.box(0, 0, 0, 16, 2, 2, '#f4ecd0', { shadow: false }) : V.shape('sphere', 0, 0, 0, 12, 12, 12, '#2a2f3a', {})));
+            if (sh.kind === 'arrow') { m.position.set(sh.x, 30, sh.y); m.rotation.y = -(sh.a || 0); }
+            else { const k = Math.min(1, sh.t / sh.dur); m.position.set(U.lerp(sh.sx, sh.tx, k), 34 + Math.sin(k * Math.PI) * 80, U.lerp(sh.sy, sh.ty, k)); }
+          }
+          shotPool.sweep();
+          for (const b of bolts) {
+            const grp = boltPool.use(b, () => { const g = V.group(); for (let i = 1; i < b.pts.length; i++) V.box(0, 0, 0, 1, 3, 3, b.color, { parent: g, basic: true, shadow: false }); return g; });
+            grp.children.forEach((seg, i) => {
+              const p1 = b.pts[i], p2 = b.pts[i + 1];
+              const x1 = p1[0], z1 = p1[1], x2 = p2[0] + (Math.random() - 0.5) * 8, z2 = p2[1] + (Math.random() - 0.5) * 8;
+              const len = Math.hypot(x2 - x1, z2 - z1);
+              seg.scale.set(len, 3, 3);
+              seg.position.set((x1 + x2) / 2, 28, (z1 + z2) / 2);
+              seg.rotation.y = -Math.atan2(z2 - z1, x2 - x1);
+            });
+          }
+          boltPool.sweep();
+          const plat = terrain && terrain.userData.plat;
+          if (plat) {
+            const crew = [{ id: 'me', av: ctx.player.avatar, name: ctx.player.name }].concat(Array.from(allies.values()).map((a) => ({ id: a.bot.id, av: a.bot.avatar, name: a.bot.displayName })));
+            crew.forEach((c, i) => {
+              const rig = V.actor(c.id, c.av, { scale: 8 });
+              const x = plat.position.x - 30 + (i % 3) * 30, z = plat.position.z - 18 + Math.floor(i / 3) * 36 + (i % 2) * 6;
+              rig.setPos(x, 33, z);
+              rig.faceAngle(Math.PI * 0.75);
+              if (phase === 'wave' && Math.random() < 0.004) rig.emote('cheer', 1.5);
+              // Only the player and whoever is talking get a tag, so the crowded platform stays readable.
+              const bubble = ctx.bubbleText(c.id);
+              if (c.id === 'me' || bubble) V.label(x, 86, z, { name: c.name, color: c.id === 'me' ? '#ffb454' : '#ffffff', bubble });
+            });
+          }
+          V.sweep();
+        };
+      })();
+
       return {
         update(rawDt) {
           const dt = rawDt * speedMul;
@@ -317,8 +499,9 @@
           if (phase === 'lobby' || phase === 'over') return;
           const inp = ctx.input;
           const p = inp.pointer;
-          hover = p.y > TOP ? { cx: Math.floor(p.x / TS), cy: Math.floor((p.y - TOP) / TS) } : null;
-          if (p.pressed && !ctx.ui.has('lobby')) clickTile(p.x, p.y);
+          const w = V ? (p.y > TOP ? ctx.pointerWorld(0) : { x: -1, y: -1 }) : p;
+          hover = w.y > TOP ? { cx: Math.floor(w.x / TS), cy: Math.floor((w.y - TOP) / TS) } : null;
+          if (p.pressed && !ctx.ui.has('lobby') && (!V || p.y > TOP)) clickTile(w.x, w.y);
           ['t1', 't2', 't3', 't4'].forEach((k, i) => { if (inp.actPressed(k)) { selectedType = Object.keys(TOWERS)[i]; buildBar(); } });
           if (inp.actPressed('next')) callWave();
           if (inp.actPressed('speed')) { speedMul = speedMul === 1 ? 2 : 1; buildBar(); }
@@ -431,21 +614,26 @@
           }
           parts.draw(g);
           floats.draw(g);
-          // HUD bar
+          drawHud(g);
+        },
+        render3d(dt) { view(dt); },
+        hud(g) { drawHud(g); },
+        onBotJoin(b) { if (!allies.has(b.id) && allies.size < 2) allies.set(b.id, { bot: b, gold: 60, t: 8 }); },
+        onBotLeave(b) { allies.delete(b.id); towers.forEach((t) => { if (t.owner && t.owner.id === b.id) t.owner = null; }); },
+        destroy() { offPass(); },
+      };
+
+      function drawHud(g) {
           g.fillStyle = 'rgba(8,10,16,.85)';
           g.fillRect(0, 0, W, TOP);
-          g.fillRect(0, TOP + ROWS * TS, W, H - TOP - ROWS * TS);
+          if (!V) g.fillRect(0, TOP + ROWS * TS, W, H - TOP - ROWS * TS);
           G.text(g, 'Wave ' + wave + ' / ' + T.waves, 16, 31, { size: 19, weight: 800 });
           G.text(g, '♥ ' + lives, 200, 31, { size: 19, weight: 800, color: lives <= 5 ? '#ff8b98' : '#ff5a6a' });
           G.text(g, '◈ ' + Math.floor(gold) + ' gold', 290, 31, { size: 19, weight: 800, color: '#ffd66b' });
           if (phase === 'build') G.text(g, 'Next wave in ' + Math.ceil(betweenT) + 's · Space to call early (+' + T.earlyBonus + 'g)', W - 16, 31, { size: 14, align: 'right', color: '#cfd6e2' });
           if (phase === 'wave') G.text(g, enemies.length + spawnQ.length + ' enemies left', W - 16, 31, { size: 14, align: 'right', color: '#cfd6e2' });
-          if (phase === 'lobby') { g.fillStyle = 'rgba(6,8,12,.5)'; g.fillRect(0, 0, W, H); }
-        },
-        onBotJoin(b) { if (!allies.has(b.id) && allies.size < 2) allies.set(b.id, { bot: b, gold: 60, t: 8 }); },
-        onBotLeave(b) { allies.delete(b.id); towers.forEach((t) => { if (t.owner && t.owner.id === b.id) t.owner = null; }); },
-        destroy() { offPass(); },
-      };
+          if (phase === 'lobby') { g.fillStyle = V ? 'rgba(6,8,12,.3)' : 'rgba(6,8,12,.5)'; g.fillRect(0, 0, W, H); }
+      }
     },
   });
 })((window.BF = window.BF || {}));

@@ -432,6 +432,43 @@
       return mesh;
     },
 
+    /**
+     * A flat ribbon following a path of game points [{x, y}] (Z = y).
+     * o: {width, offset (lateral shift), y, closed, map, texLen (world units per texture repeat), color, glow, basic, opacity}
+     */
+    strip(pts, o) {
+      o = o || {};
+      const n = pts.length;
+      const closed = o.closed !== false;
+      const w = (o.width || 100) / 2, off = o.offset || 0, y = o.y || 0.5;
+      const pos = [], uv = [], idx = [];
+      let dist = 0;
+      const cnt = closed ? n + 1 : n;
+      for (let k = 0; k < cnt; k++) {
+        const i = k % n;
+        const p = pts[i];
+        const a = pts[(i - 1 + n) % n], b = pts[(i + 1) % n];
+        const ta = !closed && i === 0 ? Math.atan2(b.y - p.y, b.x - p.x) : !closed && i === n - 1 ? Math.atan2(p.y - a.y, p.x - a.x) : Math.atan2(b.y - a.y, b.x - a.x);
+        const nx = -Math.sin(ta), ny = Math.cos(ta);
+        if (k > 0) { const q = pts[(k - 1) % n]; dist += Math.hypot(p.x - q.x, p.y - q.y); }
+        const cx = p.x + nx * off, cy = p.y + ny * off;
+        pos.push(cx - nx * w, y, cy - ny * w, cx + nx * w, y, cy + ny * w);
+        const v = dist / (o.texLen || 200);
+        uv.push(0, v, 1, v);
+        if (k > 0) { const b0 = (k - 1) * 2; idx.push(b0, b0 + 2, b0 + 1, b0 + 1, b0 + 2, b0 + 3); }
+      }
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+      g.setIndex(idx);
+      g.computeVertexNormals();
+      this.owned.push(g);
+      const mesh = new THREE.Mesh(g, o.material || mat(o.color || '#ffffff', { map: o.map, glow: o.glow, basic: o.basic, opacity: o.opacity, side: 2 }));
+      mesh.receiveShadow = true;
+      (o.parent || this.scene).add(mesh);
+      return mesh;
+    },
+
     /** Text sprite that always faces the camera (world-size h). */
     sign(text, x, y, z, o) {
       o = o || {};

@@ -74,6 +74,7 @@
   }
 
   BF.GameModules.register('racing', {
+    three: true,
     maxBots: 5,
     actions: { gas: ['KeyW', 'ArrowUp'], brake: ['KeyS', 'ArrowDown', 'Space'], left: ['KeyA', 'ArrowLeft'], right: ['KeyD', 'ArrowRight'], nitro: ['ShiftLeft', 'ShiftRight'] },
     controls: { joystick: true, buttons: [{ act: 'gas', label: 'Gas', icon: 'chevronUp' }, { act: 'brake', label: 'Brake', icon: 'chevronDown' }, { act: 'nitro', label: 'Nitro', icon: 'rocket' }] },
@@ -82,7 +83,8 @@
       const custom = !!ctx.config.custom;
       const diff = { easy: 0.9, normal: 1, hard: 1.07 }[ctx.difficulty] || 1;
       const glow = ctx.hasItem('tool_underglow');
-      const parts = new BF.Particles(600);
+      const V = ctx.g3;
+      const parts = V ? V.particles2d(6) : new BF.Particles(600);
       const cam = new BF.Camera(W, H);
       let phase = 'lobby';
       let trackId = custom ? 'custom' : ctx.data.lastTrack || 'downtown';
@@ -462,7 +464,155 @@
         if (phase === 'countdown') G.display(g, countdown > 0.05 ? String(Math.ceil(countdown)) : 'GO!', W / 2, H / 2 - 40, 80, '#ffd66b');
       }
 
+      // ----------------------------------------------------------------- 3D
+
+      const view = V && (() => {
+        let built = null, trackGroup = null, arches = [], padMeshes = [];
+        const carPool = V.pool();
+        let camYaw = 0;
+        const THEME = { downtown: ['sunset', '#8a95a8'], harbor: ['day', '#6b8aa8'], highway: ['dusk', '#6a5a9a'], custom: ['day', '#8a95a8'] };
+        const asphalt = BF.g3d.canvasTex('road:asphalt', 128, 256, (g, w, h) => {
+          g.fillStyle = '#3b404c'; g.fillRect(0, 0, w, h);
+          const r = U.rng('asph');
+          for (let i = 0; i < 700; i++) { g.fillStyle = 'rgba(255,255,255,' + (0.02 + r() * 0.05) + ')'; g.fillRect(r() * w, r() * h, 2, 2); }
+          g.fillStyle = 'rgba(255,255,255,.75)'; g.fillRect(w / 2 - 3, 0, 6, h / 2);
+          g.fillStyle = 'rgba(255,255,255,.18)'; g.fillRect(4, 0, 3, h); g.fillRect(w - 7, 0, 3, h);
+        }, { repeat: [1, 1] });
+        asphalt.wrapT = THREE.RepeatWrapping;
+        const curb = BF.g3d.canvasTex('road:curb', 16, 64, (g, w, h) => { g.fillStyle = '#d6384a'; g.fillRect(0, 0, w, h / 2); g.fillStyle = '#f2f2f2'; g.fillRect(0, h / 2, w, h / 2); });
+        curb.wrapT = THREE.RepeatWrapping;
+        const chevron = BF.g3d.canvasTex('road:pad', 128, 128, (g, w, h) => {
+          g.fillStyle = 'rgba(57,243,255,.35)'; BF.gfx.rr(g, 4, 4, w - 8, h - 8, 16); g.fill();
+          g.strokeStyle = '#b8fbff'; g.lineWidth = 12; g.lineCap = 'round';
+          for (let k = 0; k < 2; k++) { g.beginPath(); g.moveTo(34 + k * 34, 30); g.lineTo(58 + k * 34, 64); g.lineTo(34 + k * 34, 98); g.stroke(); }
+        });
+
+        function buildTrack() {
+          built = track;
+          if (trackGroup) V.remove(trackGroup);
+          trackGroup = V.group();
+          const th = THEME[trackId] || THEME.custom;
+          V.preset(th[0], { fogNear: 1100, fogFar: 3400 });
+          V.shadowSize(520);
+          const ground = V.ground(-2400, -2200, 5400, 4200, track.ground, { parent: trackGroup, map: BF.g3d.gridTex(track.ground, 'rgba(255,255,255,0.04)', 1, { repeat: [120, 80], noise: true }) });
+          ground.position.y = -0.5;
+          if (trackId === 'harbor') V.ground(-2400, 1750, 5400, 4200, '#1d6e9c', { parent: trackGroup, rough: 0.2, metal: 0.1 });
+          const pts = path.pts;
+          V.strip(pts, { width: T.width + 40, y: 0.2, color: '#20242c', parent: trackGroup });
+          V.strip(pts, { width: T.width, y: 0.6, map: asphalt, texLen: 140, parent: trackGroup });
+          for (const sd of [-1, 1]) V.strip(pts, { width: 14, offset: sd * (T.width / 2 + 7), y: 0.8, map: curb, texLen: 44, parent: trackGroup });
+          // start line
+          const s0 = pts[0];
+          const startTex = BF.g3d.canvasTex('road:start', 64, 256, (g, w, h) => { for (let i = 0; i < 16; i++) for (let j = 0; j < 4; j++) { g.fillStyle = (i + j) % 2 ? '#ffffff' : '#111111'; g.fillRect(j * 16, i * 16, 16, 16); } });
+          const sl = V.ground(-14, -T.width / 2, 14, T.width / 2, '#ffffff', { parent: trackGroup, map: startTex, y: 1 });
+          sl.position.set(s0.x, 1, s0.y);
+          sl.rotation.z = -s0.a;
+          // start gantry
+          const gantry = V.group(trackGroup);
+          gantry.position.set(s0.x, 0, s0.y);
+          gantry.rotation.y = -s0.a;
+          for (const sd of [-1, 1]) V.box(0, 0, sd * (T.width / 2 + 24), 12, 120, 12, '#2a2f3a', { parent: gantry });
+          V.box(0, 110, 0, 14, 18, T.width + 60, '#ff7a2e', { parent: gantry, glow: 0.5 });
+          // checkpoint arches
+          arches = cps.slice(1).map((d) => {
+            const p = nearestByDist(d);
+            const a = V.group(trackGroup);
+            a.position.set(p.x, 0, p.y);
+            a.rotation.y = -p.a;
+            for (const sd of [-1, 1]) V.box(0, 0, sd * (T.width / 2 + 16), 8, 70, 8, '#39414f', { parent: a });
+            a.userData.bar = V.box(0, 66, 0, 6, 8, T.width + 40, '#46a8ff', { parent: a, glow: 0.3, shadow: false });
+            return a;
+          });
+          padMeshes = pads.map((p) => {
+            const m = V.ground(-26, -20, 26, 20, '#ffffff', { parent: trackGroup, map: chevron, basic: true, opacity: 0.95, y: 1.2 });
+            m.position.set(p.x, 1.2, p.y);
+            m.rotation.z = -p.a;
+            return m;
+          });
+          // scenery
+          const city = trackId !== 'harbor';
+          const blocks = decor.filter((d) => d.kind === 'block');
+          const trees = decor.filter((d) => d.kind === 'tree');
+          V.boxes(blocks.map((d) => { const h = city ? 40 + (U.hash(d.x + ':' + d.y) % 100) * (trackId === 'highway' ? 3.2 : 2.1) : 30 + d.s; return { x: d.x + d.s / 2, z: d.y + d.s / 2, w: d.s * 1.6, h, d: d.s * 1.6, color: d.c }; }), { parent: trackGroup });
+          V.boxes(blocks.map((d) => ({ x: d.x + d.s / 2, y: 2, z: d.y + d.s / 2, w: d.s * 1.62, h: 6, d: d.s * 1.62, color: th[1] })), { parent: trackGroup, shadow: false });
+          V.boxes(trees.map((d) => ({ x: d.x, z: d.y, w: 8, h: d.s * 0.7, d: 8, color: '#6b4226' })), { parent: trackGroup, geo: 'cylLo' });
+          V.boxes(trees.map((d) => ({ x: d.x, y: d.s * 0.55, z: d.y, w: d.s * 0.9, h: d.s * 1.1, d: d.s * 0.9, color: U.shade('#2f8f47', (U.hash(d.x + 't') % 20) / 100) })), { parent: trackGroup, geo: 'cone' });
+        }
+
+        function carModel(c) {
+          const grp = V.group();
+          const body = V.group(grp);
+          grp.userData.body = body;
+          const col = c.color;
+          const prem = c.spec.premium;
+          V.box(0, 5, 0, 42, 10, 23, col, { parent: body, metal: 0.3, rough: 0.35 });
+          V.box(-2, 15, 0, 20, 8, 19, '#a8e6ff', { parent: body, opacity: 0.55, rough: 0.1, shadow: false });
+          V.box(-14, 12, 0, 8, 6, 22, U.shade(col, -0.2), { parent: body });
+          for (const sd of [-1, 1]) V.box(21, 8, sd * 7, 2, 3, 5, '#fff4b0', { parent: body, glow: 1, shadow: false });
+          for (const sd of [-1, 1]) V.box(-21, 8, sd * 7, 2, 3, 5, '#ff3b3b', { parent: body, glow: 0.8, shadow: false });
+          if (prem) { V.box(-19, 17, 0, 4, 2, 22, '#1b1b22', { parent: body }); for (const sd of [-1, 1]) V.box(-18, 12, sd * 8, 2, 6, 2, '#1b1b22', { parent: body }); }
+          grp.userData.wheels = [];
+          for (const [x, z] of [[13, 12], [13, -12], [-13, 12], [-13, -12]]) {
+            const w = V.shape('cyl', x, 5, z, 10, 5, 10, '#15151c', { parent: grp });
+            w.rotation.x = Math.PI / 2;
+            grp.userData.wheels.push(w);
+          }
+          if (c.isPlayer && glow) { const d = V.shape('disc', 0, 0.8, 0, 70, 40, 1, '#39f3ff', { parent: grp, basic: true, opacity: 0.5, shadow: false }); d.rotation.x = -Math.PI / 2; }
+          const flame = V.shape('cone', -26, 7, 0, 8, 16, 8, '#39f3ff', { parent: body, glow: 1.4, shadow: false });
+          flame.rotation.z = Math.PI / 2;
+          grp.userData.flame = flame;
+          // the driver, seated
+          const av = c.isPlayer ? ctx.player.avatar : c.bot && c.bot.avatar;
+          if (av) {
+            const rig = BF.char3d.build(av);
+            rig.group.scale.setScalar(3.4);
+            rig.group.position.set(-3, 5, 0);
+            rig.group.rotation.y = Math.PI / 2;
+            rig.set({ mode: 'sit' });
+            rig.tick(0.016);
+            body.add(rig.group);
+            grp.userData.rig = rig;
+          }
+          return grp;
+        }
+
+        return function sync(dt) {
+          if (!path) return;
+          if (built !== track) buildTrack();
+          const me = cars[0];
+          if (!me || phase === 'lobby') {
+            const s0 = path.pts[0];
+            V.look(s0.x, 0, s0.y, { dist: 520, pitch: 0.5, yaw: ctx.time * 0.15, fov: 50 }, dt);
+          } else {
+            const want = Math.atan2(-Math.cos(me.a), -Math.sin(me.a));
+            camYaw += U.wrapAngle(want - camYaw) * Math.min(1, dt * 3.2);
+            const spd = Math.min(1, Math.abs(me.speed) / 500);
+            V.look(me.x + Math.cos(me.a) * 70, 0, me.y + Math.sin(me.a) * 70, { dist: 250 + spd * 60, pitch: 0.36, yaw: camYaw, fov: 56 + spd * 10, lerp: 0.25 }, dt);
+          }
+          arches.forEach((a, i) => { a.userData.bar.material = V.mat(me && me.cpNext === i + 1 && phase !== 'lobby' ? '#ffd66b' : '#46a8ff', { glow: me && me.cpNext === i + 1 ? 1.2 : 0.3 }); });
+          padMeshes.forEach((m, i) => { m.material.opacity = 0.75 + Math.sin(ctx.time * 6 + i) * 0.2; });
+          for (const c of cars) {
+            const grp = carPool.use(c.id, () => carModel(c));
+            grp.position.set(c.x, 0, c.y);
+            grp.rotation.y = -c.a;
+            const body = grp.userData.body;
+            body.rotation.x = U.clamp(-c.steer * Math.min(1, Math.abs(c.speed) / 300) * 0.08, -0.1, 0.1);
+            for (const w of grp.userData.wheels) w.rotation.y -= c.speed * dt * 0.08;
+            grp.userData.flame.visible = c.boostT > 0 || !!(c.isPlayer && c.nitroOn);
+            grp.userData.flame.scale.y = 12 + Math.random() * 10;
+            if (grp.userData.rig) grp.userData.rig.tick(dt);
+            V.label(c.x, 46, c.y, { name: c.name, color: c.isPlayer ? '#ffb454' : '#ffffff', bubble: ctx.bubbleText(c.id) });
+          }
+          carPool.sweep();
+        };
+      })();
+
       return {
+        render3d(dt) { view(dt); },
+        hud(g) {
+          if (phase !== 'lobby' && phase !== 'over' && cars.length) drawHud(g);
+          if (phase === 'lobby') { g.fillStyle = 'rgba(6,8,12,.3)'; g.fillRect(0, 0, W, H); }
+        },
         update(dt) {
           parts.update(dt);
           if (phase === 'lobby' || phase === 'over') { if (path) cam.follow(path.pts[0].x, path.pts[0].y, dt, 0.05); return; }
