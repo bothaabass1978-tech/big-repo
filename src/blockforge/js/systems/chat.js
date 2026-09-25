@@ -259,6 +259,7 @@
   // ------------------------------------------------------------ memory
 
   const SERIOUS = ['personal', 'ask_personal', 'scam', 'rude', 'feel_bad'];
+  const SAFETY_FIXED = ['personal', 'ask_personal', 'scam', 'rude'];
   const MAX_MEMS = 80;
   function blankMem() {
     return { nick: null, likes: [], dislikes: [], pending: null, rude: 0, muteUntil: 0, talks: 0, first: 0, last: 0, used: [] };
@@ -1278,7 +1279,8 @@
       const d = think(bot, text, ctx);
       if (!d) return null;
       let out = d.text;
-      if (BF.ai && BF.ai.available() && d.intent !== 'muted') {
+      // safety replies (personal info, scams, rudeness) always keep their fixed local wording
+      if (BF.ai && BF.ai.available() && d.intent !== 'muted' && !SAFETY_FIXED.includes(d.intent)) {
         try {
           const worded = await BF.ai.word(bot, text, d, ctx || {});
           if (worded) out = worded;

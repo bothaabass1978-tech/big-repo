@@ -1,9 +1,10 @@
 # BlockForge
 
 A fictional platform for user-made games that runs entirely in your browser.
-It has 20 playable games, an avatar shop, friends and messages full of
-fictional bots, a creator studio and a ForgeCoin economy. There is nothing to
-install and no server or sign-up.
+It has 20 playable 3D games, 3D blocky avatars, an avatar shop, friends and
+messages full of fictional bots who answer whatever you say, a creator studio
+with a level editor, ad campaigns and creator earnings, and a ForgeCoin
+economy. There is nothing to install and no server or sign-up.
 
 > **Fictional and local only.** ForgeCoins are not real money and cannot be
 > bought or cashed out. All players you meet are generated bots. Nothing leaves
@@ -36,10 +37,12 @@ online and fall back to system fonts when you are not.
 | **Inventory / Avatar** | Wear, favourite and sell items (40% back), a 14-slot avatar editor with skin tones, randomize and reset |
 | **Wallet** | Live balance in the header (click it to open the Wallet) and a full ledger with categories and filters |
 | **Progress** | Daily rewards 50 → 75 → 100 → 150 → 200 → 300 → 500 over a 7-day streak; 32 quests (5 daily and 4 weekly slots); 35 achievements; 6 platform badges; levels with ForgeCoin level-up rewards |
-| **Social** | 640 fictional bots (22 handcrafted) with six personalities: competitive, friendly, explorer, collector, chaotic and beginner. Friends, requests, follows, blocking, messages with typing and replies, game invites, and servers that bots join and leave |
-| **Create** | Build games from 5 templates (Arena, Racing, Obby, Simulator, Tower Defense) with a seed and difficulty. Publish, unpublish or delete them, add passes, and watch simulated visits and earnings |
+| **3D** | Every game and every avatar renders in 3D (three.js, vendored). The avatar editor and profiles have a live, drag-to-spin viewer. Settings → Gameplay → Graphics: Auto, High, Low or Classic 2D |
+| **Social** | 2,000 fictional bots (60 handcrafted) with ten personalities: competitive, friendly, explorer, collector, chaotic, beginner, builder, speedrunner, roleplayer and helper. Friends, requests, follows, blocking, messages, game invites, and fuller servers that bots join and leave |
+| **Bot chat** | Bots understand and answer whatever you type, in DMs and in game chat: questions, maths, jokes and riddles, game facts with live player counts, opinions, invites ("wanna play Sky Obby?" and they meet you there) and friend requests. They remember your name and what you like, and they keep chat safe (no personal info, "free coins" scams called out). In the claude.ai viewer, bots can word their replies with Claude (Settings → Bot replies) |
+| **Create** | Build games from 5 templates (Arena, Racing, Obby, Simulator, Tower Defense). Hand-build Obby, Tower Defense and Arena levels in the **Studio** tile editor, add passes, publish, run **ad campaigns** (Standard / Boosted / Premium, Home, Discover and Search placements, prepaid budget with refunds), and follow earnings from visits and pass sales on per-minute charts with **Collect all** |
 | **Search** | Games, items and players, with autocomplete (press `/`) |
-| **Settings** | Account, privacy, notifications, appearance (theme, accent, density, reduced motion, font size), gameplay (volume, touch controls, FPS counter, bot chat), and data (autosave, save now, export or import JSON, reset). Developer tools are hidden: tap the build number 5 times |
+| **Settings** | Account, privacy, notifications, appearance (theme, accent, density, reduced motion, font size), gameplay (volume, touch controls, FPS counter, graphics, bot chat, bot replies), and data (autosave, save now, export or import JSON, reset). Developer tools are hidden: tap the build number 5 times |
 
 ## The 20 games
 
@@ -73,6 +76,11 @@ Every game has bots, rewards, win and lose conditions, and a results screen
 with Play again and Leave. Game passes change gameplay, for example Double
 Jump, Void Element, Tesla Tower or Auto Collect.
 
+All games run in 3D on WebGL: arenas with glowing cover, a neon race track
+through city blocks, floating islands, a farmhouse at night, a voxel dig
+site, a football stadium with a crowd and more. On older devices pick
+**Low** graphics; **Classic 2D** brings back the original flat renderer.
+
 **Keyboard shortcuts:**
 
 - `/` search · `?` all shortcuts · `g` then a letter to jump
@@ -96,29 +104,33 @@ Jump, Void Element, Tesla Tower or Auto Collect.
 # unit tests: platform systems and all game modules, run headlessly in Node (no browser needed)
 node --test 'tests/blockforge/unit/*_test.js'
 
-# end-to-end smoke test in Chromium: all routes, shop, all 20 games, creator
-# templates, save round-trip, autosave-off reload and a phone viewport
+# end-to-end smoke test in Chromium: all routes, shop, all 20 games in 3D and
+# Classic 2D, bot chat, creator templates, Studio, ads and earnings, save
+# round-trip, autosave-off reload and a phone viewport
 npm i -D playwright   # once, if Playwright is not installed globally
 node tests/blockforge/e2e/platform_smoke_e2e_test.js --shots /tmp/blockforge-shots
 ```
 
-Current status: 53 unit tests and 67 end-to-end checks, all passing.
+Current status: 81 unit tests and 76 end-to-end checks, all passing.
 
 ## Code layout
 
 ```
 src/blockforge/
 ├── index.html          script order = dependency order
+├── vendor/             three.min.js (r159, MIT) + its licence
 ├── css/                base · components · pages · game
 └── js/
     ├── core/           util, event bus + clock, storage adapter, synthesized sfx, icons, store + accounts
     ├── data/           items, games (passes, badges, products), quests/achievements, bots, thumbnails
     ├── systems/        economy, meta (quests, badges, achievements, notifications), inventory,
-    │                   avatar, social, world (servers, catalog, leaderboards, search), creator, secrets
+    │                   avatar, social, world (servers, catalog, leaderboards, search), creator,
+    │                   studio (level layouts), ads (campaigns), secrets, chat (bot conversation), ai (Claude wording)
     ├── ui/             components, router, shell, actions, terminal
-    ├── pages/          one file per area (home, discover, game, items, social, create, profile, settings, progress)
-    ├── engine/         input, gfx (particles, camera), phys, runtime (game sessions)
-    ├── games/          the 20 game modules
+    ├── pages/          one file per area (home, discover, game, items, social, create, studio, profile, settings, progress)
+    ├── engine/         input, gfx (particles, camera), g3d (3D world kit), avatar3d (rigs + thumbnails),
+    │                   props3d (merged pets, cars, zombies, ships), phys, runtime (game sessions)
+    ├── games/          the 20 game modules (2D simulation + 3D view)
     └── main.js         boot
 ```
 
@@ -128,10 +140,16 @@ Design decisions are recorded in `docs/architecture/`:
 - [ADR-0002 Local persistence and save format](../../docs/architecture/adr-0002-blockforge-local-persistence-and-save-format.md)
 - [ADR-0003 Game runtime and module contract](../../docs/architecture/adr-0003-blockforge-game-runtime-and-module-contract.md)
 - [ADR-0004 Fictional economy and hidden features](../../docs/architecture/adr-0004-blockforge-fictional-economy-and-forgecore-secret.md) (contains spoilers)
+- [ADR-0005 3D rendering for games and avatars](../../docs/architecture/adr-0005-blockforge-3d-rendering.md)
+- [ADR-0006 Bot conversation engine and optional Claude wording](../../docs/architecture/adr-0006-blockforge-bot-conversation-engine.md)
+- [ADR-0007 Creator Studio, advertising and earnings](../../docs/architecture/adr-0007-blockforge-creator-studio-and-ads.md)
 
 To **add a game**, register a module with `BF.GameModules.register(type, {...})`
-in a new `js/games/*.js` file (see ADR-0003). Then add its entry to
-`js/data/games.js` and a `<script>` tag to `index.html`.
+in a new `js/games/*.js` file (see ADR-0003). Add `three: true` with a
+`render3d(dt)` view and a `hud(g)` to render it in 3D (ADR-0005). Then add its
+entry to `js/data/games.js` and a `<script>` tag to `index.html`.
+
+Third-party code: three.js r159 (MIT licence, `vendor/LICENSE-three.txt`).
 
 Developer notes on hidden content live in `docs/blockforge/`. **They contain
 spoilers.**

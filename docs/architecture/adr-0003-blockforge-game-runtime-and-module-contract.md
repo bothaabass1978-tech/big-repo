@@ -2,7 +2,8 @@
 
 ## Status
 
-Accepted
+Accepted. Amended 2026-09-25 by ADR-0005 (3D rendering path) and ADR-0007
+(Studio layouts in `ctx.config.layout`).
 
 ## Date
 
@@ -117,7 +118,8 @@ BF.GameModules.register('towerdefense', {
   feedTop: 0.1,                                           // optional: move the event feed below a HUD strip
   create(ctx) {
     return {
-      update(dt) {}, draw(g) {},                          // required
+      update(dt) {}, draw(g) {},                          // required (draw = the Classic 2D renderer)
+      render3d(dt) {}, hud(g) {},                         // with three: true (ADR-0005): 3D view + 2D HUD overlay
       destroy() {}, onBotJoin(bot) {}, onBotLeave(bot) {}, onEmote(e) {}, onChat(msg) {},
       _test: {},                                          // optional hooks for automated tests
     };
@@ -125,7 +127,8 @@ BF.GameModules.register('towerdefense', {
 });
 
 // ctx: the module's only access to the platform
-ctx.W, ctx.H (960×540) · ctx.gameId · ctx.config (creator seed/difficulty) · ctx.difficulty · ctx.mobile
+ctx.W, ctx.H (960×540) · ctx.gameId · ctx.config (creator seed/difficulty/layout) · ctx.difficulty · ctx.mobile
+ctx.g3 (BF.g3d World, 3D sessions only) · ctx.pointerWorld(h) (pointer picked onto the ground, game coordinates)
 ctx.player · ctx.bots (active participants) · ctx.allBots (whole server) · ctx.botLevel(bot)
 ctx.input.axis() · act(name) · actPressed(name) · pointer {x, y, down, pressed, released, touch}
 ctx.data (persistent per-game object) · ctx.save()

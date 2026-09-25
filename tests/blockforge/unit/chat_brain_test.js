@@ -134,3 +134,16 @@ test('test_chat_normalize_expands_slang', () => {
   assert.equal(BF.chat.evalMath('2^3+(4-1)*2'), 14);
   assert.equal(BF.chat.evalMath('alert(1)'), null);
 });
+
+test('test_chat_safety_replies_keep_their_local_wording_even_with_claude', async () => {
+  const { BF } = bootDefault();
+  let asked = 0;
+  BF.ai.available = () => true;
+  BF.ai.word = async () => { asked++; return 'CLAUDE WORDING'; };
+  const safe = await BF.chat.reply(BF.bots.get('bot_glitchgoblin'), 'my phone number is 555 0101', { channel: 'dm' });
+  assert.equal(asked, 0);
+  assert.ok(!/CLAUDE WORDING|555/.test(safe.text));
+  const normal = await BF.chat.reply(friendBot(BF), 'what games do you like?', { channel: 'dm' });
+  assert.equal(asked, 1);
+  assert.equal(normal.text, 'CLAUDE WORDING');
+});
