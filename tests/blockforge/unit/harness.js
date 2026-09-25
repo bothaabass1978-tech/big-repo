@@ -19,6 +19,7 @@ const SYSTEM_SCRIPTS = [
   'js/core/store.js',
   'js/systems/bots.js', 'js/systems/avatar.js', 'js/systems/economy.js', 'js/systems/meta.js',
   'js/systems/inventory.js', 'js/systems/social.js', 'js/systems/world.js', 'js/systems/creator.js', 'js/systems/secrets.js',
+  'js/systems/chat.js', 'js/systems/ai.js',
 ];
 
 function memoryStorage(seed) {

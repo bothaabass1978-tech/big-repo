@@ -76,7 +76,7 @@
         game, gameId, mod, server: j.server,
         ctx: null, instance: null, input: null,
         paused: false, ended: false, loading: true, crashed: 0,
-        all: [], active: [],
+        all: [], active: [], lines: [], partner: null,
         timers: [], offs: [],
         raf: 0, lastT: 0, playTime: 0, timeBank: 0,
         pendingCoins: 0, pendingReasons: new Set(), flushTimer: null,
@@ -579,6 +579,8 @@
     const el = document.createElement('div');
     el.className = 'gr-msg' + (from === 'system' ? ' sys' : '') + (o.emote ? ' emote' : '');
     el.innerHTML = from === 'system' ? esc(text) : '<b style="color:' + color + '">[' + esc(name) + ']:</b> ' + esc(text);
+    s.lines.push({ who: me ? 'me' : from === 'system' ? 'system' : from.id, text: String(text) });
+    if (s.lines.length > 60) s.lines.shift();
     s.chatLog.appendChild(el);
     while (s.chatLog.children.length > 90) s.chatLog.firstElementChild.remove();
     s.chatLog.scrollTop = s.chatLog.scrollHeight;
@@ -683,15 +685,29 @@
     BF.store.update('player', (st) => { st.player.stats.chatSent += 1; });
     BF.quests.track('chat', 1, { gameId: s.gameId });
     if (s.instance && s.instance.onChat) { try { s.instance.onChat(clean); } catch (e) { /* optional */ } }
-    const lower = clean.toLowerCase();
-    const mentioned = s.all.filter((b) => lower.includes(b.username.toLowerCase()) || lower.includes(b.displayName.toLowerCase()));
-    const pool = mentioned.length ? mentioned : U.shuffle(s.active.length ? s.active : s.all).slice(0, 3);
-    let replies = 0;
-    for (const b of pool) {
-      if (replies >= 2) break;
-      const r = BF.dialogue.respond(b, clean, s.game, { mentioned: mentioned.includes(b) });
-      if (r) { botChat(b, r, 900 + Math.random() * 2200 + replies * 900); replies++; }
-    }
+    const pool = s.active.concat(s.all.filter((b) => !s.active.some((a) => a.id === b.id)));
+    const partner = s.partner && s.ctx && s.ctx.time - s.partner.t < 45 ? s.partner : null;
+    BF.chat.responders(pool, clean, { partner }).list.forEach((b, i) => botAnswer(b, clean, i));
+  }
+
+  /** One bot answers the player's chat line: "..." bubble, then the reply and any action. */
+  function botAnswer(bot, text, order) {
+    const sess = s;
+    const started = Date.now();
+    const delay = 450 + order * 900 + Math.random() * 600;
+    s.timers.push(setTimeout(() => { if (s === sess) bubble(bot.id, '...'); }, delay));
+    const mine = s.lines.filter((l) => l.who === 'me' || l.who === bot.id);
+    const history = mine.slice(-9, -1).map((l) => ({ from: l.who === 'me' ? 'me' : 'bot', text: l.text }));
+    BF.chat.reply(bot, text, { channel: 'game', game: s.game, audience: s.all, history }).then((r) => {
+      if (s !== sess || !r || !r.text) { if (s === sess) s.bubbles.delete(bot.id); return; }
+      const wait = Math.max(0, delay + Math.min(3000, 600 + r.text.length * 28) - (Date.now() - started));
+      s.timers.push(setTimeout(() => {
+        if (s !== sess) return;
+        botChat(bot, r.text);
+        s.partner = { id: bot.id, t: s.ctx ? s.ctx.time : 0 };
+        if (r.after) { try { r.after(); } catch (e) { /* best-effort action */ } }
+      }, wait));
+    }, () => {});
   }
 
   // --------------------------------------------------------------- rewards

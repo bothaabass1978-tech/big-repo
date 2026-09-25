@@ -86,6 +86,7 @@
       toggle('gameplay.sfx', g.sfx, 'Sound effects') + '</div>' +
       '<div class="settings-card"><h3>Controls</h3>' + seg('gameplay.touchControls', g.touchControls, [['auto', 'Auto'], ['on', 'Always'], ['off', 'Never']], 'On-screen touch controls', 'Auto shows them on touch devices.') + toggle('gameplay.showFps', g.showFps, 'Show FPS counter in games') + '</div>' +
       '<div class="settings-card"><h3>Servers and chat</h3>' + seg('gameplay.botChat', g.botChat, [['quiet', 'Quiet'], ['normal', 'Normal'], ['lively', 'Lively']], 'Server chat activity', 'How often other players chat, message you and send requests.') +
+      seg('gameplay.botAI', g.botAI || 'smart', [['smart', 'Smart'], ['local', 'Local only']], 'Bot replies', BF.ai && BF.ai.status() === 'ready' ? 'Smart: bots word their replies with Claude (asks once, uses your Claude usage). Local only: replies come from BlockForge itself.' : 'Bots understand what you say and answer from BlockForge itself. In the claude.ai viewer, Smart can also word replies with Claude.') +
       toggle('gameplay.chatFilter', g.chatFilter, 'Chat filter', 'Hides rude words in chat and messages.') + toggle('gameplay.autoJoinBest', g.autoJoinBest, 'Play joins the best server', 'Otherwise Play opens the server list.') + '</div>';
   }
 

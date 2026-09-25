@@ -179,19 +179,6 @@
 
   // ---------------------------------------------------------------- dialogue
 
-  const RX = {
-    greet: /\b(hi+|hello|hey+|yo|sup|hiya|howdy|heya)\b/i,
-    gg: /\bgg+\b/i,
-    laugh: /\b(lol+|lmao|haha+|xd|rofl)\b/i,
-    thanks: /\b(thanks|thank you|thx|ty)\b/i,
-    bye: /\b(bye+|cya|gtg|later|goodnight)\b/i,
-    friend: /\b(friend|friends|add me|friend me)\b/i,
-    challenge: /\b(1v1|race|fight|duel|battle|versus|vs|compete)\b/i,
-    help: /\b(help|how do|how to|stuck|lost)\b/i,
-    nice: /\b(nice|cool|wow|awesome|great|gj|good job|amazing|sick)\b/i,
-    question: /\?\s*$/,
-  };
-
   const FILTER = /\b(idiot|stupid|dumb|loser|shut ?up|trash)\b/gi;
 
   function style(bot, text) {
@@ -241,31 +228,12 @@
     },
 
     /**
-     * Decide whether (and how) a bot answers a player chat message.
-     * @returns {string|null}
+     * Synchronous reply for a player chat message in a game (null = stays quiet).
+     * Kept for callers that cannot wait; the runtime uses BF.chat.reply().
      */
     respond(bot, text, game, opts) {
-      const mentioned = opts && opts.mentioned;
-      const t = String(text);
-      let cat = null;
-      if (RX.friend.test(t)) cat = 'friend';
-      else if (RX.challenge.test(t)) cat = 'challenge';
-      else if (RX.help.test(t)) cat = 'help';
-      else if (RX.greet.test(t)) cat = 'greet';
-      else if (RX.gg.test(t)) cat = 'gg';
-      else if (RX.thanks.test(t)) cat = 'thanks';
-      else if (RX.bye.test(t)) cat = 'bye';
-      else if (RX.laugh.test(t)) cat = 'laugh';
-      else if (RX.nice.test(t)) cat = 'nice';
-      else if (RX.question.test(t)) cat = 'question';
-      const chance = mentioned ? 0.95 : cat ? 0.45 : 0.18;
-      if (Math.random() > chance * BF.PERSONALITIES[bot.personality].chatty) return null;
-      let pool;
-      if (cat && BF.DIALOGUE[cat] && BF.DIALOGUE[cat][bot.personality]) pool = BF.DIALOGUE[cat][bot.personality];
-      else if (cat && BF.DIALOGUE.reply[cat]) pool = BF.DIALOGUE.reply[cat];
-      else if (game && game.chat && game.chat.any && Math.random() < 0.4) pool = game.chat.any;
-      else pool = BF.DIALOGUE.reply.default;
-      return style(bot, fill(U.pick(pool), { game }));
+      const d = BF.chat.think(bot, text, { channel: 'game', game, mentioned: !!(opts && opts.mentioned) });
+      return d ? d.text : null;
     },
 
     /** Opening line for an unsolicited private message. */
@@ -276,18 +244,10 @@
       return { text: style(bot, fill(U.pick(BF.DIALOGUE.dmOpen[bot.personality]), { game: favorite })) };
     },
 
-    /** Reply to a private message. */
+    /** Synchronous reply to a private message (see BF.chat for the async path). */
     dmReply(bot, text) {
-      const t = String(text);
-      if (RX.greet.test(t)) return style(bot, U.pick(BF.DIALOGUE.greet[bot.personality]));
-      if (RX.friend.test(t)) return style(bot, U.pick(BF.DIALOGUE.friend[bot.personality]));
-      if (RX.challenge.test(t)) return style(bot, U.pick(BF.DIALOGUE.challenge[bot.personality]));
-      if (RX.help.test(t)) return style(bot, U.pick(BF.DIALOGUE.help[bot.personality]));
-      if (RX.thanks.test(t)) return style(bot, U.pick(BF.DIALOGUE.reply.thanks));
-      if (RX.bye.test(t)) return style(bot, U.pick(BF.DIALOGUE.reply.bye));
-      if (RX.gg.test(t)) return style(bot, U.pick(BF.DIALOGUE.reply.gg));
-      if (RX.question.test(t)) return style(bot, U.pick(BF.DIALOGUE.reply.question));
-      return style(bot, fill(U.pick(BF.DIALOGUE.dmReply[bot.personality])));
+      const d = BF.chat.think(bot, text, { channel: 'dm' });
+      return d ? d.text : style(bot, fill(U.pick(BF.DIALOGUE.dmReply[bot.personality] || BF.DIALOGUE.reply.default)));
     },
 
     styleFor: style,

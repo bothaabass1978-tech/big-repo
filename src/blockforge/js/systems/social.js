@@ -74,6 +74,20 @@
       return true;
     },
 
+    /** A bot accepts your pending request straight away (asked in chat). */
+    botAccept(id) {
+      const bot = BF.bots.get(id);
+      if (!bot || !friends.hasOutgoing(id)) return false;
+      BF.store.update('social', (st) => {
+        st.social.outgoing = st.social.outgoing.filter((r) => r.id !== id);
+        if (!st.social.friends.includes(id)) st.social.friends.push(id);
+      });
+      BF.quests.track('friend_added', 1);
+      BF.bus.emit('friends:added', { bot });
+      BF.notify.push({ type: 'friend', title: bot.displayName + ' accepted your friend request', body: 'You are now friends. Say hi!', icon: 'userCheck', route: '#/messages/' + id });
+      return true;
+    },
+
     accept(id) {
       const bot = BF.bots.get(id);
       if (!bot || !friends.hasIncoming(id)) return { ok: false, error: 'No request from that player.' };
@@ -209,22 +223,33 @@
       });
       BF.quests.track('message_sent', 1);
       const bot = BF.bots.get(withId);
-      if (bot) {
-        const willReply = Math.random() < 0.9;
-        if (willReply) {
-          setTimeout(() => {
-            typing.add(withId);
-            BF.bus.emit('messages:typing', { with: withId, typing: true });
-          }, 600 + Math.random() * 900);
-          setTimeout(() => {
-            typing.delete(withId);
-            BF.bus.emit('messages:typing', { with: withId, typing: false });
-            if (!BF.store.state || BF.friends.isBlocked(withId)) return;
-            messages.receive(withId, BF.dialogue.dmReply(bot, clean), { quietIfOpen: true });
-          }, 1900 + Math.random() * 2600);
-        }
-      }
+      if (bot) messages.botReply(bot, clean);
       return { ok: true };
+    },
+
+    /**
+     * A bot answers a private message: typing indicator, then the reply from
+     * BF.chat (worded by Claude when available) and any action it decided on.
+     */
+    botReply(bot, text) {
+      const withId = bot.id;
+      const account = BF.store.accountId;
+      const conv = BF.store.state.messages[withId];
+      const history = conv ? conv.msgs.slice(-9, -1).map((m) => ({ from: m.from === 'me' ? 'me' : 'bot', text: m.text })) : [];
+      const started = Date.now();
+      const typingOn = setTimeout(() => { typing.add(withId); BF.bus.emit('messages:typing', { with: withId, typing: true }); }, 450 + Math.random() * 600);
+      const finish = (r) => {
+        const wait = r ? Math.max(0, Math.min(4200, 900 + r.text.length * 32) - (Date.now() - started)) : 0;
+        setTimeout(() => {
+          clearTimeout(typingOn);
+          typing.delete(withId);
+          BF.bus.emit('messages:typing', { with: withId, typing: false });
+          if (!r || !r.text || !BF.store.state || BF.store.accountId !== account || BF.friends.isBlocked(withId)) return;
+          messages.receive(withId, r.text, { quietIfOpen: true, invite: r.invite || undefined });
+          if (r.after) { try { r.after(); } catch (e) { /* action is best-effort */ } }
+        }, wait);
+      };
+      BF.chat.reply(bot, text, { channel: 'dm', history }).then(finish, () => finish(null));
     },
 
     /**

@@ -26,7 +26,7 @@
         types: { friend: true, achievement: true, invite: true, purchase: true, daily: true, quest: true, bot: true, update: true, level: true, system: true },
       },
       appearance: { theme: 'dark', accent: 'ember', density: 'comfortable', reduceMotion: false, fontScale: 1 },
-      gameplay: { volume: 0.6, sfx: true, touchControls: 'auto', showFps: false, botChat: 'normal', chatFilter: true, autoJoinBest: true },
+      gameplay: { volume: 0.6, sfx: true, touchControls: 'auto', showFps: false, botChat: 'normal', chatFilter: true, autoJoinBest: true, botAI: 'smart', graphics: 'auto' },
       data: { autosave: true },
     };
   }
@@ -99,6 +99,7 @@
       secrets: { forgecore: { unlocked: false, at: 0, uses: 0, total: 0, wordSolved: false } },
       bots: {},
       world: { seed: worldSeed },
+      chatmem: {},
       debug: { dayOffset: 0, devMode: false },
     };
 
@@ -227,7 +228,7 @@
       debug: fresh.debug, world: fresh.world, avatar: fresh.avatar,
     };
     ['transactions', 'recent', 'notifications', 'created'].forEach((k) => { if (!Array.isArray(state[k])) state[k] = []; });
-    ['inventory', 'passes', 'progress', 'messages', 'achievements', 'badges', 'bots'].forEach((k) => { if (!state[k] || typeof state[k] !== 'object') state[k] = {}; });
+    ['inventory', 'passes', 'progress', 'messages', 'achievements', 'badges', 'bots', 'chatmem'].forEach((k) => { if (!state[k] || typeof state[k] !== 'object') state[k] = {}; });
     deepDefaults(state, skeleton);
     if (!Array.isArray(state.player.stats.distinctGames)) state.player.stats.distinctGames = [];
     state.version = BF.SAVE_VERSION;

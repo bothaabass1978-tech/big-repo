@@ -164,6 +164,7 @@
     visitDelta: new Map(),
     session: null,
     lastSeen: new Map(),
+    meets: new Map(),
 
     /** Build the bot population and fill servers. */
     init() {
@@ -175,6 +176,7 @@
       world.menuOnline = new Set();
       world.visitDelta = new Map();
       world.session = null;
+      world.meets = new Map();
       usedServerIds = new Set();
       for (const g of catalog.all()) world.servers.set(g.id, []);
       for (const bot of BF.bots.list) {
@@ -289,6 +291,15 @@
       if (serverId && !srv) return { ok: false, reason: 'gone' };
       if (srv && srv.bots.length + 1 > srv.max) return { ok: false, reason: 'full' };
       if (!srv) {
+        // a bot that agreed in chat to meet you here: join its server when there is room
+        for (const [id, mt] of world.meets) {
+          if (mt.gameId !== gameId || mt.until < Date.now()) continue;
+          const l = world.loc.get(id);
+          const cand = l && l.gameId === gameId ? world.findServer(gameId, l.serverId) : null;
+          if (cand && cand.bots.length + 1 <= cand.max) { srv = cand; break; }
+        }
+      }
+      if (!srv) {
         const list = world.serversFor(gameId).filter((s) => s.bots.length + 1 <= s.max);
         srv = list.find((s) => s.bots.length >= 2 && s.bots.length + 1 < s.max) || list[0] || world.newServer(gameId);
       }
@@ -317,9 +328,10 @@
       if (!srv) return;
       const game = catalog.get(srv.gameId);
       const occupancy = (srv.bots.length + 1) / srv.max;
-      const wantsLeave = srv.bots.length > 1 && (occupancy > 0.8 ? Math.random() < 0.6 : Math.random() < 0.35);
+      const leavers = srv.bots.filter((id) => !world.meets.has(id));
+      const wantsLeave = leavers.length > 1 && (occupancy > 0.8 ? Math.random() < 0.6 : Math.random() < 0.35);
       if (wantsLeave) {
-        const id = U.pick(srv.bots);
+        const id = U.pick(leavers);
         const bot = BF.bots.get(id);
         world.unplace(id);
         if (Math.random() < 0.7) world.place(bot, world.pickGame(bot));
@@ -401,6 +413,34 @@
       if (!bot) return;
       const m = BF.dialogue.dmOpen(bot);
       BF.messages.receive(bot.id, m.text, { invite: m.invite });
+    },
+
+    /**
+     * A bot agreed (in chat) to meet the player in a game: it heads there now,
+     * and the player's next Play for that game lands in the same server.
+     */
+    meetPlayer(botId, gameId) {
+      const bot = BF.bots.get(botId);
+      if (!bot || !catalog.get(gameId)) return null;
+      world.meets.set(botId, { gameId, until: Date.now() + 15 * 60000 });
+      const l = world.loc.get(botId);
+      const sess = world.sessionServer();
+      if (sess && sess.gameId === gameId) {
+        if (!sess.bots.includes(botId) && sess.bots.length + 1 < sess.max) {
+          world.unplace(botId);
+          sess.bots.push(botId);
+          world.loc.set(botId, { gameId, serverId: sess.id });
+          world.menuOnline.delete(botId);
+          BF.bus.emit('server:join', { gameId, serverId: sess.id, bot, game: catalog.get(gameId) });
+        }
+      } else if (!l || l.gameId !== gameId) {
+        const leaving = sess && l && l.gameId === sess.gameId && l.serverId === sess.id;
+        world.unplace(botId);
+        world.place(bot, gameId);
+        if (leaving) BF.bus.emit('server:leave', { gameId: sess.gameId, serverId: sess.id, bot });
+      }
+      BF.bus.emit('world:changed');
+      return world.loc.get(botId) || null;
     },
 
     /** An in-game friend invites you to their server. */
