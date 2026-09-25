@@ -32,6 +32,7 @@
       const templates = Object.entries(BF.creator.TEMPLATES);
       return '<div class="page-head"><div><h1 class="page-title">Create</h1><p class="page-sub">Build a game from a playable template, publish it, and watch players arrive.</p></div><a class="btn btn-primary btn-lg" href="#/create/new">' + BF.icon('plus', 17) + 'Create new game</a></div>' +
         (list.length ? '<div class="stat-strip"><div><span class="faint">Games</span><b class="num">' + list.length + '</b></div><div><span class="faint">Published</span><b class="num">' + list.filter((g) => g.published).length + '</b></div><div><span class="faint">Total visits</span><b class="num">' + U.fmt(totals.visits) + '</b></div><div><span class="faint">Lifetime revenue</span>' + BF.ui.coins(Math.floor(totals.revenue)) + '</div><div><span class="faint">Ready to collect</span>' + BF.ui.coins(Math.floor(totals.pending)) + '</div></div>' : '') +
+        (list.length ? '<section class="section"><div id="earn-host">' + BF.creatorTabs.earnings(null) + '</div></section>' : '') +
         '<section class="section">' + BF.ui.sectionHead('My Creations', 'anvil') +
         (list.length ? '<div class="creations">' + list.map((ug) => {
           const listing = BF.creator.toListing(ug);
@@ -47,7 +48,13 @@
     },
     mount(root) {
       this._off = BF.bus.on('creator:changed', () => BF.router.refresh());
+      this._earn = BF.bus.on('store:change', (keys) => { if (!keys.has('created') && !keys.has('ads')) return; const h = root.querySelector('#earn-host'); if (h) h.innerHTML = BF.creatorTabs.earnings(null); });
       root.addEventListener('click', async (e) => {
+        const all = e.target.closest('[data-collect-all]');
+        if (all) {
+          const r = BF.creator.collectAll();
+          if (r.ok) { BF.ui.coinFly(all, 10); BF.ui.toast({ title: 'Collected ' + U.fmt(r.amount) + ' ForgeCoins', text: 'Creator earnings from all your games', kind: 'coin' }); }
+        }
         const pub = e.target.closest('[data-publish]');
         const unp = e.target.closest('[data-unpublish]');
         const del = e.target.closest('[data-delete]');
@@ -62,6 +69,7 @@
     },
     unmount() {
       if (this._off) this._off();
+      if (this._earn) this._earn();
     },
   });
 
@@ -149,7 +157,7 @@
   BF.pages.register('creategame', {
     title: (p) => { const g = BF.creator.get(p.id); return g ? 'Manage ' + g.name : 'Manage'; },
     nav: 'create',
-    watch: (p) => (p.tab === 'settings' || p.tab === 'passes' ? [] : ['created']),
+    watch: (p) => (p.tab === 'settings' || p.tab === 'passes' || p.tab === 'studio' || p.tab === 'ads' ? [] : ['created']),
     render(params) {
       const ug = BF.creator.get(params.id);
       if (!ug) return BF.ui.empty({ icon: 'anvil', title: 'Game not found', action: { label: 'My Creations', href: '#/create' } });
@@ -158,6 +166,8 @@
       const st = BF.catalog.stats(ug.id);
       const tabs = BF.ui.tabs([
         { id: 'overview', label: 'Overview', href: '#/create/' + ug.id, icon: 'podium' },
+        { id: 'studio', label: 'Studio', href: '#/create/' + ug.id + '/studio', icon: 'brush' },
+        { id: 'ads', label: 'Ads', href: '#/create/' + ug.id + '/ads', icon: 'megaphone', count: BF.ads.active(ug.id).length || null },
         { id: 'passes', label: 'Game Passes', href: '#/create/' + ug.id + '/passes', icon: 'ticket', count: (ug.passes || []).length },
         { id: 'servers', label: 'Servers', href: '#/create/' + ug.id + '/servers', icon: 'server' },
         { id: 'settings', label: 'Settings', href: '#/create/' + ug.id + '/settings', icon: 'gear' },
@@ -167,9 +177,13 @@
         body = '<div class="admin-stats">' +
           [['Players', '<span class="live-dot"></span> <span data-live="playing:' + ug.id + '">' + st.playing + '</span>', 'users'], ['Visits', U.fmt(ug.visits), 'eye'], ['Favorites', U.fmt(st.favorites), 'heart'], ['Likes', U.fmt(st.likes) + ' <span class="faint" style="font-size:12px">/ ' + U.fmt(st.dislikes) + ' dislikes</span>', 'thumbUp'], ['Revenue', BF.ui.coins(Math.floor(ug.revenue || 0)), 'wallet'], ['Pass sales', U.fmt(ug.sales || 0), 'ticket']]
             .map((x) => '<div class="admin-stat"><span class="as-icon">' + BF.icon(x[2], 18) + '</span><span class="faint">' + x[0] + '</span><b class="num">' + x[1] + '</b></div>').join('') + '</div>' +
-          '<div class="panel collect-panel"><div><div class="eyebrow">Ready to collect</div>' + BF.ui.coins(Math.floor(ug.pending || 0), { cls: 'lg', size: 22 }) + '<p class="faint" style="font-size:12.5px;margin-top:4px">Creators earn 70% of every pass sale plus a small payout per visit.</p></div><button class="btn btn-gold" data-collect' + (ug.pending >= 1 ? '' : ' disabled') + '>' + BF.icon('download', 15) + 'Collect earnings</button></div>' +
+          '<div id="earn-host">' + BF.creatorTabs.earnings(ug) + '</div>' +
           (!ug.published ? '<div class="panel notice">' + BF.icon('info', 18) + '<div><b>This game is a draft.</b><p class="faint">Only you can play it. Publish it to list it in Discover and let bots find it.</p></div><button class="btn btn-primary" data-publish-one>' + BF.icon('globe', 14) + 'Publish</button></div>' : '') +
           '<div class="panel" style="margin-top:14px"><h3 class="panel-title">' + BF.icon('info', 17) + 'Listing</h3><dl class="kv"><div><dt>Template</dt><dd>' + esc(BF.creator.TEMPLATES[ug.template].label) + '</dd></div><div><dt>Genre</dt><dd>' + esc(ug.genre) + '</dd></div><div><dt>Max players</dt><dd class="num">' + ug.maxPlayers + '</dd></div><div><dt>Visibility</dt><dd>' + esc(ug.visibility) + '</dd></div><div><dt>Difficulty</dt><dd>' + esc(ug.difficulty) + '</dd></div><div><dt>Version</dt><dd class="num">' + ug.version + '</dd></div><div><dt>Created</dt><dd>' + U.fmtDate(ug.createdAt) + '</dd></div><div><dt>Updated</dt><dd>' + U.fmtDateTime(ug.updatedAt) + '</dd></div></dl></div>';
+      } else if (tab === 'studio') {
+        body = BF.creatorTabs.studio.render(ug);
+      } else if (tab === 'ads') {
+        body = BF.creatorTabs.ads.render(ug);
       } else if (tab === 'passes') {
         body = '<div class="about-grid"><div>' + ((ug.passes || []).length ? '<div class="list panel tight">' + ug.passes.map((p) => '<div class="list-row"><span class="pc-icon sm">' + BF.icon('ticket', 18) + '</span><div class="row-main"><div class="row-title">' + esc(p.name) + '</div><div class="row-sub">' + esc(p.desc || BF.creator.PASS_EFFECTS[p.effect] || '') + '</div></div>' + BF.ui.coins(p.price) + '<button class="icon-btn sm" data-del-pass="' + p.id + '" aria-label="Delete pass" data-tip="Delete pass">' + BF.icon('trash', 15) + '</button></div>').join('') + '</div>' : BF.ui.empty({ icon: 'ticket', title: 'No passes yet', text: 'Passes give players perks and earn you ForgeCoins when bots buy them.' })) + '</div>' +
           '<form class="panel" id="pass-form"><h3 class="panel-title">' + BF.icon('plus', 17) + 'New game pass</h3><div class="field"><label for="pf-name">Name</label><input class="input" id="pf-name" maxlength="30" placeholder="e.g. VIP Lounge"></div><div class="field" style="margin-top:10px"><label for="pf-price">Price (ForgeCoins)</label><input class="input" id="pf-price" type="number" min="10" max="100000" value="250"></div>' +
@@ -197,6 +211,8 @@
           return null;
         });
       }
+      if (tab === 'studio') BF.creatorTabs.studio.mount(root, ug);
+      if (tab === 'ads') BF.creatorTabs.ads.mount(root, ug);
       if (tab === 'servers') liveOff = BF.bus.on('ui:live', () => { const l = root.querySelector('#server-list'); if (l) l.innerHTML = BF.ui.serverRows(ug.id, { noSecret: true }); });
       const pf = root.querySelector('#pass-form');
       if (pf) pf.addEventListener('submit', (e) => {
@@ -224,6 +240,7 @@
     unmount() {
       if (liveOff) liveOff();
       liveOff = null;
+      BF.creatorTabs.ads.unmount();
     },
   });
 

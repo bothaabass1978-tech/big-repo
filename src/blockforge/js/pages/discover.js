@@ -84,6 +84,7 @@
         '<div class="filter-panel" id="disc-filters" hidden>' +
         select('f-playing', PLAYING, disc.playing, 'Playing now') + select('f-size', SIZE, disc.size, 'Server size') + select('f-pop', POP, disc.pop, 'Popularity') + select('f-age', AGE, disc.age, 'Age rating') +
         '<label class="check-row"><span class="switch"><input type="checkbox" id="f-recent"' + (disc.recent ? ' checked' : '') + '><span></span></span>Updated in the last 30 days</label></div>' +
+        (BF.ads ? '<section class="section sponsored-row" style="margin-bottom:16px">' + BF.ui.sectionHead('Sponsored', 'megaphone', { href: '#/create', label: 'Advertise' }) + '<div class="row-scroll">' + BF.ui.sponsoredCards('discover', 3) + '</div></section>' : '') +
         '<div id="disc-results">' + resultsHtml() + '</div>';
     },
     mount(root) {
@@ -193,7 +194,7 @@
       let body;
       if (!q) body = BF.ui.empty({ icon: 'search', title: 'Search BlockForge', text: 'Find games, players, avatar items and creators. Press / anywhere to jump to search.' });
       else if (!total) body = BF.ui.empty({ icon: 'search', title: 'No results for “' + q + '”', text: 'Check the spelling or try a shorter word.' });
-      else if (tab === 'all') body = (games ? '<section class="section">' + BF.ui.sectionHead('Games', 'gamepad', r.games.length > 5 ? { href: link('games'), label: 'All ' + r.games.length } : null) + '<div class="grid-cards">' + r.games.slice(0, 5).map((g) => BF.ui.gameCard(g)).join('') + '</div></section>' : '') +
+      else if (tab === 'all') body = (BF.ads && (tab === 'all') ? '<section class="section sponsored-row">' + BF.ui.sectionHead('Sponsored', 'megaphone') + '<div class="row-scroll">' + BF.ui.sponsoredCards('search', 1) + '</div></section>' : '') + (games ? '<section class="section">' + BF.ui.sectionHead('Games', 'gamepad', r.games.length > 5 ? { href: link('games'), label: 'All ' + r.games.length } : null) + '<div class="grid-cards">' + r.games.slice(0, 5).map((g) => BF.ui.gameCard(g)).join('') + '</div></section>' : '') +
         (players ? '<section class="section">' + BF.ui.sectionHead('Players', 'users', r.players.length > 5 ? { href: link('players'), label: 'All ' + r.players.length } : null) + '<div class="list panel tight">' + r.players.slice(0, 5).map((p) => p.me ? '<div class="list-row">' + BF.ui.avatarChip(BF.store.state.avatar) + '<div class="row-main"><a class="row-title" href="#/profile">' + esc(p.displayName) + ' <span class="pill accent">You</span></a></div></div>' : BF.ui.userRow(p, socialButtons(p.id))).join('') + '</div></section>' : '') +
         (items ? '<section class="section">' + BF.ui.sectionHead('Avatar Items', 'bag', r.items.length > 6 ? { href: link('items'), label: 'All ' + r.items.length } : null) + '<div class="grid-cards items">' + r.items.slice(0, 6).map((i) => BF.ui.itemCard(i)).join('') + '</div></section>' : '') +
         (creators ? '<section class="section">' + BF.ui.sectionHead('Creators', 'anvil') + creators + '</section>' : '');

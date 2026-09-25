@@ -48,6 +48,8 @@
     return pts;
   }
 
+  BF.tdGenPath = genPath;
+
   BF.GameModules.register('towerdefense', {
     three: true,
     maxBots: 2,
@@ -70,8 +72,13 @@
       let bossKilled = false;
       const allies = new Map();
 
+      /** A road drawn in the Studio (null when the creation uses its generated road). */
+      function studioPath() {
+        const lay = ctx.config.layout;
+        return lay && lay.kind === 'towerdefense' && BF.studio ? BF.studio.tdPath(lay) : null;
+      }
       function setup() {
-        map = mapId === 'custom' ? { name: ctx.config.name || 'Custom Valley', grass: U.shade(ctx.config.themeColor || '#4f9a45', -0.35), road: '#d8b878', hp: 1, path: genPath(ctx.config.seed || 3) } : MAPS[mapId];
+        map = mapId === 'custom' ? { name: ctx.config.name || 'Custom Valley', grass: U.shade(U.mix('#4f9a45', ctx.config.themeColor || '#4f9a45', 0.3), -0.1), road: '#d8b878', hp: 1, path: studioPath() || genPath(ctx.config.seed || 3) } : MAPS[mapId];
         road = new Set();
         path = map.path.map((p) => ({ x: p[0] * TS + TS / 2, y: TOP + p[1] * TS + TS / 2 }));
         for (let i = 0; i < map.path.length - 1; i++) {

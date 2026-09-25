@@ -332,15 +332,48 @@
       const st = BF.catalog.stats(g.id);
       const fav = BF.catalog.isFavorite(g.id);
       const vote = BF.catalog.myVote(g.id);
-      return '<article class="gcard' + (opts.compact ? ' compact' : '') + '" data-href="#/game/' + g.id + '" data-ctx="game" data-game="' + g.id + '">' +
-        '<div class="gcard-thumb"><img src="' + BF.thumbs.url(g) + '" alt="" loading="lazy" draggable="false"><span class="gcard-genre">' + esc(g.genre) + '</span>' +
+      const ad = opts.sponsored;
+      return '<article class="gcard' + (opts.compact ? ' compact' : '') + (ad ? ' sponsored' : '') + '" data-href="#/game/' + g.id + '" data-ctx="game" data-game="' + g.id + '"' + (ad && ad.campaignId ? ' data-ad="' + ad.campaignId + '"' : '') + '>' +
+        '<div class="gcard-thumb"><img src="' + BF.thumbs.url(g) + '" alt="" loading="lazy" draggable="false"><span class="gcard-genre">' + (ad ? BF.icon('megaphone', 11) + 'Sponsored' : esc(g.genre)) + '</span>' +
         '<button class="gcard-fav' + (fav ? ' on' : '') + '" data-act="fav" data-game="' + g.id + '" aria-label="' + (fav ? 'Remove from favorites' : 'Add to favorites') + '" data-tip="' + (fav ? 'Favorited' : 'Favorite') + '">' + BF.icon('heart', 16) + '</button>' +
         '<button class="btn btn-sm btn-play gcard-play" data-act="play" data-game="' + g.id + '">' + BF.icon('play', 13) + 'Play</button></div>' +
-        '<div class="gcard-body"><a class="gcard-title" href="#/game/' + g.id + '">' + esc(g.name) + '</a><div class="gcard-creator">by ' + esc(g.creator) + '</div>' +
+        '<div class="gcard-body"><a class="gcard-title" href="#/game/' + g.id + '">' + esc(g.name) + '</a><div class="gcard-creator">' + (ad && ad.headline ? '<span class="gcard-ad">' + esc(ad.headline) + '</span>' : 'by ' + esc(g.creator)) + '</div>' +
         '<div class="gcard-meta"><span class="m"><span class="live-dot"></span><span data-live="playing:' + g.id + '">' + U.compact(st.playing) + '</span> playing</span><span class="m" data-tip="Like ratio">' + BF.icon('thumbUp', 13) + Math.round(st.approval * 100) + '%</span></div>' +
         '<div class="gcard-foot"><button class="vote' + (vote === 'like' ? ' on-like' : '') + '" data-act="vote" data-game="' + g.id + '" data-vote="like" aria-label="Like" data-tip="Like">' + BF.icon('thumbUp', 14) + U.compact(st.likes) + '</button>' +
         '<button class="vote' + (vote === 'dislike' ? ' on-dislike' : '') + '" data-act="vote" data-game="' + g.id + '" data-vote="dislike" aria-label="Dislike" data-tip="Dislike">' + BF.icon('thumbDown', 14) + '</button>' +
         '<button class="btn btn-xs btn-play" data-act="play" data-game="' + g.id + '" aria-label="Play ' + esc(g.name) + '">' + BF.icon('play', 11) + 'Play</button></div></div></article>';
+    },
+
+    /**
+     * Small SVG bar chart.
+     * @param {number[]} values
+     * @param {{h?:number, color?:string, stack?:number[], stackColor?:string, labels?:[string,string], fmt?:function}} [o]
+     */
+    barChart(values, o) {
+      o = o || {};
+      const n = values.length || 1, w = 600, h = o.h || 120, pad = 18;
+      const max = Math.max(1, ...values.map((v, i) => v + ((o.stack && o.stack[i]) || 0)));
+      const bw = (w - 8) / n;
+      let bars = '';
+      values.forEach((v, i) => {
+        const x = 4 + i * bw, bh = ((h - pad - 6) * v) / max, sh = o.stack ? ((h - pad - 6) * (o.stack[i] || 0)) / max : 0;
+        bars += '<rect x="' + (x + 1).toFixed(1) + '" y="' + (h - pad - bh).toFixed(1) + '" width="' + Math.max(1, bw - 2).toFixed(1) + '" height="' + bh.toFixed(1) + '" rx="2" fill="' + (o.color || 'var(--accent)') + '"><title>' + esc(o.fmt ? o.fmt(v, i) : String(v)) + '</title></rect>';
+        if (sh) bars += '<rect x="' + (x + 1).toFixed(1) + '" y="' + (h - pad - bh - sh).toFixed(1) + '" width="' + Math.max(1, bw - 2).toFixed(1) + '" height="' + sh.toFixed(1) + '" rx="2" fill="' + (o.stackColor || 'var(--gold)') + '"></rect>';
+      });
+      const lab = o.labels || ['', ''];
+      // bars stretch with the width; the labels stay in HTML so text never distorts
+      return '<div class="bar-chart-wrap"><span class="bc-max">' + esc(o.fmt ? o.fmt(max) : String(Math.round(max))) + '</span><svg class="bar-chart" style="height:' + (h - pad) + 'px" viewBox="0 0 ' + w + ' ' + (h - pad) + '" preserveAspectRatio="none" role="img" aria-label="' + esc(o.aria || 'Chart') + '"><line x1="0" x2="' + w + '" y1="' + (h - pad) + '" y2="' + (h - pad) + '" stroke="var(--line)" vector-effect="non-scaling-stroke"/>' + bars + '</svg>' +
+        '<div class="bc-axis"><span>' + esc(lab[0]) + '</span><span>' + esc(lab[1]) + '</span></div></div>';
+    },
+
+    /**
+     * Sponsored cards for a placement (your ad campaigns first, then house promotions).
+     * @param {'home'|'discover'|'search'} placement
+     * @param {number} n
+     */
+    sponsoredCards(placement, n) {
+      if (!BF.ads) return '';
+      return BF.ads.sponsored(placement, n).map((x) => { const g = BF.catalog.get(x.gameId); return g ? BF.ui.gameCard(g, { sponsored: x }) : ''; }).join('');
     },
 
     /** Large featured banner card. */

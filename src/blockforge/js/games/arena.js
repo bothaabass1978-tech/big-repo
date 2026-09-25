@@ -48,6 +48,8 @@
     return rects.filter((b) => !(b.x < 520 && b.x + b.w > 440 && b.y < 310 && b.y + b.h > 230));
   }
 
+  BF.arenaGenMap = genMap;
+
   BF.GameModules.register('arena', {
     three: true,
     actions: { attack: ['Space', 'Mouse0', 'KeyJ'], dash: ['ShiftLeft', 'ShiftRight', 'KeyK'], swap: ['KeyQ', 'KeyL'] },
@@ -112,8 +114,13 @@
         f.streak = 0;
       }
 
+      /** Cover blocks placed in the Studio (null when the creation uses its generated map). */
+      function studioRects() {
+        const lay = ctx.config.layout;
+        return lay && lay.kind === 'arena' && BF.studio ? BF.studio.arenaRects(lay) : null;
+      }
       function setupMatch() {
-        rects = custom ? genMap(ctx.config.seed || 7) : map === 'vip' ? VIP : CLASSIC;
+        rects = custom ? (studioRects() || genMap(ctx.config.seed || 7)) : map === 'vip' ? VIP : CLASSIC;
         vents = map === 'vip' ? VENTS.map((v, i) => ({ x: v[0], y: v[1], r: 30, t: i * 0.9, state: 'idle' })) : [];
         fighters = [makeFighter(null, true)].concat(ctx.bots.map((b) => makeFighter(b, false)));
         roundWins = new Map(fighters.map((f) => [f.id, 0]));

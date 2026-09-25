@@ -126,7 +126,9 @@
       const W = ctx.W, H = ctx.H;
       const custom = !!ctx.config.custom;
       const diff = custom ? ctx.difficulty : 'normal';
-      const course = custom ? genCourse('obby:' + (ctx.config.seed || 7), T.stages[diff] || 8, diff) : genCourse('sky-obby-v1', 10, 'normal');
+      const lay = ctx.config.layout;
+      const built = custom && lay && lay.kind === 'obby' && BF.studio && BF.studio.validate('obby', lay).ok;
+      const course = built ? BF.studio.obbyCourse(lay) : custom ? genCourse('obby:' + (ctx.config.seed || 7), T.stages[diff] || 8, diff) : genCourse('sky-obby-v1', 10, 'normal');
       const V = ctx.g3;
       // side view in 3D: game x -> X, game y (down) -> -Y, the course runs along Z = 0
       const parts = V ? V.particles2d(0, (x, y) => [x, -y + 6, 0]) : new BF.Particles(400);

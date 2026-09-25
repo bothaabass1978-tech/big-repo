@@ -95,6 +95,7 @@
       badges: { pb_welcome: { at: now } },
       daily: { lastClaimDay: null, streak: 0, bestStreak: 0, totalClaims: 0 },
       created: [],
+      ads: { campaigns: [] },
       settings: defaultSettings(),
       secrets: { forgecore: { unlocked: false, at: 0, uses: 0, total: 0, wordSolved: false } },
       bots: {},
@@ -231,6 +232,7 @@
     ['inventory', 'passes', 'progress', 'messages', 'achievements', 'badges', 'bots', 'chatmem'].forEach((k) => { if (!state[k] || typeof state[k] !== 'object') state[k] = {}; });
     deepDefaults(state, skeleton);
     if (!Array.isArray(state.player.stats.distinctGames)) state.player.stats.distinctGames = [];
+    if (!state.ads || typeof state.ads !== 'object' || !Array.isArray(state.ads.campaigns)) state.ads = { campaigns: [] };
     state.version = BF.SAVE_VERSION;
     return state;
   }

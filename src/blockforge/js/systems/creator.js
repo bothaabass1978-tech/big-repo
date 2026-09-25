@@ -1,6 +1,7 @@
 /**
  * BlockForge — Create: user-made game listings built on playable templates,
- * with passes, publishing and simulated visits / revenue.
+ * with Studio layouts, passes, publishing, simulated visits / revenue and an
+ * earnings history. Advertising lives in BF.ads (systems/ads.js).
  */
 (function (BF) {
   'use strict';
@@ -15,6 +16,9 @@
     towerdefense: { label: 'Tower Defense', gameType: 'towerdefense', base: 'towerfall-legends', icon: 'shield', genre: 'Strategy', desc: 'A generated path with towers, upgrades and waves.' },
   };
 
+  const VISIT_PAYOUT = 0.2; // ForgeCoins a creator earns per visit
+  const HIST_MAX = 120; // minutes of earnings history kept per creation
+
   const PASS_EFFECTS = {
     double_xp: 'Double XP in this game',
     bonus_coins: '+25% ForgeCoin rewards in this game',
@@ -23,6 +27,7 @@
 
   const creator = (BF.creator = {
     TEMPLATES,
+    VISIT_PAYOUT,
     PASS_EFFECTS,
     THUMB_COLORS: ['#ff7a2e', '#46a8ff', '#4ad17f', '#b67cff', '#ff4f9a', '#ffc940', '#39f3ff', '#e03e5a'],
     THUMB_PATTERNS: ['grid', 'stripes', 'dots', 'stars', 'none'],
@@ -71,7 +76,7 @@
         createdAt: new Date(ug.createdAt).toISOString().slice(0, 10),
         updatedAt: new Date(ug.updatedAt).toISOString().slice(0, 10),
         ageRating: 'All Ages',
-        popularity: ug.published ? 0.22 + Math.min(0.3, (ug.visits || 0) / 4000) : 0,
+        popularity: ug.published ? 0.22 + Math.min(0.3, (ug.visits || 0) / 4000) + (BF.ads && BF.ads.boosting(ug.id) ? 0.35 : 0) : 0,
         passes: (ug.passes || []).map((p) => Object.assign({ gameId: ug.id, kind: 'pass', icon: 'ticket' }, p)),
         products: [],
         badges: [],
@@ -87,7 +92,7 @@
         visibility: ug.visibility,
         template: ug.template,
         thumbnail: ug.thumbnail,
-        config: { seed: ug.seed, themeColor: ug.thumbnail && ug.thumbnail.color, difficulty: ug.difficulty || 'normal', custom: true, name: ug.name },
+        config: { seed: ug.seed, themeColor: ug.thumbnail && ug.thumbnail.color, difficulty: ug.difficulty || 'normal', custom: true, name: ug.name, layout: ug.layout || null },
       };
     },
 
@@ -174,6 +179,7 @@
     },
 
     remove(id) {
+      if (BF.ads) BF.ads.stopForGame(id);
       creator.unpublish(id);
       BF.store.update(['created', 'catalog', 'recent'], (s) => {
         s.created = s.created.filter((g) => g.id !== id);
@@ -206,6 +212,106 @@
       return { ok: true };
     },
 
+    /**
+     * Save a Studio layout on a creation (validated first) or clear it with null
+     * to go back to the seed-generated level.
+     */
+    setLayout(id, layout) {
+      const ug = creator.get(id);
+      if (!ug) return { ok: false, errors: ['Game not found.'] };
+      if (layout) {
+        const v = BF.studio.validate(ug.template, layout);
+        if (!v.ok) return { ok: false, errors: v.errors };
+      }
+      BF.store.update('created', () => {
+        ug.layout = layout ? U.clone(layout) : null;
+        ug.updatedAt = BF.clock.now();
+        ug.version = (ug.version || 1) + 1;
+      });
+      BF.quests.track('create_game', 1);
+      BF.bus.emit('creator:changed', { id });
+      return { ok: true };
+    },
+
+    /** How appealing a creation is to players (0.4 - 1.1): description, thumbnail, passes, likes, a Studio-built level. */
+    quality(ug) {
+      const votes = (ug.likes || 0) + (ug.dislikes || 0);
+      const liked = votes ? (ug.likes / votes - 0.5) * 0.2 : 0;
+      return 0.4 + Math.min(0.3, (ug.description || '').length / 600) + (ug.thumbnail && ug.thumbnail.type === 'image' ? 0.1 : 0.05) + Math.min(0.2, (ug.passes || []).length * 0.05) + (ug.layout ? 0.1 : 0) + liked;
+    },
+
+    /**
+     * Players arrive at a creation: pays the per-visit payout, rolls likes /
+     * favourites and pass sales, and records the minute's earnings history.
+     * @param {object} ug creation
+     * @param {number} visits
+     * @param {'organic'|'ad'} source
+     */
+    receiveVisits(ug, visits, source) {
+      if (!(visits > 0)) return;
+      const q = creator.quality(ug);
+      ug.visits += visits;
+      const likeP = 1 - Math.pow(1 - 0.06 * q, visits), favP = 1 - Math.pow(1 - 0.02 * q, visits);
+      if (Math.random() < Math.min(0.95, likeP * 3)) ug.likes += Math.max(1, Math.round(visits * 0.06 * q));
+      if (Math.random() < 0.015 * Math.min(4, visits)) ug.dislikes += 1;
+      if (Math.random() < Math.min(0.9, favP * 3)) ug.favorites += Math.max(1, Math.round(visits * 0.02 * q));
+      let earned = visits * VISIT_PAYOUT;
+      ug.earn = ug.earn || { visits: 0, passes: 0 };
+      ug.earn.visits += visits * VISIT_PAYOUT;
+      for (const p of ug.passes || []) {
+        const chance = 0.012 * q * Math.max(0.3, 1 - p.price / 3000);
+        const sold = visits > 30 ? Math.round(visits * chance * (0.6 + Math.random() * 0.8)) : Array.from({ length: visits }).filter(() => Math.random() < chance).length;
+        if (!sold) continue;
+        const share = Math.floor(p.price * 0.7) * sold;
+        earned += share;
+        ug.earn.passes += share;
+        ug.sales = (ug.sales || 0) + sold;
+        const buyer = U.pick(BF.bots.list);
+        BF.notify.push({ type: 'update', title: 'Pass sold in ' + ug.name, body: (sold > 1 ? sold + ' players' : buyer.displayName) + ' bought ' + p.name + '. +' + U.fmt(share) + ' ForgeCoins pending.', icon: 'ticket', route: '#/create/' + ug.id, silent: sold > 1 });
+      }
+      ug.pending = (ug.pending || 0) + earned;
+      ug.revenue = (ug.revenue || 0) + earned;
+      // per-minute history for the earnings chart
+      const minute = Math.floor(BF.clock.now() / 60000);
+      ug.hist = ug.hist || [];
+      let b = ug.hist[ug.hist.length - 1];
+      if (!b || b.m !== minute) { b = { m: minute, v: 0, a: 0, r: 0 }; ug.hist.push(b); if (ug.hist.length > HIST_MAX) ug.hist.splice(0, ug.hist.length - HIST_MAX); }
+      b.v += visits;
+      if (source === 'ad') b.a += visits;
+      b.r += earned;
+    },
+
+    /** Totals across every creation for the earnings dashboard. */
+    totals() {
+      return creator.list().reduce((a, g) => ({
+        visits: a.visits + (g.visits || 0),
+        pending: a.pending + (g.pending || 0),
+        revenue: a.revenue + (g.revenue || 0),
+        fromVisits: a.fromVisits + ((g.earn && g.earn.visits) || 0),
+        fromPasses: a.fromPasses + ((g.earn && g.earn.passes) || 0),
+        adSpend: a.adSpend + (g.adSpend || 0),
+        sales: a.sales + (g.sales || 0),
+      }), { visits: 0, pending: 0, revenue: 0, fromVisits: 0, fromPasses: 0, adSpend: 0, sales: 0 });
+    },
+
+    /** Earnings per minute for the last n minutes across creations (oldest first). */
+    series(n, id) {
+      const now = Math.floor(BF.clock.now() / 60000);
+      const out = Array.from({ length: n }, (_, i) => ({ m: now - n + 1 + i, v: 0, a: 0, r: 0 }));
+      for (const g of creator.list()) {
+        if (id && g.id !== id) continue;
+        for (const b of g.hist || []) { const i = b.m - (now - n + 1); if (i >= 0 && i < n) { out[i].v += b.v; out[i].a += b.a; out[i].r += b.r; } }
+      }
+      return out;
+    },
+
+    /** Collect every creation's pending earnings at once. */
+    collectAll() {
+      let total = 0;
+      for (const g of creator.list()) if (g.pending >= 1) { const r = creator.collect(g.id); if (r.ok) total += r.amount; }
+      return total ? { ok: true, amount: total } : { ok: false, error: 'No earnings to collect yet.' };
+    },
+
     /** Move pending revenue into your wallet. */
     collect(id) {
       const ug = creator.get(id);
@@ -223,28 +329,14 @@
       let touched = false;
       for (const ug of s.created) {
         if (!ug.published || ug.visibility === 'private') continue;
-        const quality = 0.4 + Math.min(0.3, (ug.description || '').length / 600) + (ug.thumbnail && ug.thumbnail.type === 'image' ? 0.1 : 0.05) + Math.min(0.2, (ug.passes || []).length * 0.05);
+        const quality = creator.quality(ug);
         const playing = BF.world.playerCount(ug.id);
         const visits = (Math.random() < 0.55 * quality ? U.randInt(1, 3) : 0) + (playing > 0 && Math.random() < 0.3 ? 1 : 0);
         if (!visits) continue;
         touched = true;
-        ug.visits += visits;
-        if (Math.random() < 0.18 * quality) ug.likes += 1;
-        if (Math.random() < 0.04) ug.dislikes += 1;
-        if (Math.random() < 0.06 * quality) ug.favorites += 1;
-        ug.pending = (ug.pending || 0) + visits * 0.2;
-        ug.revenue = (ug.revenue || 0) + visits * 0.2;
-        for (const p of ug.passes || []) {
-          if (Math.random() < 0.012 * quality * Math.max(0.3, 1 - p.price / 3000)) {
-            const share = Math.floor(p.price * 0.7);
-            ug.pending += share;
-            ug.revenue += share;
-            ug.sales = (ug.sales || 0) + 1;
-            const buyer = U.pick(BF.bots.list);
-            BF.notify.push({ type: 'update', title: 'Pass sold in ' + ug.name, body: buyer.displayName + ' bought ' + p.name + '. +' + U.fmt(share) + ' ForgeCoins pending.', icon: 'ticket', route: '#/create/' + ug.id });
-          }
-        }
+        creator.receiveVisits(ug, visits, 'organic');
       }
+      if (BF.ads && BF.ads.simulate(4)) touched = true;
       if (touched) BF.store.touch('created');
     },
   });

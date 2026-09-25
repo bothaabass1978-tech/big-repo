@@ -7,8 +7,8 @@
   const U = BF.util;
   const esc = U.esc;
 
-  const CAT_LABEL = { daily: 'Daily reward', game: 'Game reward', quest: 'Quest', achievement: 'Achievement', level: 'Level up', purchase: 'Avatar Shop', pass: 'Game pass', product: 'Game store', sale: 'Item sale', creator: 'Creator earnings', forgecore: 'FORGECORE', debug: 'Developer', gift: 'Gift', earn: 'Earned' };
-  const CAT_ICON = { daily: 'gift', game: 'gamepad', quest: 'target', achievement: 'medal', level: 'star', purchase: 'bag', pass: 'ticket', product: 'bag', sale: 'refresh', creator: 'anvil', forgecore: 'terminal', debug: 'bug', gift: 'sparkle', earn: 'plus' };
+  const CAT_LABEL = { daily: 'Daily reward', game: 'Game reward', quest: 'Quest', achievement: 'Achievement', level: 'Level up', purchase: 'Avatar Shop', pass: 'Game pass', product: 'Game store', sale: 'Item sale', creator: 'Creator earnings', ads: 'Advertising', forgecore: 'FORGECORE', debug: 'Developer', gift: 'Gift', earn: 'Earned' };
+  const CAT_ICON = { daily: 'gift', game: 'gamepad', quest: 'target', achievement: 'medal', level: 'star', purchase: 'bag', pass: 'ticket', product: 'bag', sale: 'refresh', creator: 'anvil', ads: 'megaphone', forgecore: 'terminal', debug: 'bug', gift: 'sparkle', earn: 'plus' };
   let txFilter = 'all';
   let txCat = 'all';
   let txLimit = 60;
