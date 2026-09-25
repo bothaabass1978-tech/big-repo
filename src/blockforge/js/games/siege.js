@@ -43,6 +43,7 @@
   };
   const DEF_SLOTS = [{ x: 215, y: 360 }, { x: 275, y: 345 }, { x: 335, y: 360 }, { x: 395, y: 330 }, { x: 150, y: 250, roof: true }];
   const ECO_SLOTS = [{ x: 60, y: 500 }, { x: 150, y: 500 }, { x: 240, y: 500 }, { x: 330, y: 500 }];
+  const ECO_Z = 150; // in 3D the village plots sit in front of the lane
 
   function waveList(n) {
     const list = [];
@@ -63,14 +64,17 @@
   const costTxt = (c) => Object.entries(c || {}).map(([k, v]) => v + ' ' + k).join(' + ');
 
   BF.GameModules.register('siege', {
+    three: true,
     maxBots: 2,
     feedTop: 0.19,
     actions: { next: ['Space'] },
     controls: { joystick: false, buttons: [{ act: 'next', label: 'Next wave', icon: 'play' }] },
     create(ctx) {
       const W = ctx.W, H = ctx.H;
-      const parts = new BF.Particles(600);
-      const floats = new BF.Floaters();
+      const V = ctx.g3;
+      // side view in 3D: X = x, Y = height above the ground line, the lane runs along Z = 0
+      const parts = V ? V.particles2d(0, (x, y) => [x, GROUND - y, 20]) : new BF.Particles(600);
+      const floats = V ? V.floaters2d(0, (x, y) => [x, GROUND - y + 10, 30]) : new BF.Floaters();
       const treasury = ctx.hasPass('treasury');
       const res = { gold: T.startGold, stone: T.startStone };
       let phase = 'build';
@@ -243,6 +247,13 @@
         if (Math.abs(px - WALL_X) < 22 && py > GROUND - 110 && py < GROUND) return { type: 'wall' };
         return null;
       }
+      /** 3D picking: village plots lie on the ground in front of the lane; everything else on the lane plane. */
+      function pick3d(px, py) {
+        const gp = V.groundAt(px, py, 0);
+        if (gp && gp.z > 60) { const ei = eco.findIndex((e) => Math.abs(gp.x - e.x) < 44 && Math.abs(gp.z - ECO_Z) < 44); if (ei >= 0) return { type: 'eco', i: ei }; }
+        const wp = V.wallAt(px, py, 0);
+        return wp ? pick(wp.x, GROUND - wp.y) : null;
+      }
       function fireTower(s) {
         const tw = TOWERS[s.tower], L = tw.levels[s.lvl];
         const inRange = foes.filter((e) => (tw.air || !FOES[e.kind].fly) && e.x - s.x < L.range && e.x > s.x - 40);
@@ -257,6 +268,163 @@
         }
         ctx.sfx(tw.levels[0].splash ? 'explosion' : 'shoot', { volume: 0.2 });
       }
+
+      // ------------------------------------------------------------ 3D view
+      const view = !V ? null : (() => {
+        V.preset('day', { fogNear: 1500, fogFar: 3800 });
+        V.shadowSize(640);
+        const Y = (y) => GROUND - y;
+        V.ground(-2000, -1600, W + 2000, 1600, '#6a9a5a', { map: BF.g3d.gridTex('#6a9a5a', 'rgba(0,0,0,0)', 1, { repeat: [40, 30], noise: true }) });
+        V.ground(WALL_X - 40, -60, W + 1400, 60, '#8a6a4a', { y: 0.4, map: BF.g3d.gridTex('#8a6a4a', 'rgba(0,0,0,0)', 1, { repeat: [30, 2], noise: true }) });
+        V.ground(0, 90, 420, 210, '#7a5a3a', { y: 0.4 });
+        const r = U.rng('cs3d');
+        const hills = [];
+        for (let i = 0; i < 26; i++) hills.push({ x: -800 + r() * (W + 1800), y: -80, z: -900 - r() * 900, w: 360 + r() * 400, h: 140 + r() * 180, d: 300, color: r() < 0.5 ? '#8fb58a' : '#7aa878' });
+        V.boxes(hills, { geo: 'sphereLo', shadow: false });
+        const pines = [];
+        for (let i = 0; i < 40; i++) { const x = -400 + r() * (W + 900), z = -120 - r() * 300; pines.push({ x, y: 0, z, w: 36, h: 80 + r() * 40, d: 36, color: '#2f7a3a' }); }
+        V.boxes(pines, { geo: 'cone' });
+        // village houses in front of the keep
+        for (let i = 0; i < 3; i++) { const x = 60 + i * 150, z = 260 + (i % 2) * 30; V.box(x, 0, z, 60, 34, 44, U.pick(['#f4ecd0', '#e8d3a8', '#d7c3a0'], r)); const roof = V.shape('cone4', x, 50, z, 76, 32, 60, '#9a3b2e'); roof.rotation.y = Math.PI / 4; }
+        // keep
+        let keepG = null, keepBuilt = -1, wallG = null, wallBuilt = '';
+        function buildKeep() {
+          keepBuilt = keepLvl;
+          if (keepG) V.remove(keepG);
+          keepG = V.group();
+          const col = keepLvl === 2 ? '#8a94a6' : keepLvl === 1 ? '#7a8494' : '#6a707c';
+          const cx = KEEP_X + KEEP_W / 2;
+          V.box(cx, 0, 0, KEEP_W, 190, 120, col, { parent: keepG });
+          for (let i = 0; i < 5; i++) for (const zz of [-54, 54]) V.box(KEEP_X + 11 + i * 22, 190, zz, 14, 16, 12, U.shade(col, -0.1), { parent: keepG });
+          for (let i = 0; i < 4; i++) for (const xx of [KEEP_X + 6, KEEP_X + KEEP_W - 6]) V.box(xx, 190, -42 + i * 28, 12, 16, 14, U.shade(col, -0.1), { parent: keepG });
+          V.box(cx + KEEP_W / 2 + 0.5, 0, 0, 2, 60, 34, '#3a2a1e', { parent: keepG });
+          for (const [dy, dz] of [[110, -30], [110, 30], [150, 0]]) V.box(cx + KEEP_W / 2 + 0.6, dy, dz, 1, 18, 10, '#1b1b22', { parent: keepG, shadow: false });
+          V.box(cx, 190, 0, 3, 60, 3, '#3a2a1e', { parent: keepG });
+          keepG.userData.flag = V.box(cx + 16, 232, 0, 30, 16, 1, '#ff5a1f', { parent: keepG, shadow: false });
+        }
+        function buildWall() {
+          wallBuilt = wallLvl + '|' + (wallHp > 0);
+          if (wallG) V.remove(wallG);
+          wallG = V.group();
+          const col = wallLvl === 0 ? '#8b5a2b' : wallLvl === 1 ? '#8a94a6' : '#6a707c';
+          if (wallHp > 0) {
+            for (let z = -60; z < 60; z += 20) V.box(WALL_X + 12, 0, z + 10, 24, 100, 19, (z / 20) % 2 ? col : U.shade(col, -0.08), { parent: wallG });
+            if (wallLvl === 0) for (let z = -60; z < 60; z += 10) V.shape('cone4', WALL_X + 12, 106, z + 5, 10, 12, 10, col, { parent: wallG });
+            else for (let z = -60; z < 60; z += 24) V.box(WALL_X + 12, 100, z + 12, 26, 12, 12, U.shade(col, -0.1), { parent: wallG });
+          } else for (let i = 0; i < 7; i++) V.box(WALL_X + 12 + (i % 3 - 1) * 10, 0, -50 + i * 16, 16, 8 + (i % 3) * 8, 14, '#5a4a3a', { parent: wallG });
+        }
+        // defense slots (pillars)
+        slots.forEach((s) => {
+          if (!s.roof) V.box(s.x, 0, 0, 44, Y(s.y) - 4, 44, '#6a5a4a');
+          V.box(s.x, Y(s.y) - 6, 0, 56, 8, 56, '#8a7a6a');
+        });
+        const towerPool = V.pool(), foePool = V.pool(), shotPool = V.pool(), ecoPool = V.pool();
+        const selRing = V.shape('ring', 0, 0, 0, 1, 1, 1, '#ffb454', { basic: true, side: 2, shadow: false });
+        function towerModel(s) {
+          const g = V.group();
+          const tw = TOWERS[s.tower];
+          const lv = s.lvl;
+          V.box(0, 0, 0, 32, 30 + lv * 8, 32, tw.color, { parent: g });
+          for (let k = 0; k <= lv; k++) V.box(-8 + k * 8, 30 + lv * 8, 16.5, 5, 5, 1, '#ffd66b', { parent: g, glow: 0.6, shadow: false });
+          const head = V.group(g); head.position.y = 36 + lv * 8;
+          if (s.tower === 'archer') { V.shape('cone4', 0, 12, 0, 40, 22, 40, '#8b5a2b', { parent: g }).position.y = 48 + lv * 8; V.box(10, -2, 0, 22, 3, 3, '#3a2a1e', { parent: head }); }
+          else if (s.tower === 'catapult') { V.box(8, -4, 0, 30, 5, 6, '#6b4226', { parent: head }); V.shape('sphere', 22, 2, 0, 10, 10, 10, '#5a5f6a', { parent: head }); }
+          else if (s.tower === 'mage') { V.shape('cone', 0, 16, 0, 20, 36, 20, '#7a4bd6', { parent: g }).position.y = 50 + lv * 8; V.shape('sphere', 16, 0, 0, 12, 12, 12, '#b67cff', { parent: head, glow: 1.3 }); }
+          else { V.box(10, -2, 0, 30, 4, 4, '#b8860b', { parent: head, metal: 0.5 }); V.box(4, -2, 0, 4, 4, 30, '#6b4226', { parent: head }); }
+          g.userData.head = head;
+          return g;
+        }
+        function foeModel(e) {
+          const f = FOES[e.kind];
+          if (f.fly) {
+            const g = V.group();
+            V.box(0, 0, 0, 30, 12, 14, f.color, { parent: g });
+            V.box(-18, 4, 0, 14, 10, 10, f.color, { parent: g });
+            V.box(-20, 8, 5.2, 3, 3, 1, '#ffd66b', { parent: g, glow: 1, shadow: false });
+            V.box(18, 2, 0, 16, 4, 4, U.shade(f.color, -0.2), { parent: g });
+            g.userData.wings = [-1, 1].map((sd) => { const w = V.group(g); w.position.z = sd * 7; V.box(0, 0, sd * 14, 20, 2, 28, U.shade(f.color, 0.1), { parent: w }); return w; });
+            return g;
+          }
+          if (e.kind === 'ram') {
+            const g = V.group();
+            V.box(0, 10, 0, 44, 20, 30, '#8b5a2b', { parent: g });
+            V.box(-8, 30, 0, 40, 4, 34, '#6b4226', { parent: g });
+            const log = V.shape('cyl', -24, 18, 0, 12, 50, 12, '#4a3a2a', { parent: g }); log.rotation.z = Math.PI / 2;
+            for (const [x, z] of [[-12, 16], [12, 16], [-12, -16], [12, -16]]) { const w = V.shape('cyl', x, 7, z, 14, 4, 14, '#3a2a1e', { parent: g }); w.rotation.x = Math.PI / 2; }
+            return g;
+          }
+          const look = { footman: { shirt: '#9a3a3a', helmet: '#9aa5b5' }, runner: { shirt: '#c9703a' }, shield: { shirt: '#5a5f6a', helmet: '#6a707c' }, ogre: { skin: '#5a7a3a', shirt: '#6b4b2a' }, giant: { skin: '#b09a80', shirt: '#6a5a4a' }, warlord: { skin: '#8a7aa0', shirt: '#3a1f4a', helmet: '#ffd66b' } }[e.kind] || {};
+          const g = BF.props3d.zombie(Object.assign({ skin: '#e0ac69', pants: '#3a3040', arms: 'down' }, look));
+          if (e.kind === 'shield') V.box(-16, 14, 0, 4, 30, 22, '#9aa5b5', { parent: g, metal: 0.5 });
+          V.scene.add(g);
+          g.scale.setScalar(f.boss ? (e.kind === 'giant' ? 2.8 : 2.2) : e.kind === 'runner' ? 0.85 : 1);
+          return g;
+        }
+        buildKeep();
+        buildWall();
+
+        return function sync(dt) {
+          const t = ctx.time;
+          V.look(440, 120, 40, { dist: 760, pitch: 0.26, yaw: 0.08, fov: 45 }, dt);
+          if (keepBuilt !== keepLvl) buildKeep();
+          if (wallBuilt !== wallLvl + '|' + (wallHp > 0)) buildWall();
+          keepG.userData.flag.scale.x = 30 * (0.85 + Math.sin(t * 4) * 0.15);
+          V.label(KEEP_X + KEEP_W / 2, 262, 0, { hp: keepHp / KEEPS[keepLvl].hp, hpColor: '#3fd08a', name: 'Keep', color: '#ffffff' });
+          if (wallHp > 0) V.label(WALL_X + 12, 128, 0, { hp: wallHp / WALLS[wallLvl].hp, hpColor: '#ffd66b' });
+          slots.forEach((s, i) => {
+            if (!s.tower) { V.label(s.x, Y(s.y) + 26, 0, { name: '+', color: s.owner ? '#8fd3ff' : '#ffffff' }); return; }
+            const m = towerPool.use(i + ':' + s.tower + ':' + s.lvl, () => towerModel(s));
+            m.position.set(s.x, Y(s.y) + 2, 0);
+            m.userData.head.rotation.z = -(s.aim || 0);
+            if (s.owner) V.label(s.x, Y(s.y) + 80, 0, { name: s.owner.displayName, color: '#8fd3ff', bubble: ctx.bubbleText(s.owner.id) });
+          });
+          towerPool.sweep();
+          eco.forEach((e, i) => {
+            const m = ecoPool.use(i + ':' + (e.kind || 'none'), () => {
+              const g = V.group();
+              if (!e.kind) V.box(0, 0, 0, 70, 2, 60, '#5a4a3a', { parent: g });
+              else if (e.kind === 'mine') { V.shape('dodeca', 0, 14, 0, 70, 40, 56, '#4a3a2a', { parent: g, flat: true }); V.box(0, 0, 26, 22, 22, 4, '#1b1b22', { parent: g }); for (const [x, y] of [[-16, 26], [14, 30], [4, 36]]) V.shape('octa', x, y, 18, 8, 8, 8, '#ffd66b', { parent: g, glow: 0.4 }); }
+              else { for (const [x, z, s2] of [[-14, -6, 26], [12, 8, 22], [4, -14, 16]]) V.box(x, 0, z, s2, s2, s2, '#9aa5b5', { parent: g }); }
+              return g;
+            });
+            m.position.set(e.x, 0, ECO_Z);
+            V.label(e.x, 60, ECO_Z, { name: e.kind ? ECON[e.kind].name + ' L' + (e.lvl + 1) : '+ plot', color: e.kind ? '#ffffff' : '#e8d3a8' });
+          });
+          ecoPool.sweep();
+          selRing.visible = !!selected && (selected.type === 'def' || selected.type === 'eco');
+          if (selRing.visible) {
+            if (selected.type === 'def') { const s = slots[selected.i]; selRing.position.set(s.x, Y(s.y) + 22, 30); selRing.rotation.set(0, 0, 0); selRing.scale.set(64, 64, 1); }
+            else { const e = eco[selected.i]; selRing.position.set(e.x, 1.5, ECO_Z); selRing.rotation.set(-Math.PI / 2, 0, 0); selRing.scale.set(84, 84, 1); }
+          }
+          foes.forEach((e) => {
+            const f = FOES[e.kind];
+            const m = foePool.use(e, () => foeModel(e));
+            if (!e._z) e._z = (Math.random() - 0.5) * 70;
+            m.position.set(e.x, f.fly ? Y(e.y) + 12 : 0, e._z);
+            m.rotation.y = f.fly ? 0 : -Math.PI / 2;
+            if (m.userData.tick) m.userData.tick(t, true, e.flash > 0);
+            if (m.userData.wings) { const fl = Math.sin(t * 14 + e.x) * 0.7; m.userData.wings[0].rotation.x = fl; m.userData.wings[1].rotation.x = -fl; }
+            if (e.hp < e.max || f.boss) V.label(e.x, (f.fly ? Y(e.y) + 12 : 0) + (f.boss ? (e.kind === 'giant' ? 170 : 134) : 70), e._z, { hp: e.hp / e.max, hpColor: '#ff5a6a', name: f.boss ? f.name : null, color: '#ff8b98' });
+          });
+          foePool.sweep();
+          for (const s of shots) {
+            const m = shotPool.use(s, () => (s.kind === 'rock' ? V.shape('dodeca', 0, 0, 0, 14, 14, 14, '#5a5f6a', { flat: true }) : s.kind === 'magic' ? V.shape('sphere', 0, 0, 0, 12, 12, 12, '#b67cff', { glow: 1.4, shadow: false }) : s.kind === 'bolt' ? V.box(0, 0, 0, 30, 4, 4, '#ffd66b', { glow: 0.6, shadow: false }) : V.box(0, 0, 0, 18, 2, 2, '#3a2a1e', { shadow: false })));
+            if (s.kind === 'bolt') { m.position.set(s.x, Y(s.laneY) + 18, 0); continue; }
+            const k = Math.min(1, s.t / s.dur);
+            const x = U.lerp(s.sx, s.tx, k), y = U.lerp(s.sy, s.ty, k) - Math.sin(k * Math.PI) * (s.kind === 'rock' ? 120 : 30);
+            m.position.set(x, Y(y), s.tgt && s.tgt._z ? s.tgt._z * k : 0);
+            if (s.kind === 'arrow') m.rotation.z = -Math.atan2(s.ty - s.sy - Math.cos(k * Math.PI) * 94, s.tx - s.sx);
+            else m.rotation.set(t * 5, t * 3, 0);
+          }
+          shotPool.sweep();
+          const rig = V.actor('me', ctx.player.avatar, { scale: 6 });
+          rig.setPos(KEEP_X + KEEP_W / 2 - 24, 190, 24);
+          rig.faceAngle(0.6);
+          if (phase !== 'build' && Math.random() < 0.004) rig.emote('cheer', 1.2);
+          V.label(KEEP_X + KEEP_W / 2 - 24, 236, 24, { name: ctx.player.name, color: '#ffb454', bubble: ctx.bubbleText('me') });
+          V.sweep();
+        };
+      })();
 
       return {
         update(dt) {
@@ -273,7 +441,7 @@
           if (ctx.input.actPressed('next')) startWave();
           if (ctx.input.pointer.pressed) {
             const p = ctx.input.pointer;
-            const hit = pick(p.x, p.y);
+            const hit = V ? pick3d(p.x, p.y) : pick(p.x, p.y);
             selected = hit;
             if (hit) ctx.sfx('click');
             panelFor();
@@ -409,19 +577,25 @@
           }
           parts.draw(g);
           floats.draw(g);
-          // HUD
+          drawHud(g);
+        },
+
+        render3d(dt) { view(dt); },
+        hud(g) { drawHud(g); },
+
+        onBotJoin(b) { addCommander(b); },
+        onBotLeave(b) { const i = commanders.findIndex((c) => c.bot.id === b.id); if (i >= 0) { commanders[i].slot.owner = null; commanders.splice(i, 1); } },
+      };
+
+      function drawHud(g) {
           G.panel(g, 10, 10, 300, 58);
           G.text(g, 'Wave ' + wave + ' / ' + T.waves, 22, 36, { size: 18, weight: 800, color: '#fff' });
           G.text(g, phase === 'build' ? 'Next wave in ' + Math.ceil(buildT) + 's' : spawnQ.length + foes.length + ' enemies', 22, 56, { size: 11, color: '#cfd6e2' });
           const inc = income();
           G.text(g, Math.floor(res.gold) + ' gold', 298, 34, { size: 14, weight: 800, align: 'right', color: '#ffd66b' });
           G.text(g, Math.floor(res.stone) + ' stone · +' + inc.gold.toFixed(1) + 'g/s', 298, 54, { size: 11, align: 'right', color: '#cfd6e2' });
-          if (!selected && phase === 'build' && wave === 0) G.text(g, 'Click a + slot to build · village plots below make gold and stone', W / 2, 96, { size: 13, align: 'center', color: '#1b1b22', weight: 800 });
-        },
-
-        onBotJoin(b) { addCommander(b); },
-        onBotLeave(b) { const i = commanders.findIndex((c) => c.bot.id === b.id); if (i >= 0) { commanders[i].slot.owner = null; commanders.splice(i, 1); } },
-      };
+          if (!selected && phase === 'build' && wave === 0) G.text(g, 'Click a + slot to build · village plots below make gold and stone', W / 2, 96, { size: 13, align: 'center', color: V ? '#ffffff' : '#1b1b22', weight: 800, stroke: V ? 'rgba(0,0,0,.6)' : null, strokeW: 3 });
+      }
     },
   });
 })((window.BF = window.BF || {}));

@@ -221,12 +221,14 @@
   /**
    * A shambling zombie (arms out, facing +Z, feet on y = 0, about 54 units tall):
    * one merged body mesh plus two swinging legs. Call userData.tick(t, moving, flash).
-   * @param {{skin?:string, shirt?:string, pants?:string, eyes?:string}} o
+   * arms:'down' gives a marching soldier instead; helmet adds a coloured cap.
+   * @param {{skin?:string, shirt?:string, pants?:string, eyes?:string, arms?:string, helmet?:string}} o
    */
   function zombie(o) {
     o = o || {};
     const skin = o.skin || '#8fbf6a', shirt = o.shirt || '#5a6a7a', pants = o.pants || '#3a4250', eyes = o.eyes || '#1b1b22';
-    const key = [skin, shirt, pants, eyes].join('|');
+    const soldier = o.arms === 'down';
+    const key = [skin, shirt, pants, eyes, soldier ? 1 : 0, o.helmet || ''].join('|');
     let geo = zCache.get(key);
     if (!geo) {
       const P = [];
@@ -235,9 +237,15 @@
       P.push({ k: 'box', p: [0, 48, 2], s: [15, 14, 14], r: [0.18, 0, 0.1], c: skin });
       for (const sd of [-1, 1]) {
         P.push({ k: 'box', p: [sd * 4, 49.5, 9.3], s: [3, 3, 0.6], r: [0.18, 0, 0.1], c: eyes });
-        P.push({ k: 'box', p: [sd * 12.5, 37, 1], s: [6.4, 6.4, 7], c: shirt });
-        P.push({ k: 'box', p: [sd * 12.5, 36 - sd, 11], s: [5.6, 5.6, 16], r: [-0.1, 0, 0], c: skin });
+        if (soldier) {
+          P.push({ k: 'box', p: [sd * 12.5, 34, 0], s: [6.4, 14, 7], c: shirt });
+          P.push({ k: 'box', p: [sd * 12.5, 24, 0], s: [5.6, 6, 6], c: skin });
+        } else {
+          P.push({ k: 'box', p: [sd * 12.5, 37, 1], s: [6.4, 6.4, 7], c: shirt });
+          P.push({ k: 'box', p: [sd * 12.5, 36 - sd, 11], s: [5.6, 5.6, 16], r: [-0.1, 0, 0], c: skin });
+        }
       }
+      if (o.helmet) { P.push({ k: 'box', p: [0, 55.5, 2], s: [16.5, 5, 15.5], r: [0.18, 0, 0.1], c: o.helmet }); }
       P.push({ k: 'box', p: [0, 44.5, 9.1], s: [7, 2, 0.6], r: [0.18, 0, 0.1], c: '#3a1f1f' });
       geo = merge(P);
       zCache.set(key, geo);

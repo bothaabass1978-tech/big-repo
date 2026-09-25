@@ -12,6 +12,7 @@
 
   const U = BF.util;
   const G = BF.gfx;
+  const TAU = Math.PI * 2;
 
   const TYPES = { fire: '#ff7a2e', water: '#46a8ff', grass: '#4ad17f', electric: '#ffd66b', rock: '#b48a4a', dark: '#6b4bd6', light: '#fff1a8', ice: '#7fe7ff' };
   const CHART = {
@@ -57,14 +58,17 @@
   }
 
   BF.GameModules.register('petbattle', {
+    three: true,
     maxBots: 5,
     feedTop: 0.3,
     actions: { m1: ['Digit1'], m2: ['Digit2'], m3: ['Digit3'], m4: ['Digit4'] },
     controls: { joystick: false, buttons: [] },
     create(ctx) {
       const W = ctx.W, H = ctx.H;
-      const parts = new BF.Particles(400);
-      const floats = new BF.Floaters();
+      const V = ctx.g3;
+      // 3D stands the pets on the ground where the 2D art sits on screen (x -> X, y -> Z)
+      const parts = V ? V.particles2d(46) : new BF.Particles(400);
+      const floats = V ? V.floaters2d(0, (x, y) => [x, 150, y + 60]) : new BF.Floaters();
       const d = ctx.data;
       d.levels = d.levels || {};
       d.xp = d.xp || {};
@@ -331,6 +335,77 @@
         if (tags.length) G.text(g, tags.join(' · '), x + 12, y + 58, { size: 10.5, color: f.status === 'burn' ? '#ff7a2e' : f.status === 'poison' ? '#b67cff' : '#ffd66b' });
       }
 
+      // ------------------------------------------------------------ 3D view
+      const view = !V ? null : (() => {
+        V.preset('dusk', { fogNear: 1400, fogFar: 3400 });
+        V.stars(300);
+        V.shadowSize(560);
+        V.ground(-2000, -1600, 3000, 2200, '#2f6b45', { map: BF.g3d.gridTex('#2f6b45', 'rgba(0,0,0,0)', 1, { repeat: [30, 24], noise: true }) });
+        const MY = { x: 250, z: 330 }, FOE = { x: 710, z: 200 };
+        for (const p of [MY, FOE]) {
+          V.shape('cyl', p.x, 5, p.z, 300, 10, 240, '#3a8a5a');
+          V.shape('cyl', p.x, 10.5, p.z, 270, 1, 212, '#4aa86a', { shadow: false });
+          const ring = V.shape('ring', p.x, 11.5, p.z, 250, 190, 1, '#ffd66b', { basic: true, opacity: 0.35, side: 2, shadow: false });
+          ring.rotation.x = -Math.PI / 2;
+        }
+        // arena rim: lantern posts and trees
+        const r = U.rng('pb3d');
+        const trees = [], crowns = [];
+        for (let i = 0; i < 26; i++) { const a = (i / 26) * TAU, dd = 620 + r() * 300; const x = 480 + Math.cos(a) * dd * 1.3, z = 260 + Math.sin(a) * dd * 0.9; if (z > 520) continue; trees.push({ x, z, w: 14, h: 50, d: 14, color: '#6b4226' }); crowns.push({ x, y: 36, z, w: 90, h: 110, d: 90, color: r() < 0.5 ? '#2f7a3a' : '#3a8a4a' }); }
+        V.boxes(trees, { geo: 'cylLo' });
+        V.boxes(crowns, { geo: 'cone' });
+        const lanterns = [];
+        for (let i = 0; i < 8; i++) { const x = 60 + i * 120, z = -40; V.box(x, 0, z, 6, 90, 6, '#3a2a1e'); lanterns.push(V.shape('sphere', x, 96, z, 18, 18, 18, '#ffd66b', { glow: 1.4, shadow: false })); }
+        const petPool = V.pool();
+        const shields = [MY, FOE].map((p) => V.shape('sphere', p.x, 70, p.z, 200, 170, 200, '#7fe7ff', { basic: true, opacity: 0.16, depthWrite: false, shadow: false }));
+        const artOf = (def) => def.art;
+
+        function placePet(key, def, pos, face, o) {
+          const m = petPool.use(key, () => { const g = BF.pet3d.build(artOf(def), {}); V.scene.add(g); return g; });
+          const lunge = o.lunge > 0 ? Math.sin((o.lunge / 0.35) * Math.PI) * 70 : 0;
+          const shake = o.hit > 0 ? Math.sin(o.hit * 60) * 7 : 0;
+          const dirX = FOE.x - MY.x, dirZ = FOE.z - MY.z, l = Math.hypot(dirX, dirZ);
+          const sgn = pos === MY ? 1 : -1;
+          m.position.set(pos.x + (dirX / l) * lunge * sgn + shake, 11 + (o.fainted ? 0 : Math.abs(Math.sin(ctx.time * 3 + pos.x)) * 4), pos.z + (dirZ / l) * lunge * sgn);
+          m.scale.setScalar(o.size || 120);
+          BF.pet3d.face(m, face);
+          m.rotation.z = o.fainted ? Math.PI / 2 : 0;
+          m.userData.tick(ctx.time);
+          return m;
+        }
+
+        return function sync(dt) {
+          const t = ctx.time;
+          V.look(480, 40, 300, { dist: 700, pitch: 0.42, yaw: 0.12, fov: 45, lerp: 0.06 }, dt);
+          lanterns.forEach((l, i) => { l.scale.setScalar(18 + Math.sin(t * 3 + i) * 2); });
+          const faceFoe = Math.atan2(FOE.z - MY.z, FOE.x - MY.x);
+          const faceMe = faceFoe + Math.PI;
+          if (phase === 'lobby') {
+            (d.team || []).forEach((id, i) => { if (PETS[id]) placePet('team' + id, PETS[id], { x: MY.x - 90 + i * 90, z: MY.z }, Math.PI / 2 + 0.3, { size: 80 }); });
+            shields.forEach((s2) => { s2.visible = false; });
+          } else {
+            const me = mine[mi], f = foes[fi];
+            if (me) placePet('me' + me.id + mi, me.def, MY, faceFoe * 0.5 + Math.PI / 4, { lunge: anim.me, hit: anim.meHit, fainted: me.hp <= 0 });
+            if (f) placePet('foe' + f.id + fi, f.def, FOE, faceMe * 0.6 + Math.PI / 3, { lunge: anim.foe, hit: anim.foeHit, fainted: f.hp <= 0 });
+            shields[0].visible = !!(me && me.shield > 0 && me.hp > 0);
+            shields[1].visible = !!(f && f.shield > 0 && f.hp > 0);
+          }
+          petPool.sweep();
+          const rig = V.actor('me', ctx.player.avatar, { scale: 11 });
+          rig.setPos(MY.x - 150, 11, MY.z + 70);
+          rig.faceAngle(faceFoe - 0.4);
+          if (anim.me > 0.3 && Math.random() < 0.2) rig.play('attack');
+          V.label(MY.x - 150, 96, MY.z + 70, { name: ctx.player.name, color: '#ffb454', bubble: ctx.bubbleText('me') });
+          if (trainer && phase !== 'lobby') {
+            const tr = V.actor('trainer:' + (trainer.bot ? trainer.bot.id : 'npc'), trainer.bot ? trainer.bot.avatar : { skin: '#e0ac69', shirt: '#7a4bd6', shirt2: '#ffd66b', pants: '#2a2150', hat: '#ffd66b', hatStyle: 'cap' }, { scale: 10 });
+            tr.setPos(FOE.x + 150, 11, FOE.z - 40);
+            tr.faceAngle(faceMe + 0.3);
+            V.label(FOE.x + 150, 86, FOE.z - 40, { name: trainer.name, color: '#e3ccff', bubble: trainer.bot ? ctx.bubbleText(trainer.bot.id) : null });
+          }
+          V.sweep();
+        };
+      })();
+
       return {
         update(dt) {
           parts.update(dt);
@@ -363,20 +438,29 @@
           const me = mine[mi], f = foes[fi];
           if (f) drawPet(g, f, 710, 200, false, anim.foeHit, anim.foe);
           if (me) drawPet(g, me, 250, 330, true, anim.meHit, anim.me);
-          if (f) infoBox(g, f, 60, 52, insight);
-          if (me) infoBox(g, me, 650, 330, true);
-          G.text(g, (trainer ? trainer.name : '') + ' · ' + RANKS[rank].name, 60, 136, { size: 12, color: '#e3ccff', weight: 800 });
-          if (log) { G.panel(g, 40, 8, W - 80, 30, 0.75); G.text(g, log, W / 2, 28, { size: 14, color: '#fff', weight: 700, align: 'center' }); }
           parts.draw(g);
           floats.draw(g);
-          if (foes.length) foes.forEach((x, i) => G.circle(g, 76 + i * 14, 148, 5, x.hp > 0 ? '#ff5a6a' : 'rgba(255,255,255,.2)'));
-          if (mine.length) mine.forEach((x, i) => G.circle(g, 666 + i * 14, 410, 5, x.hp > 0 ? '#3fd08a' : 'rgba(255,255,255,.2)'));
+          drawHud(g);
         },
+
+        render3d(dt) { view(dt); },
+        hud(g) { drawHud(g); },
 
         onBotJoin() {},
         onBotLeave() {},
         destroy() { offPass(); },
       };
+
+      function drawHud(g) {
+          if (phase === 'lobby') return;
+          const me = mine[mi], f = foes[fi];
+          if (f) infoBox(g, f, 60, 52, insight);
+          if (me) infoBox(g, me, 650, 330, true);
+          G.text(g, (trainer ? trainer.name : '') + ' · ' + RANKS[rank].name, 60, 136, { size: 12, color: '#e3ccff', weight: 800 });
+          if (log) { G.panel(g, 40, 8, W - 80, 30, 0.75); G.text(g, log, W / 2, 28, { size: 14, color: '#fff', weight: 700, align: 'center' }); }
+          if (foes.length) foes.forEach((x, i) => G.circle(g, 76 + i * 14, 148, 5, x.hp > 0 ? '#ff5a6a' : 'rgba(255,255,255,.2)'));
+          if (mine.length) mine.forEach((x, i) => G.circle(g, 666 + i * 14, 410, 5, x.hp > 0 ? '#3fd08a' : 'rgba(255,255,255,.2)'));
+      }
     },
   });
 })((window.BF = window.BF || {}));

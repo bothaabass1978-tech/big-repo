@@ -41,14 +41,21 @@
   const BOOK_ORDER = [0, 1, 2, 3]; // crimson, sea (blue), eldest (1871 brown), tree (green)
 
   BF.GameModules.register('mansion', {
+    three: true,
     maxBots: 3,
     feedTop: 0.13,
     actions: {},
     controls: { joystick: false, buttons: [] },
     create(ctx) {
       const W = ctx.W, H = ctx.H;
-      const parts = new BF.Particles(400);
-      const floats = new BF.Floaters();
+      const V = ctx.g3;
+      // In 3D the back wall of every room sits on the plane Z = 0 and the camera is placed so that
+      // plane maps 1:1 onto the 960×540 screen (screen x = X, screen y = FLOOR - Y). Hotspots,
+      // puzzles and the cellar secret therefore keep their 2D screen rectangles unchanged.
+      const CAM_D = (H / 2) / Math.tan((45 / 2) * Math.PI / 180);
+      const toWall = (x, y) => [x, FLOOR - y, 0];
+      const parts = V ? V.particles2d(0, (x, y) => toWall(x, y)) : new BF.Particles(400);
+      const floats = V ? V.floaters2d(0, (x, y) => toWall(x, y)) : new BF.Floaters();
       const d = ctx.data;
       d.beetles = d.beetles || [];
       const lantern = ctx.hasPass('lantern');
@@ -466,6 +473,165 @@
         if (mb) G.bubble(g, 90, FLOOR - 4, mb);
       }
 
+      // ------------------------------------------------------------ 3D view
+      const view = !V ? null : (() => {
+        let builtKey = null, roomG = null, glowParts = [], fireLight = null, suspects = [];
+        const P = (x, y, w, h, d, color, o) => V.box(x + w / 2, FLOOR - y - h, (o && o.z != null ? o.z : 0) + d / 2, w, h, d, color, Object.assign({ parent: roomG }, o));
+        const wallTex = (key, base, stripe) => BF.g3d.canvasTex('mm-wall:' + key, 128, 128, (g2, w, h) => { g2.fillStyle = base; g2.fillRect(0, 0, w, h); g2.fillStyle = stripe; for (let x = 0; x < w; x += 32) g2.fillRect(x, 0, 14, h); g2.fillStyle = 'rgba(255,255,255,.05)'; for (let y = 8; y < h; y += 32) for (let x = 8; x < w; x += 32) { g2.beginPath(); g2.arc(x + 12, y + 8, 4, 0, Math.PI * 2); g2.fill(); } }, { repeat: [960 / 128 * 1.5, 360 / 128 * 1.5] });
+        const floorTex = (key, base) => BF.g3d.canvasTex('mm-floor:' + key, 128, 128, (g2, w, h) => { g2.fillStyle = base; g2.fillRect(0, 0, w, h); g2.fillStyle = 'rgba(0,0,0,.2)'; for (let y = 0; y < h; y += 16) g2.fillRect(0, y, w, 2); for (let y = 0; y < h; y += 16) g2.fillRect(((y * 37) % 90) + 20, y, 2, 16); }, { repeat: [12, 6] });
+        const doorAt = (x, y, w, h, color) => { P(x - 6, y - 6, w + 12, h + 6, 6, '#2a1a10'); P(x, y, w, h, 8, color || '#3a2418'); P(x + w - 18, y + h * 0.55, 6, 6, 12, '#b8860b', { metal: 0.6 }); };
+
+        function build() {
+          const R = st.room, room = ROOMS[R];
+          builtKey = key();
+          if (roomG) V.remove(roomG);
+          if (fireLight) { V.remove(fireLight); fireLight = null; }
+          roomG = V.group();
+          glowParts = []; suspects = [];
+          const outdoor = room.outdoor;
+          V.preset(outdoor ? 'night' : R === 'cellar' ? 'cave' : 'indoor', { fogNear: 2400, fogFar: 5000 });
+          V.shadowSize(600);
+          V.focus(480, 100);
+          // back wall, floor, baseboard
+          if (outdoor) {
+            V.box(480, -1, -400, 3000, 1400, 2, '#1a2a4a', { parent: roomG, basic: true });
+            const moon = V.shape('sphere', 840, FLOOR - 70, -300, 60, 60, 60, '#f4f1ea', { parent: roomG, basic: true });
+            moon.position.set(480 + (840 - 480) * (CAM_D + 300) / CAM_D, 90 + (FLOOR - 70 - 90) * (CAM_D + 300) / CAM_D, -300);
+            const hedge = [];
+            for (let x = -200; x < 1200; x += 60) hedge.push({ x, y: 0, z: -40, w: 70, h: 70 + ((x * 7) % 30), d: 60, color: '#1f4a2a' });
+            V.boxes(hedge, { parent: roomG, geo: 'sphereLo' });
+          } else {
+            V.box(480, 0, -10, 1600, FLOOR + 400, 20, '#ffffff', { parent: roomG, map: wallTex(R, room.wall, U.shade(room.wall, 0.06)) });
+            V.box(480, 0, 1, 1600, 50, 4, U.shade(room.wall, -0.3), { parent: roomG });
+            V.box(480, 50, 3, 1600, 4, 4, U.shade(room.wall, 0.2), { parent: roomG, shadow: false });
+          }
+          V.ground(-600, 0, 1560, 700, '#ffffff', { parent: roomG, map: outdoor ? BF.g3d.gridTex('#2a4a2a', 'rgba(0,0,0,0)', 1, { repeat: [16, 8], noise: true }) : floorTex(R, room.floor) });
+          if (!outdoor && R !== 'cellar') { const rug = V.ground(300, 160, 660, 330, U.shade(room.wall, 0.15), { parent: roomG, y: 0.5 }); rug.receiveShadow = true; }
+          // doors
+          for (const sp of room.spots) if (sp.door && !(R === 'foyer' && (sp.id === 'toUpper' || sp.id === 'toCellar')) && !(R === 'upper' && sp.id === 'toFoyer') && !(R === 'cellar' && sp.id === 'toFoyer')) doorAt(sp.x, sp.y, sp.w, sp.h);
+          if (R === 'foyer') {
+            P(395, 75, 160, 190, 8, '#b8860b', { metal: 0.5, rough: 0.35, rot: st.flags.portraitMoved ? 0.06 : 0 });
+            P(405, 85, 140, 170, 10, '#3a2a1e');
+            P(440, 185, 70, 60, 12, '#1f2a44'); V.shape('sphere', 475, FLOOR - 150, 12, 56, 64, 12, '#e0ac69', { parent: roomG }); P(452, 118, 46, 16, 14, '#6b6b6b');
+            P(130, 110, 70, 250, 40, '#5a3a2a'); V.shape('cyl', 165, FLOOR - 160, 41, 44, 2, 44, '#f4f1ea', { parent: roomG }).rotation.x = Math.PI / 2;
+            P(163, 142, 3, 18, 44, '#1b1b22'); P(165, 160, 8, 3, 44, '#1b1b22');
+            P(140, 230, 50, 110, 42, '#3a2418');
+            V.shape('cyl', 263, FLOOR - 325, 25, 46, 70, 46, '#2a2f3a', { parent: roomG });
+            for (const [x, c] of [[252, '#8b5a2b'], [272, '#c0392b']]) { const u = V.shape('cyl', x, FLOOR - 270, 25, 4, 60, 4, c, { parent: roomG }); u.rotation.z = x < 262 ? 0.15 : -0.2; }
+            for (let i = 0; i < 8; i++) P(660 + i * 20, 180 - i * 16, 160 - i * 20, 14, 70 - i * 6, '#6a4a2a');
+            P(660, 196, 160, 164, 20, '#5a3a22');
+            P(700, 260, 90, 100, 24, '#2a1e18'); V.shape('sphere', 775, FLOOR - 312, 25, 8, 8, 6, '#b8860b', { parent: roomG, metal: 0.6 });
+            for (let i = 0; i < 4; i++) V.shape('sphere', 598 + (i % 2) * 22, FLOOR - (180 + Math.floor(i / 2) * 22), 6, 10, 10, 10, '#b8860b', { parent: roomG, metal: 0.6 });
+            V.shape('cyl', 480, FLOOR - 10, 120, 8, 20, 8, '#b8860b', { parent: roomG });
+          } else if (R === 'upper') {
+            P(620, 110, 120, 250, 8, st.flags.studyOpen ? '#0b0a0e' : '#3a2418');
+            P(372, 62, 176, 186, 6, '#5a3a2a'); P(380, 70, 160, 170, 8, '#1a2a4a', { basic: true });
+            V.shape('sphere', 480, FLOOR - 130, 10, 44, 44, 4, '#f4f1ea', { parent: roomG, basic: true });
+            P(380, 150, 160, 6, 12, '#5a3a2a'); P(456, 70, 6, 170, 12, '#5a3a2a');
+            P(390, 290, 180, 10, 30, '#6a4a2a'); P(400, 300, 160, 60, 2, '#1b120c', { basic: true });
+          } else if (R === 'library') {
+            P(300, 90, 360, 230, 40, '#4a3020');
+            const books = [];
+            for (let row = 0; row < 3; row++) for (let i = 0; i < 16; i++) { if (st.flags.shelfOpen && row === 1 && i >= 7 && i <= 9) continue; books.push({ x: 312 + i * 21 + 8, y: FLOOR - (102 + row * 72) - 60, z: 30, w: 16, h: 58 + ((i * 7) % 5), d: 22, color: ['#8b3a3a', '#3a5a8b', '#6b8b3a', '#8b7a3a', '#5a3a6b'][(i * 3 + row) % 5] }); }
+            V.boxes(books, { parent: roomG });
+            for (let row = 1; row < 3; row++) P(300, 90 + row * 72 - 6, 360, 6, 44, '#3a2418');
+            if (st.flags.shelfOpen) P(450, 180, 60, 40, 44, '#0b0a0e', { basic: true });
+            P(100, 250, 90, 110, 30, '#5a3a2a'); const book = P(90, 240, 110, 12, 40, '#f4ecd0'); book.rotation.x = 0.3;
+            V.shape('sphere', 845, FLOOR - 290, 30, 80, 80, 80, '#2e86c1', { parent: roomG, rough: 0.5 });
+            P(840, 330, 10, 30, 30, '#5a3a2a'); P(820, 350, 50, 10, 40, '#5a3a2a');
+            P(700, 70, 70, 50, 20, '#6a4a2a');
+            for (let i = 0; i < 8; i++) P(680 + (i % 2) * 36, 110 + i * 30, 6, 6, 50, '#8b5a2b');
+            for (const x of [676, 718]) P(x, 100, 6, 260, 50, '#8b5a2b');
+          } else if (R === 'study') {
+            P(560, 90, 130, 140, 10, '#b8860b', { metal: 0.5, rough: 0.35 });
+            P(570, 100, 110, 120, 12, st.flags.safeOpen ? '#2a2f3a' : '#3a5a3a');
+            if (st.flags.safeOpen) P(585, 115, 80, 90, 14, '#1b1b22', { basic: true });
+            P(220, 250, 260, 110, 70, '#5a3a2a'); P(250, 236, 110, 14, 50, '#f4ecd0');
+            V.shape('cylLo', 430, FLOOR - 250, 30, 16, 24, 16, '#e8d3a8', { parent: roomG, glow: 0.8 });
+            P(760, 200, 120, 120, 40, '#6a4a2a'); P(768, 208, 104, 60, 44, '#bfe6ff', { opacity: 0.35 });
+            for (let i = 0; i < 5; i++) { const b = V.shape('sphere', 782 + i * 19, FLOOR - 250, 30, 12, 8, 12, i < d.beetles.length ? '#ffd66b' : '#2a1e18', { parent: roomG, metal: i < d.beetles.length ? 0.7 : 0, glow: i < d.beetles.length ? 0.3 : 0 }); if (i < d.beetles.length) glowParts.push(b); }
+          } else if (R === 'kitchen') {
+            P(110, 110, 110, 130, 30, '#6a707c', { metal: 0.4 });
+            for (let i = 0; i < 5; i++) V.shape('sphere', 130 + i * 18, FLOOR - 150, 32, 11, 11, 6, st.fuses[i] ? '#ffd66b' : '#2a2f3a', { parent: roomG, glow: st.fuses[i] ? 1.2 : 0 });
+            P(300, 290, 330, 70, 70, '#8b5a2b'); P(296, 286, 338, 6, 74, '#d7dde6');
+            V.shape('cyl', 440, FLOOR - 272, 40, 30, 20, 30, '#f4f1ea', { parent: roomG });
+            const print = V.shape('disc', 685, 0.8, 150, 60, 26, 1, '#3c2814', { parent: roomG, opacity: 0.8, shadow: false }); print.rotation.x = -Math.PI / 2; print.rotation.z = 0.2;
+            P(780, 150, 70, 60, 10, '#1a2a4a', { basic: true });
+            V.shape('cyl', 560, FLOOR - 240, 20, 50, 30, 50, '#39414f', { parent: roomG, metal: 0.5 });
+          } else if (R === 'garden') {
+            P(80, 120, 200, 230, 110, '#8fd3ff', { opacity: 0.25, depthWrite: false });
+            for (const [x, y, w, h] of [[80, 120, 4, 230], [276, 120, 4, 230], [80, 120, 200, 4], [178, 120, 4, 230]]) P(x, y, w, h, 112, '#d7dde6');
+            const lamp = V.shape('sphere', 180, FLOOR - 230, 55, 16, 16, 16, '#ffd66b', { parent: roomG, glow: 1.4 });
+            glowParts.push(lamp); lamp.userData.flicker = !st.flags.trueEnding;
+            for (let i = 0; i < 6; i++) { V.shape('sphere', 380 + i * 26, 22, 60, 42, 40, 42, '#2f8f47', { parent: roomG }); V.shape('sphere', 380 + i * 26, 40, 76, 12, 12, 12, '#c0392b', { parent: roomG }); }
+            P(610, 150, 170, 200, 90, '#6b4b2a');
+            const roof = V.shape('cone4', 695, FLOOR - 128, 45, 240, 60, 130, '#4a3020', { parent: roomG }); roof.rotation.y = Math.PI / 4;
+            P(670, 250, 50, 100, 94, '#3a2418');
+          } else if (R === 'parlor') {
+            SUSPECTS.forEach((sp, i) => {
+              const look = { skin: ['#e0ac69', '#f1c27d', '#c68642', '#8d5524'][i], shirt: sp.color, shirt2: U.shade(sp.color, 0.3), pants: '#1f2a44', shoes: '#1b1b22', hair: ['#d7dde6', '#ff9a3c', '#1b1b22', '#1b1b22'][i], hat: i === 0 ? '#1b1b22' : null };
+              const rig = BF.char3d.build(look);
+              rig.group.scale.setScalar(19);
+              rig.group.position.set(250 + i * 140, 0, 60);
+              rig.group.rotation.y = i < 2 ? 0.5 : -0.5;
+              roomG.add(rig.group);
+              suspects.push(rig);
+            });
+            P(790, 190, 130, 170, 40, '#6a707c'); P(815, 250, 80, 110, 44, '#1b1b22', { basic: true });
+            const fire = V.shape('cone', 855, 16, 30, 40, 36, 20, '#ff7a2e', { parent: roomG, glow: 1.5, shadow: false });
+            glowParts.push(fire);
+            P(180, 300, 90, 60, 60, '#7a3b4a');
+          } else if (R === 'cellar') {
+            P(90, 110, 170, 240, 50, '#3a2418');
+            const bottles = [];
+            for (let r2 = 0; r2 < 5; r2++) for (let c = 0; c < 4; c++) bottles.push({ x: 115 + c * 40, y: FLOOR - (140 + r2 * 44) - 10, z: 52, w: 20, h: 20, d: 14, color: '#1a3a2a' });
+            V.boxes(bottles, { parent: roomG, geo: 'cylLo' });
+            const chute = P(300, 60, 100, 130, 60, '#2a2f3a', { metal: 0.5 }); chute.rotation.x = -0.2;
+            P(470, 110, 220, 250, 44, '#2a2426');
+            P(500, 180, 160, 140, 46, furnaceGlow > 0 ? '#3a1a0a' : '#141012');
+            for (let i = 0; i < 5; i++) P(506 + i * 31, 138, 26, 30, 46, '#8a6a2a', { metal: 0.5 });
+            P(560, 30, 40, 80, 40, '#2a2426');
+            if (furnaceGlow > 0) {
+              const f1 = V.shape('sphere', 580, FLOOR - 270, 44, 110, 90, 30, '#ff7a2e', { parent: roomG, glow: 1.6, shadow: false });
+              const f2 = V.shape('sphere', 580, FLOOR - 280, 50, 60, 50, 20, '#ffd66b', { parent: roomG, glow: 1.6, shadow: false });
+              glowParts.push(f1, f2);
+              fireLight = new THREE.PointLight('#ff7a2e', 1.8, 900, 1.2);
+              fireLight.position.set(580, 80, 160);
+              V.scene.add(fireLight);
+            }
+            P(730, 290, 120, 40, 50, '#39414f', { metal: 0.4 }); P(760, 330, 60, 30, 40, '#2a2f3a');
+            for (let i = 0; i < 6; i++) P(840 + i * 14, 200 - i * 22, 90 - i * 14, 12, 60, '#3a3030');
+          }
+        }
+        const key = () => [st.room, JSON.stringify(st.flags), st.fuses.join(''), d.beetles.length, furnaceGlow > 0 ? 1 : 0, powered() ? 1 : 0].join('|');
+
+        return function sync(dt) {
+          const t = ctx.time;
+          if (key() !== builtKey) build();
+          V.look(480, 90, 0, { dist: CAM_D, pitch: 0.0001, yaw: 0, fov: 45 }, 0);
+          glowParts.forEach((m, i) => { if (m.userData.flicker && Math.sin(t * 2) <= 0) m.visible = false; else m.visible = true; m.scale.x *= 1; if (m.material && m.material.emissiveIntensity != null && !m.material.userData.shared) m.material.emissiveIntensity = 1.3 + Math.sin(t * 13 + i) * 0.3; });
+          if (fireLight) fireLight.intensity = (1.5 + Math.sin(t * 13) * 0.3) * furnaceGlow;
+          suspects.forEach((rig) => rig.tick(dt));
+          const room = ROOMS[st.room];
+          const dark = room.dark && !powered();
+          // the player and other detectives on the floor in front of the wall
+          const atScreen = (sx, z) => 480 + (sx - 480) * (CAM_D - z) / CAM_D;
+          const me = V.actor('me', ctx.player.avatar, { scale: 9 });
+          me.setPos(atScreen(90, 200), 0, 200);
+          me.faceAngle(0.9);
+          me.group.visible = !dark;
+          for (const b of bots) {
+            if (b.room !== st.room || dark) continue;
+            const rig = V.actor(b.bot.id, b.bot.avatar, { scale: 8.5 });
+            rig.setPos(atScreen(b.x, 170), 0, 170);
+            rig.faceAngle(b.facing > 0 ? 0.6 : Math.PI - 0.6);
+            V.label(atScreen(b.x, 170), 62, 170, { name: b.bot.displayName, color: '#ffffff', bubble: ctx.bubbleText(b.bot.id) });
+          }
+          if (!dark) V.label(atScreen(90, 200), 66, 200, { bubble: ctx.bubbleText('me') });
+          V.sweep();
+        };
+      })();
+
       return {
         update(dt) {
           parts.update(dt);
@@ -500,10 +666,25 @@
         },
 
         draw(g) {
+          drawRoom(g, ctx.time);
+          drawHud(g);
+        },
+
+        render3d(dt) { view(dt); },
+        hud(g) { drawHud(g); },
+
+        /** Automated-test hooks (not used by gameplay). */
+        _test: { st, go, get glow() { return furnaceGlow; } },
+        onBotJoin(b) { addBot(b); },
+        onBotLeave(b) { const i = bots.findIndex((x) => x.bot.id === b.id); if (i >= 0) bots.splice(i, 1); },
+        destroy() { ctx.canvas.style.cursor = ''; ctx.save(); },
+      };
+
+      function drawHud(g) {
           const t = ctx.time;
-          drawRoom(g, t);
           const room = ROOMS[st.room];
           const dark = room.dark && !powered();
+          if (V) drawOverlay3d(g, t, dark);
           for (const s of visibleSpots()) {
             if (s.door) { g.globalAlpha = hover === s ? 0.9 : 0.35; G.text(g, (s.door === 'foyer' || s.door === 'upper' ? '' : '') + '▸ ' + s.label, s.x + s.w / 2, s.y + s.h / 2, { size: 12, align: 'center', color: '#fff', weight: 800, stroke: 'rgba(0,0,0,.6)', strokeW: 3 }); g.globalAlpha = 1; }
             if (lantern && s.hidden && s.hidden() && !dark) { g.globalAlpha = 0.35 + Math.sin(t * 5 + s.x) * 0.25; G.ring(g, s.x + s.w / 2, s.y + s.h / 2, Math.min(s.w, s.h) / 2 + 6, '#ffd66b', 2); g.globalAlpha = 1; }
@@ -523,14 +704,24 @@
           G.text(g, 'Midnight in ' + U.fmtClock(left), 238, 32, { size: 12, align: 'right', color: left < 60 ? '#ff8b98' : '#cfd6e2' });
           G.text(g, 'Ashcombe Manor · ' + st.clues.length + ' clues', 22, 52, { size: 11, color: '#a1abbb' });
           if (st.selected) G.text(g, 'Using: ' + st.items.find((i) => i.id === st.selected).name + ' (click an object)', W / 2, DOCK - 10, { size: 12, align: 'center', color: '#8fd3ff', stroke: 'rgba(0,0,0,.7)', strokeW: 3 });
-        },
+      }
 
-        /** Automated-test hooks (not used by gameplay). */
-        _test: { st, go, get glow() { return furnaceGlow; } },
-        onBotJoin(b) { addBot(b); },
-        onBotLeave(b) { const i = bots.findIndex((x) => x.bot.id === b.id); if (i >= 0) bots.splice(i, 1); },
-        destroy() { ctx.canvas.style.cursor = ''; ctx.save(); },
-      };
+      /** Screen-space details drawn over the 3D room (dial letters, runes, darkness, furnace halo). */
+      function drawOverlay3d(g, t, dark) {
+        if (st.room === 'cellar') {
+          const glow = furnaceGlow;
+          // letters and runes are painted onto the protruding dial and anvil faces
+          for (let i = 0; i < 5; i++) { const p = V.toScreen(519 + i * 31, FLOOR - 153, 46.5); G.text(g, secrets.state().wordSolved ? 'EMBER'[i] : st.dials[i], p.x, p.y + 6, { size: 17, align: 'center', color: '#1b1b22', weight: 900 }); }
+          secrets.RUNES.forEach((r2, i) => { const p = V.toScreen(752 + i * 26, FLOOR - 312, 50.5); G.text(g, r2, p.x, p.y + 5, { size: 14, align: 'center', color: glow > 0 ? (st.rhythm && st.rhythm.lit === i ? '#ffffff' : '#ff9d5c') : '#5a5f6a', weight: 900 }); });
+          if (glow > 0) {
+            const halo = g.createRadialGradient(580, 250, 20, 580, 250, 320);
+            halo.addColorStop(0, 'rgba(255,122,46,' + 0.22 * glow + ')'); halo.addColorStop(1, 'rgba(255,122,46,0)');
+            g.fillStyle = halo; g.fillRect(0, 0, W, DOCK);
+          }
+          if (dark) { g.fillStyle = 'rgba(0,0,0,.93)'; g.fillRect(0, 0, W, DOCK); G.text(g, 'It is too dark to see.', W / 2, 240, { size: 16, align: 'center', color: '#5a5f6a' }); g.fillStyle = 'rgba(255,255,255,.08)'; g.fillRect(840, 60, 100, 140); }
+        }
+        if (st.room === 'parlor') SUSPECTS.forEach((sp, i) => G.text(g, sp.name, 250 + i * 140, FLOOR + 26, { size: 12, align: 'center', color: '#fff', weight: 800, stroke: 'rgba(0,0,0,.6)', strokeW: 3 }));
+      }
     },
   });
 })((window.BF = window.BF || {}));

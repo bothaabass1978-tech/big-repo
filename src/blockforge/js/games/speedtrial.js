@@ -133,14 +133,16 @@
   BF.speedTrialCourses = COURSES;
 
   BF.GameModules.register('speedtrial', {
+    three: true,
     maxBots: 4,
     feedTop: 0.18,
     actions: { brake: ['Space'], restart: ['KeyR'] },
     controls: { joystick: true, buttons: [{ act: 'brake', label: 'Brake', icon: 'pause' }, { act: 'restart', label: 'Restart', icon: 'refresh' }] },
     create(ctx) {
       const W = ctx.W, H = ctx.H;
-      const parts = new BF.Particles(400);
-      const floats = new BF.Floaters();
+      const V = ctx.g3;
+      const parts = V ? V.particles2d(10) : new BF.Particles(400);
+      const floats = V ? V.floaters2d(50) : new BF.Floaters();
       const cam = new BF.Camera(W, H);
       const d = ctx.data;
       d.medals = d.medals || {};
@@ -226,6 +228,100 @@
         if (a === 'buy-all') BF.actions.run('buy-pass', null, null, { pass: 'st_all' });
         if (a === 'buy-turbo') BF.actions.run('buy-pass', null, null, { pass: 'st_turbo' });
       });
+
+      // ------------------------------------------------------------ 3D view
+      const view = !V ? null : (() => {
+        V.preset('night', { fogNear: 1200, fogFar: 3400 });
+        V.stars(400);
+        V.shadowSize(520);
+        V.ground(-3000, -3000, 7000, 6000, '#ffffff', { y: -60, map: BF.g3d.gridTex('#0a0c14', 'rgba(57,243,255,0.16)', 4, { repeat: [60, 50] }), basic: true });
+        let built = null, trackG = null, gateMeshes = [], padMeshes = [];
+        const ghostPool = V.pool();
+        const SURF_COL = { ice: '#bfe6ff', mud: '#6b4b2a', normal: '#262b3a' };
+        const orb = V.group();
+        const shell = V.shape('sphere', 0, 0, 0, 34, 34, 34, ctx.player.look.shirt || '#ffb454', { parent: orb, opacity: 0.42, rough: 0.05, metal: 0.2, depthWrite: false });
+        shell.castShadow = true;
+        const band = V.shape('torus', 0, 0, 0, 30, 30, 30, '#ffffff', { parent: orb, glow: 0.8, shadow: false });
+        band.rotation.x = Math.PI / 2;
+        const rig = BF.char3d.build(ctx.player.avatar);
+        rig.group.scale.setScalar(3.3);
+        rig.group.position.y = -12;
+        orb.add(rig.group);
+        const qb = new THREE.Quaternion(), axis = new THREE.Vector3();
+
+        function rebuild() {
+          built = course;
+          if (trackG) V.remove(trackG);
+          trackG = V.group();
+          const c = course;
+          const pts = c.pts.map((p) => ({ x: p[0], y: p[1] }));
+          V.strip(pts, { width: c.width + 16, y: 0.4, closed: false, color: c.color, glow: 0.8, parent: trackG });
+          for (const sg of c.segs) V.strip([{ x: sg.x1, y: sg.y1 }, { x: sg.x2, y: sg.y2 }], { width: c.width, y: 1, closed: false, color: SURF_COL[sg.surf], parent: trackG });
+          c.pts.forEach((p, i) => { const sf = c.segs[Math.min(i, c.segs.length - 1)].surf; V.shape('cyl', p[0], 0.9, p[1], c.width, 1.4, c.width, SURF_COL[sf], { parent: trackG, shadow: false }); V.shape('cyl', p[0], 0.3, p[1], c.width + 16, 1, c.width + 16, c.color, { parent: trackG, glow: 0.8, shadow: false }); });
+          // rails
+          for (const sg of c.segs) {
+            const len = sg.len, a = Math.atan2(sg.ty, sg.tx), nx = -sg.ty, ny = sg.tx;
+            for (const sd of [-1, 1]) { const m = V.box((sg.x1 + sg.x2) / 2 + nx * sd * (c.width / 2 + 6), 0, (sg.y1 + sg.y2) / 2 + ny * sd * (c.width / 2 + 6), len, 8, 4, c.color, { parent: trackG, glow: 1, shadow: false }); m.rotation.y = -a; }
+          }
+          // track pillars
+          const piles = [];
+          for (const sg of c.segs) for (let k = 0; k < sg.len; k += 220) piles.push({ x: sg.x1 + sg.tx * k, y: -60, z: sg.y1 + sg.ty * k, w: 18, h: 60, d: 18, color: '#1b1e2a' });
+          V.boxes(piles, { parent: trackG, shadow: false });
+          padMeshes = c.boostPads.map((pad) => {
+            const g = V.group(trackG);
+            g.position.set(pad.x, 2, pad.y);
+            g.rotation.y = -Math.atan2(pad.dy, pad.dx);
+            V.box(0, 0, 0, 60, 1, 48, '#ffd66b', { parent: g, basic: true, opacity: 0.2, shadow: false });
+            g.userData.chev = [0, 1, 2].map(() => { const ch = V.shape('cone4', 0, 1.5, 0, 16, 18, 4, '#ffd66b', { parent: g, glow: 1.4, shadow: false }); ch.rotation.z = -Math.PI / 2; ch.rotation.x = Math.PI / 2; return ch; });
+            return g;
+          });
+          gateMeshes = c.gateS.map((gs, i) => {
+            const p = pointAt(c, gs);
+            const nx = -p.sg.ty, ny = p.sg.tx, half = c.width / 2;
+            const g = V.group(trackG);
+            g.position.set(p.x, 0, p.y);
+            g.rotation.y = -Math.atan2(ny, nx);
+            for (const sd of [-1, 1]) V.box(sd * half, 0, 0, 8, 54, 8, '#ffffff', { parent: g });
+            const last = i === c.gateS.length - 1;
+            if (last) { for (let k = -4; k < 4; k++) V.box((k + 0.5) * (half / 4), 1.6, 0, half / 4, 1, 12, (k & 1) ? '#ffffff' : '#1b1b22', { parent: g, shadow: false }); V.box(0, 54, 0, half * 2 + 8, 10, 8, '#ffffff', { parent: g }); }
+            g.userData.bar = V.box(0, 50, 0, half * 2, 6, 6, c.color, { parent: g, glow: 1, shadow: false });
+            g.userData.last = last;
+            return g;
+          });
+        }
+
+        return function sync(dt) {
+          const t = ctx.time;
+          if (!course) {
+            V.look(0, 0, 0, { dist: 400, pitch: 0.5, yaw: t * 0.2, fov: 45 }, dt);
+            orb.position.set(0, 20, 0);
+            rig.tick(dt);
+            V.sweep();
+            return;
+          }
+          if (built !== course) rebuild();
+          if (ball) V.look(ball.x + ball.vx * 0.35, 0, ball.y + ball.vy * 0.35, { dist: 620, pitch: 0.98, fov: 45, lerp: 0.14 }, dt);
+          padMeshes.forEach((g) => g.userData.chev.forEach((ch, k) => { ch.position.x = ((t * 60 + k * 18) % 54) - 27; }));
+          gateMeshes.forEach((g, i) => { if (g.userData.last) return; g.userData.bar.material = V.mat(i === gate ? '#3fd08a' : i < gate ? '#5a606c' : course.color, { glow: i === gate ? 1.4 : 0.6 }); });
+          if (ball) {
+            orb.position.set(ball.x, 17, ball.y);
+            const sp = Math.hypot(ball.vx, ball.vy);
+            if (sp > 1) { axis.set(ball.vy, 0, -ball.vx).normalize(); qb.setFromAxisAngle(axis, (sp * dt) / 17); shell.quaternion.premultiply(qb); band.quaternion.premultiply(qb); rig.group.rotation.y = Math.PI / 2 - Math.atan2(ball.vy, ball.vx); }
+            rig.set({ move: Math.min(1.5, sp / 300) });
+            rig.tick(dt);
+            V.label(ball.x, 44, ball.y, { name: ctx.player.name, color: '#ffb454', bubble: ctx.bubbleText('me') });
+          }
+          const gt = phase === 'race' ? time : 0;
+          for (const gh of ghosts) {
+            const p = ghostPos(gh, gt);
+            const m = ghostPool.use(gh, () => V.shape('sphere', 0, 0, 0, 26, 26, 26, gh.color, { opacity: 0.4, glow: 0.4, depthWrite: false, shadow: false }));
+            m.position.set(p.x, 14, p.y);
+            V.label(p.x, 36, p.y, { name: gh.name, color: gh.color, bubble: gh.bot ? ctx.bubbleText(gh.bot.id) : null });
+          }
+          ghostPool.sweep();
+          V.sweep();
+        };
+      })();
 
       return {
         update(dt) {
@@ -330,8 +426,19 @@
           parts.draw(g);
           floats.draw(g);
           g.restore();
-          if (phase === 'lobby') return;
-          // HUD
+          drawHud(g);
+        },
+
+        render3d(dt) { view(dt); },
+        hud(g) { drawHud(g); },
+
+        onBotJoin() {},
+        onBotLeave() {},
+        destroy() { offPass(); },
+      };
+
+      function drawHud(g) {
+          if (phase === 'lobby' || !course) return;
           G.panel(g, 10, 10, 250, 70);
           G.text(g, U.fmtTime(time * 1000), 22, 42, { size: 26, weight: 800, color: '#fff', font: "'Rubik', system-ui, sans-serif" });
           G.text(g, course.name, 248, 30, { size: 12, align: 'right', color: course.color, weight: 800 });
@@ -341,12 +448,7 @@
           else if (lastSplit) G.display(g, U.fmtTime(lastSplit.t * 1000), W / 2, 90, 26, '#ffffff');
           if (phase === 'count') G.display(g, countT > 0.1 ? String(Math.ceil(countT)) : 'GO', W / 2, H / 2 - 40, 84, '#ffffff');
           if (ball) { const sp = Math.hypot(ball.vx, ball.vy); G.panel(g, W - 130, H - 50, 120, 40); G.text(g, Math.round(sp / 4) + ' km/h', W - 20, H - 24, { size: 16, weight: 800, align: 'right', color: ball.boostT > 0 ? '#ffd66b' : '#fff' }); }
-        },
-
-        onBotJoin() {},
-        onBotLeave() {},
-        destroy() { offPass(); },
-      };
+      }
     },
   });
 })((window.BF = window.BF || {}));

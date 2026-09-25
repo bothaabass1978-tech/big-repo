@@ -31,14 +31,16 @@
   const STARS = (() => { const r = U.rng('cosmic-stars'); return Array.from({ length: 140 }, () => ({ x: r() * 960, y: r() * 540, z: 0.2 + r() * 0.8 })); })();
 
   BF.GameModules.register('cosmic', {
+    three: true,
     maxBots: 3,
     feedTop: 0.15,
     actions: { fire: ['Space', 'KeyJ'], thrust: ['KeyW', 'ArrowUp'], brake: ['KeyS', 'ArrowDown'] },
     controls: { joystick: true, buttons: [{ act: 'fire', label: 'Fire', icon: 'crosshair' }, { act: 'thrust', label: 'Thrust', icon: 'rocket' }] },
     create(ctx) {
       const W = ctx.W, H = ctx.H;
-      const parts = new BF.Particles(700);
-      const floats = new BF.Floaters();
+      const V = ctx.g3;
+      const parts = V ? V.particles2d(0) : new BF.Particles(700);
+      const floats = V ? V.floaters2d(40) : new BF.Floaters();
       const deflector = ctx.hasPass('deflector');
       const tractor = ctx.hasPass('tractor');
       const shieldMax = T.shield * (deflector ? 1.5 : 1);
@@ -168,6 +170,119 @@
 
       ctx.banner('SURVIVE THE STORM', 'Evacuation opens at 3:00', 1800);
 
+      // ------------------------------------------------------------ 3D view
+      const view = !V ? null : (() => {
+        V.preset('space', { fogNear: 2000, fogFar: 5000 });
+        V.stars(700);
+        V.shadowSize(560);
+        // a planet far below and a faint arena grid
+        const planet = V.shape('sphere', 1500, -900, -700, 1100, 1100, 1100, '#3a4aa8', { rough: 0.9 });
+        V.shape('sphere', 1500, -900, -700, 1140, 1140, 1140, '#8fd3ff', { basic: true, opacity: 0.12, depthWrite: false, shadow: false });
+        const grid = V.ground(0, 0, W, H, '#ffffff', { y: -30, map: BF.g3d.gridTex('rgba(0,0,0,0)', 'rgba(143,211,255,0.10)', 4, { repeat: [W / 160, H / 160] }), opacity: 0.9, depthWrite: false, basic: true });
+        grid.receiveShadow = false;
+        const meteorPool = V.pool(), shotPool = V.pool(), dropPool = V.pool(), cometPool = V.pool(), shipPool = V.pool();
+        function shipModel(color) {
+          const g = V.group();
+          V.box(0, -3, 0, 26, 7, 12, color, { parent: g, metal: 0.4, rough: 0.35 });
+          const nose = V.shape('cone4', 16, 0, 0, 10, 12, 10, color, { parent: g, metal: 0.4, rough: 0.35 }); nose.rotation.z = -Math.PI / 2;
+          for (const sd of [-1, 1]) { const w = V.box(-4, -2, sd * 12, 16, 3, 16, U.shade(color, -0.25), { parent: g }); w.rotation.y = sd * 0.35; }
+          V.box(4, 2, 0, 9, 4, 7, '#2a3a55', { parent: g, rough: 0.1, metal: 0.3 });
+          g.userData.flame = V.shape('cone', -18, 0, 0, 8, 14, 8, '#ffb454', { parent: g, glow: 1.6, shadow: false });
+          g.userData.flame.rotation.z = Math.PI / 2;
+          g.userData.shield = V.shape('sphere', 0, 0, 0, 48, 36, 48, '#7fe7ff', { parent: g, basic: true, opacity: 0.18, depthWrite: false, shadow: false });
+          return g;
+        }
+        function placeShip(key, sh, color, dt) {
+          const m = shipPool.use(key, () => shipModel(color));
+          m.scale.setScalar(1.45);
+          m.position.set(sh.x, 20, sh.y);
+          m.rotation.y = -sh.a;
+          m.rotation.x = U.clamp((sh._turn || 0), -0.6, 0.6);
+          const da = sh._pa != null ? U.wrapAngle(sh.a - sh._pa) : 0;
+          sh._turn = U.lerp(sh._turn || 0, -da * 12, Math.min(1, dt * 8));
+          sh._pa = sh.a;
+          m.userData.flame.visible = !!sh.thrusting;
+          m.userData.flame.scale.set(8, 14 + Math.random() * 8, 8);
+          return m;
+        }
+        let evacG = null;
+
+        return function sync(dt) {
+          const t = ctx.time;
+          V.look(W / 2 + (me.x - W / 2) * 0.12, 0, H / 2 + 30 + (me.y - H / 2) * 0.1, { dist: 760, pitch: 1.12, fov: 45, lerp: 0.05 }, dt);
+          planet.rotation.y = t * 0.02;
+          for (const m of meteors) {
+            const mesh = meteorPool.use(m, () => { const g = V.shape(m.size === 3 ? 'dodeca' : 'ico', 0, 0, 0, 1, 1, 1, U.pick(['#7a6a5a', '#6a5e52', '#86766a']), { flat: true, rough: 0.95 }); g.userData.k = [0.9 + Math.random() * 0.3, 0.8 + Math.random() * 0.3, 0.9 + Math.random() * 0.3]; return g; });
+            const k = mesh.userData.k;
+            mesh.scale.set(m.r * 2 * k[0], m.r * 1.6 * k[1], m.r * 2 * k[2]);
+            mesh.position.set(m.x, 20, m.y);
+            mesh.rotation.set(m.rot * 0.7, m.rot, m.rot * 0.4);
+          }
+          meteorPool.sweep();
+          for (const b of bullets) {
+            const mesh = shotPool.use(b, () => V.box(0, 0, 0, 14, 3, 3, b.color || '#ffd66b', { basic: true, shadow: false }));
+            mesh.position.set(b.x, 20, b.y);
+            mesh.rotation.y = -Math.atan2(b.vy, b.vx);
+          }
+          shotPool.sweep();
+          for (const dr of drops) {
+            const mesh = dropPool.use(dr, () => (dr.kind === 'crystal' ? V.shape('octa', 0, 0, 0, 10, 16, 10, '#7fe7ff', { glow: 0.9, flat: true, shadow: false }) : V.shape('ico', 0, 0, 0, 22, 22, 22, POWERS[dr.kind].color, { glow: 0.7, flat: true, shadow: false })));
+            mesh.position.set(dr.x, 20 + Math.sin(t * 4 + dr.x) * 3, dr.y);
+            mesh.rotation.y = t * 2;
+            if (dr.kind !== 'crystal') V.label(dr.x, 44, dr.y, { name: POWERS[dr.kind].name, color: POWERS[dr.kind].color });
+          }
+          dropPool.sweep();
+          for (const c of comets) {
+            const mesh = cometPool.use(c, () => {
+              const g = V.group();
+              g.userData.warn = V.box(0, 0, 0, W + 400, 1, c.r * 2, '#ff3d5a', { parent: g, basic: true, opacity: 0.2, depthWrite: false, shadow: false });
+              const body = V.group(g);
+              V.shape('sphere', 0, 0, 0, c.r * 2, c.r * 2, c.r * 2, '#bfe6ff', { parent: body, glow: 0.8 });
+              const tail = V.shape('cone', 0, 0, 0, c.r * 1.8, c.r * 8, c.r * 1.8, '#8fd3ff', { parent: body, basic: true, opacity: 0.35, depthWrite: false, shadow: false });
+              tail.rotation.z = c.vx > 0 ? Math.PI / 2 : -Math.PI / 2;
+              tail.position.x = c.vx > 0 ? -c.r * 4 : c.r * 4;
+              g.userData.body = body;
+              return g;
+            });
+            mesh.userData.warn.visible = c.warn > 0;
+            mesh.userData.warn.position.set(W / 2, 2, c.y);
+            mesh.userData.warn.material = V.mat('#ff3d5a', { basic: true, opacity: 0.12 + Math.abs(Math.sin(t * 20)) * 0.15, depthWrite: false });
+            mesh.userData.body.visible = c.warn <= 0;
+            mesh.userData.body.position.set(c.x, 20, c.y);
+          }
+          cometPool.sweep();
+          mates.forEach((m) => {
+            if (m.dead > 0) return;
+            const mesh = placeShip(m.bot.id, m, m.color, dt);
+            mesh.visible = !(m.inv > 0 && Math.sin(t * 30) > 0);
+            mesh.userData.shield.visible = false;
+            V.label(m.x, 44, m.y, { name: m.name, color: m.color, bubble: ctx.bubbleText(m.bot.id) });
+          });
+          const mine = placeShip('me', me, '#ffb454', dt);
+          mine.visible = phase !== 'over' && !(me.inv > 0 && Math.sin(t * 30) > 0);
+          mine.userData.shield.visible = me.shield > 0;
+          mine.userData.shield.material = V.mat('#7fe7ff', { basic: true, opacity: 0.08 + (me.shield / shieldMax) * 0.2, depthWrite: false });
+          V.label(me.x, 44, me.y, { name: ctx.player.name, color: '#ffb454', bubble: ctx.bubbleText('me') });
+          shipPool.sweep();
+          if (evac && evac.t < T.evacWindow) {
+            if (!evacG) {
+              evacG = V.group();
+              V.shape('cylLo', 0, 200, 0, 92, 440, 92, '#8fd3ff', { parent: evacG, basic: true, opacity: 0.22, depthWrite: false, shadow: false });
+              const ring = V.shape('ring', 0, 2, 0, 104, 104, 1, '#8fd3ff', { parent: evacG, basic: true, side: 2, shadow: false }); ring.rotation.x = -Math.PI / 2;
+              const shuttle = V.group(evacG); shuttle.position.y = 360;
+              V.box(0, 0, 0, 90, 26, 50, '#d7dde6', { parent: shuttle, metal: 0.3 });
+              V.box(0, -8, 0, 40, 6, 30, '#8fd3ff', { parent: shuttle, glow: 1 });
+              evacG.userData.shuttle = shuttle;
+            }
+            evacG.visible = true;
+            evacG.position.set(evac.x, 0, evac.y);
+            evacG.userData.shuttle.rotation.y = t * 0.3;
+            V.label(evac.x, 60, evac.y + 60, { name: 'EVAC · ' + Math.ceil(T.evacWindow - evac.t) + 's', color: '#8fd3ff' });
+          } else if (evacG) evacG.visible = false;
+          V.sweep();
+        };
+      })();
+
       return {
         update(dt) {
           parts.update(dt);
@@ -181,7 +296,8 @@
           if (p.moved) me.mouse = true;
           if (Math.abs(ax.x) > 0.3) me.mouse = false;
           let turn = ax.x;
-          if (me.mouse) turn = U.clamp(U.wrapAngle(Math.atan2(p.y - me.y, p.x - me.x) - me.a) * 3, -1, 1);
+          const q = V ? ctx.pointerWorld(0) : p;
+          if (me.mouse) turn = U.clamp(U.wrapAngle(Math.atan2(q.y - me.y, q.x - me.x) - me.a) * 3, -1, 1);
           const thrust = inp.act('thrust') || ax.y < -0.4;
           me.thrusting = thrust;
           steerShip(me, dt, turn, thrust, inp.act('brake') || ax.y > 0.5);
@@ -297,7 +413,17 @@
           if (mb) G.bubble(g, me.x, me.y - 36, mb);
           parts.draw(g);
           floats.draw(g);
-          // HUD
+          drawHud(g);
+        },
+
+        render3d(dt) { view(dt); },
+        hud(g) { drawHud(g); },
+
+        onBotJoin(b) { addMate(b); },
+        onBotLeave(b) { const i = mates.findIndex((m) => m.bot.id === b.id); if (i >= 0) mates.splice(i, 1); },
+      };
+
+      function drawHud(g) {
           G.panel(g, 10, 10, 260, 66);
           G.text(g, U.fmtClock(time), 22, 38, { size: 22, weight: 800, color: time >= T.evac ? '#3fd08a' : '#fff' });
           G.text(g, time < T.evac ? 'evac in ' + U.fmtClock(T.evac - time) : 'evac reached', 110, 34, { size: 11, color: '#a1abbb' });
@@ -306,11 +432,7 @@
           G.bar(g, 60, 53, 120, 8, me.shield / shieldMax, '#7fe7ff');
           for (let i = 0; i < T.hull; i++) G.fillRR(g, 196 + i * 20, 51, 14, 12, 3, i < me.hull ? '#ff5a6a' : 'rgba(255,255,255,.15)');
           if (me.power) G.text(g, POWERS[me.power].name + ' ' + Math.ceil(me.powerT) + 's', 22, 92, { size: 12, color: POWERS[me.power].color, weight: 800, stroke: 'rgba(0,0,0,.6)', strokeW: 3 });
-        },
-
-        onBotJoin(b) { addMate(b); },
-        onBotLeave(b) { const i = mates.findIndex((m) => m.bot.id === b.id); if (i >= 0) mates.splice(i, 1); },
-      };
+      }
     },
   });
 })((window.BF = window.BF || {}));
