@@ -181,7 +181,8 @@
     const visits = Math.round(Math.pow(pop, 2.1) * 42000000 + 180000);
     BF.registerGame({
       id, name, gameType: type, genre: t.genre, categories: (t.cats || []).concat(cats || []),
-      creator, maxPlayers: t.maxPlayers, activeBots: t.bots, popularity: pop, approval,
+      // the second wave draws a little smaller crowds than the originals
+      creator, maxPlayers: t.maxPlayers, activeBots: t.bots, popularity: +(pop * 0.86).toFixed(3), approval,
       baseVisits: visits, baseFavorites: Math.round(visits * 0.018), baseLikes: Math.round(visits * 0.022),
       createdAt: created, updatedAt: '2026-09-' + String(10 + (id.length % 15)).padStart(2, '0'), ageRating: type === 'spooky' ? '9+' : 'All Ages',
       tagline, description, howTo: t.howTo, controls: t.controls,

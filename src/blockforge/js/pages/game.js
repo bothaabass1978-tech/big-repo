@@ -8,6 +8,13 @@
   const U = BF.util;
   const esc = U.esc;
 
+  /** Where a game's creator link goes: you, a player's profile, or a studio page. */
+  function creatorHref(g) {
+    if (g.userGame) return '#/profile';
+    if (g.botGame) return '#/user/' + g.creatorId + '/creations';
+    return '#/creator/' + encodeURIComponent(g.creator);
+  }
+
   /**
    * Banner for a developer update: its event while one runs in this game, or
    * any recent update when `opts.latest` (home page). Empty string when none.
@@ -114,7 +121,7 @@
         (g.leaderboard || []).filter((d) => d.stat !== 'wins').map((d) => '<div><dt>' + esc(d.label) + '</dt><dd class="num">' + BF.leaderboards.format(d, pr[d.stat]) + '</dd></div>').join('') +
         '<div><dt>Passes owned</dt><dd class="num">' + passCount + '/' + (g.passes || []).length + '</dd></div></dl>' : '<p class="faint">You have not played yet. Press Play to jump into a server.</p>') + '</div>' +
       '<div class="panel" style="margin-top:14px"><h3 class="panel-title">' + BF.icon('layers', 17) + 'Details</h3><dl class="kv">' +
-      '<div><dt>Creator</dt><dd><a class="link" href="' + (g.userGame ? '#/profile' : '#/creator/' + encodeURIComponent(g.creator)) + '">' + esc(g.creator) + '</a></dd></div>' +
+      '<div><dt>Creator</dt><dd><a class="link" href="' + creatorHref(g) + '">' + esc(g.botGame ? g.creatorName + ' (' + g.creator + ')' : g.creator) + '</a></dd></div>' +
       '<div><dt>Created</dt><dd>' + U.fmtDate(g.createdAt) + '</dd></div><div><dt>Updated</dt><dd>' + U.fmtDate(g.updatedAt) + '</dd></div>' +
       '<div><dt>Genre</dt><dd>' + esc(g.genre) + '</dd></div><div><dt>Max players</dt><dd class="num">' + g.maxPlayers + '</dd></div><div><dt>Content rating</dt><dd>' + esc(g.ageRating) + '</dd></div>' +
       '<div><dt>Visits</dt><dd class="num">' + U.fmt(st.visits) + '</dd></div><div><dt>Favorites</dt><dd class="num">' + U.fmt(st.favorites) + '</dd></div></dl></div></div></div>';
@@ -187,7 +194,7 @@
       return '<section class="game-hero">' +
         '<div class="gh-thumb"><img src="' + BF.thumbs.url(g) + '" alt="' + esc(g.name) + ' thumbnail"></div>' +
         '<div class="gh-info"><div class="gh-tags"><span class="pill accent">' + esc(g.genre) + '</span><span class="pill">' + esc(g.ageRating) + '</span><span class="pill">Up to ' + g.maxPlayers + ' players</span>' + (owner ? '<span class="pill gold">Your game</span>' : '') + (passesOwned.length ? '<span class="pill success">' + BF.icon('ticket', 11) + passesOwned.length + ' pass' + (passesOwned.length > 1 ? 'es' : '') + '</span>' : '') + '</div>' +
-        '<h1 class="gh-title">' + esc(g.name) + '</h1><div class="gh-creator">By <a class="link" href="' + (owner ? '#/profile' : '#/creator/' + encodeURIComponent(g.creator)) + '">' + esc(g.creator) + '</a></div>' +
+        '<h1 class="gh-title">' + esc(g.name) + '</h1><div class="gh-creator">By <a class="link" href="' + creatorHref(g) + '">' + esc(g.botGame ? g.creatorName : g.creator) + '</a>' + (g.botGame ? ' <span class="faint">' + esc(g.creator) + ' · community game</span>' : '') + '</div>' +
         '<div class="gh-actions"><button class="btn btn-xl btn-play" data-act="play" data-game="' + g.id + '" id="play-btn">' + BF.icon('play', 20) + 'PLAY</button>' +
         '<button class="icon-btn gh-ib' + (fav ? ' fav-on' : '') + '" data-act="fav" data-game="' + g.id + '" data-tip="' + (fav ? 'Remove favorite' : 'Favorite') + '" aria-label="Favorite">' + BF.icon('heart', 20) + '</button>' +
         '<button class="icon-btn gh-ib' + (vote === 'like' ? ' on' : '') + '" data-act="vote" data-game="' + g.id + '" data-vote="like" data-tip="Like" aria-label="Like">' + BF.icon('thumbUp', 20) + '</button>' +

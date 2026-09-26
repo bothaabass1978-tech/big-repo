@@ -32,6 +32,8 @@
     const q = disc.q.trim().toLowerCase();
     if (q) list = list.filter((g) => g.name.toLowerCase().includes(q) || g.creator.toLowerCase().includes(q) || (g.categories || []).some((c) => c.toLowerCase().includes(q)) || g.description.toLowerCase().includes(q));
     if (['Popular', 'Trending', 'New'].includes(disc.cat)) list = BF.catalog.inCategory(disc.cat, list);
+    else if (disc.cat === 'Official') list = list.filter((g) => g.builtIn);
+    else if (disc.cat === 'Community') list = list.filter((g) => g.botGame || g.userGame);
     else if (disc.cat !== 'All') list = list.filter((g) => (g.categories || [g.genre]).includes(disc.cat));
     list = list.filter((g) => {
       const st = BF.catalog.stats(g.id);
@@ -74,8 +76,8 @@
       if (query.q != null) disc.q = query.q;
       if (query.sort) disc.sort = query.sort;
       const all = BF.catalog.all();
-      const cats = ['All', 'Popular', 'Trending', 'New'].concat(BF.GAME_CATEGORIES);
-      const count = (c) => (['All', 'Popular', 'Trending', 'New'].includes(c) ? all.length : all.filter((g) => (g.categories || []).includes(c)).length);
+      const cats = ['All', 'Popular', 'Trending', 'New', 'Official', 'Community'].concat(BF.GAME_CATEGORIES);
+      const count = (c) => (['All', 'Popular', 'Trending', 'New'].includes(c) ? all.length : c === 'Official' ? all.filter((g) => g.builtIn).length : c === 'Community' ? all.filter((g) => g.botGame || g.userGame).length : all.filter((g) => (g.categories || []).includes(c)).length);
       return '<div class="page-head"><div><h1 class="page-title">Discover</h1><p class="page-sub">' + U.plural(all.length, 'experience') + ' · <span data-live="online:x">' + U.fmt(BF.world.totalOnline()) + '</span> players online now</p></div></div>' +
         '<div class="chips scroll" style="margin-bottom:14px">' + cats.map((c) => '<button class="chip' + (disc.cat === c ? ' on' : '') + '" data-cat="' + esc(c) + '">' + esc(c) + (count(c) && !['All', 'Popular', 'Trending', 'New'].includes(c) ? '<span class="count">' + count(c) + '</span>' : '') + '</button>').join('') + '</div>' +
         '<div class="toolbar"><div class="search-box inline"><input class="input" id="disc-q" type="search" placeholder="Search games, creators or genres" value="' + esc(disc.q) + '" autocomplete="off">' + BF.icon('search', 16) + '</div>' +

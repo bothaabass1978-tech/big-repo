@@ -16,7 +16,7 @@
     A('first_steps', 'First Steps', 'Play your first game.', 'play', 50, 100, (s) => [st(s).gamesPlayed, 1]),
     A('explorer', 'Explorer', 'Play 5 different games.', 'compass', 150, 250, (s) => [st(s).distinctGames.length, 5]),
     A('globetrotter', 'Globetrotter', 'Play 15 different games.', 'globe', 400, 600, (s) => [st(s).distinctGames.length, 15]),
-    A('world_tour', 'World Tour', 'Play all 20 original BlockForge games.', 'mapPin', 1000, 1500, (s) => [st(s).distinctGames.filter((id) => BF.GAME_REGISTRY.some((g) => g.id === id && g.builtIn)).length, 20]),
+    A('world_tour', 'World Tour', 'Play 20 different official BlockForge games.', 'mapPin', 1000, 1500, (s) => [st(s).distinctGames.filter((id) => BF.GAME_REGISTRY.some((g) => g.id === id && g.builtIn)).length, 20]),
     A('first_win', 'First Victory', 'Win your first match.', 'flag', 75, 150, (s) => [st(s).wins, 1]),
     A('champion', 'Champion', 'Win 10 matches.', 'trophy', 300, 500, (s) => [st(s).wins, 10]),
     A('legend', 'Living Legend', 'Win 50 matches.', 'crown', 1000, 1500, (s) => [st(s).wins, 50]),

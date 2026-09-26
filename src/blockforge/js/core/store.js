@@ -102,6 +102,7 @@
       ads: { campaigns: [] },
       limiteds: {},
       updates: { seen: [], last: 0 },
+      botGames: { list: [], feed: [], nextAt: 0 },
       settings: defaultSettings(),
       secrets: { forgecore: { unlocked: false, at: 0, uses: 0, total: 0, wordSolved: false } },
       bots: {},
@@ -242,6 +243,7 @@
     if (!state.ads || typeof state.ads !== 'object' || !Array.isArray(state.ads.campaigns)) state.ads = { campaigns: [] };
     if (!state.limiteds || typeof state.limiteds !== 'object') state.limiteds = {};
     if (!state.updates || typeof state.updates !== 'object' || !Array.isArray(state.updates.seen)) state.updates = { seen: [], last: 0 };
+    if (!state.botGames || typeof state.botGames !== 'object' || !Array.isArray(state.botGames.list)) state.botGames = { list: [], feed: [], nextAt: 0 };
     state.version = BF.SAVE_VERSION;
     return state;
   }

@@ -270,8 +270,9 @@
     },
 
     /**
-     * Listings to show as Sponsored in a placement: your running campaigns plus
-     * house promotions for official games, so the slot is never empty.
+     * Listings to show as Sponsored in a placement: your running campaigns, then
+     * other players' campaigns, then house promotions for official games, so the
+     * slot is never empty.
      * @param {'home'|'discover'|'search'} placement
      * @param {number} n
      */
@@ -280,6 +281,8 @@
       const weight = (x) => (TIERS[x.c.tier] ? TIERS[x.c.tier].cpm : 6) * (0.6 + Math.random());
       mine.sort((x, y) => weight(y) - weight(x));
       const out = mine.slice(0, n).map((x) => ({ gameId: x.ug.id, headline: x.c.headline, campaignId: x.c.id, own: true }));
+      // other players' campaigns compete for the remaining slots
+      if (out.length < n && BF.botGames) out.push(...BF.botGames.sponsored(placement, n - out.length));
       if (out.length < n && BF.catalog) {
         const minute = Math.floor(Date.now() / 90000);
         const house = BF.catalog.all().filter((g) => g.builtIn);

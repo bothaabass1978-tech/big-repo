@@ -538,7 +538,7 @@
 
   function sceneFor(game) {
     if (SCENES[game.id]) return { fn: SCENES[game.id], color: null };
-    if (TYPE_SCENES[game.gameType] && game.builtIn) return { fn: (A, c) => TYPE_SCENES[game.gameType](A, c, game), color: null };
+    if (TYPE_SCENES[game.gameType]) return { fn: (A, c) => TYPE_SCENES[game.gameType](A, c, game), color: null };
     const tpl = TEMPLATE_SCENE[game.template] || 'block-battlegrounds';
     return { fn: SCENES[tpl], color: (game.thumbnail && game.thumbnail.color) || '#ff7a2e' };
   }

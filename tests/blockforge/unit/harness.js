@@ -18,7 +18,7 @@ const SYSTEM_SCRIPTS = [
   'js/data/items.js', 'js/data/games.js', 'js/data/games2.js', 'js/data/progression.js', 'js/data/bots.js', 'js/data/thumbs.js', 'js/data/updates.js',
   'js/core/store.js',
   'js/systems/bots.js', 'js/systems/avatar.js', 'js/systems/economy.js', 'js/systems/meta.js',
-  'js/systems/inventory.js', 'js/systems/limiteds.js', 'js/systems/updates.js', 'js/systems/social.js', 'js/systems/followers.js', 'js/systems/world.js', 'js/systems/creator.js', 'js/systems/studio.js', 'js/systems/ads.js', 'js/systems/creatoreconomy.js', 'js/systems/secrets.js',
+  'js/systems/inventory.js', 'js/systems/limiteds.js', 'js/systems/updates.js', 'js/systems/social.js', 'js/systems/followers.js', 'js/systems/world.js', 'js/systems/creator.js', 'js/systems/studio.js', 'js/systems/ads.js', 'js/systems/creatoreconomy.js', 'js/systems/botgames.js', 'js/systems/secrets.js',
   'js/systems/voice.js', 'js/systems/chat.js', 'js/systems/ai.js', 'js/systems/orders.js',
 ];
 

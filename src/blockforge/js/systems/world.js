@@ -36,9 +36,10 @@
   const catalog = (BF.catalog = {
     /** Every listed game. Pass true to include your unpublished creations. */
     all(includeUnpublished) {
-      return BF.GAME_REGISTRY.concat(userGames(includeUnpublished));
+      return BF.GAME_REGISTRY.concat(userGames(includeUnpublished)).concat(BF.botGames ? BF.botGames.list() : []);
     },
     get(id) {
+      if (String(id).indexOf('bg_') === 0) return BF.botGames ? BF.botGames.get(id) : null;
       return BF.GAME_REGISTRY.find((g) => g.id === id) || userGames(true).find((g) => g.id === id) || null;
     },
     isUserGame(id) {
@@ -50,6 +51,7 @@
       const g = catalog.get(id);
       const s = BF.store.state;
       if (!g || !s) return { playing: 0, visits: 0, favorites: 0, likes: 0, dislikes: 0, approval: 0 };
+      if (g.botGame) return BF.botGames.stats(id);
       const vote = s.catalog.votes[id];
       const fav = s.catalog.favorites.includes(id);
       if (!g.builtIn) {
@@ -152,8 +154,9 @@
       s.recent.forEach((r, i) => bump(r.gameId, 3 / (i + 1)));
       s.catalog.favorites.forEach((id) => bump(id, 2));
       const played = new Set(s.recent.slice(0, 3).map((r) => r.gameId));
+      // community games only get recommended once they have a real audience
       return catalog.all()
-        .filter((g) => !played.has(g.id))
+        .filter((g) => !played.has(g.id) && (!g.botGame || BF.world.playerCount(g.id) >= 500))
         .map((g) => ({ g, score: (g.categories || [g.genre]).reduce((a, c) => a + (weight[c] || 0), 0) + g.popularity + Math.random() * 0.8 }))
         .sort((a, b) => b.score - a.score)
         .map((x) => x.g);
@@ -305,7 +308,7 @@
     crowd(gameId) {
       const g = catalog.get(gameId);
       if (!g) return 0;
-      if (!g.builtIn) {
+      if (g.userGame) {
         const ug = (BF.store.state && BF.store.state.created.find((x) => x.id === gameId)) || null;
         if (!ug || !ug.published) return 0;
         const h = (ug.hist || []).slice(-3);
@@ -481,6 +484,7 @@
 
       // crowds drift slowly (a few percent a minute) so counts feel alive
       for (const g of BF.GAME_REGISTRY) { const v = world.drift.get(g.id) || 1; world.drift.set(g.id, U.clamp(v + (Math.random() - 0.5) * 0.02 + (1 - v) * 0.02, 0.85, 1.15)); }
+      if (BF.botGames) BF.botGames.worldTick();
       if (BF.creator) BF.creator.simulate();
       if (BF.followers) BF.followers.worldTick();
       if (BF.limiteds) BF.limiteds.worldTick();

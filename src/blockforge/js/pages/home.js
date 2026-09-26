@@ -60,6 +60,15 @@
 
   let featTimer = null;
 
+  let feedOff = null;
+  /** Recent platform activity: releases, ad campaigns and milestones from other creators. */
+  function activityHtml() {
+    const icon = { release: 'sparkle', ad: 'megaphone', milestone: 'fire' };
+    const list = BF.botGames ? BF.botGames.feed(7) : [];
+    if (!list.length) return '<p class="faint">Quiet right now. New games drop every few minutes.</p>';
+    return list.map((e) => '<a class="act-row" href="' + (e.gameId ? '#/game/' + e.gameId : '#/discover') + '"><span class="act-icon ' + e.kind + '">' + BF.icon(icon[e.kind] || 'bell', 14) + '</span><span class="act-text">' + esc(e.text) + '</span><span class="faint num act-time">' + U.timeAgo(e.t, BF.clock.now()) + '</span></a>').join('');
+  }
+
   BF.pages.register('home', {
     title: 'Home',
     nav: 'home',
@@ -123,6 +132,12 @@
 
       const ads = BF.ui.sponsoredCards('home', 4);
       if (ads) h += '<section class="section sponsored-row">' + BF.ui.sectionHead('Sponsored', 'megaphone', { href: '#/create', label: 'Advertise your game' }) + '<div class="row-scroll">' + ads + '</div></section>';
+      if (BF.botGames) {
+        const rising = BF.botGames.rising(10);
+        if (rising.length) h += '<section class="section">' + BF.ui.sectionHead('Rising in the Community', 'bolt', { href: '#/discover?cat=Community', label: 'See all' }) + '<div class="row-scroll">' + rising.map((g) => BF.ui.gameCard(g)).join('') + '</div></section>';
+        h += '<section class="section home-split"><div class="panel"><div class="section-head" style="margin-bottom:10px"><h2 class="section-title">' + BF.icon('signal', 18) + 'Happening on BlockForge</h2></div><div class="activity-feed" id="activity-feed">' + activityHtml() + '</div></div>' +
+          '<div class="panel"><div class="section-head" style="margin-bottom:10px"><h2 class="section-title">' + BF.icon('sparkle', 18) + 'Fresh from Creators</h2><a class="section-link" href="#/discover?cat=Community">More' + BF.icon('chevronRight', 14) + '</a></div><div class="fresh-list">' + BF.botGames.newest(5).map((g) => '<a class="fresh-row" href="#/game/' + g.id + '"><img src="' + BF.thumbs.url(g) + '" alt=""><span><b>' + esc(g.name) + '</b><span class="faint">by ' + esc(g.creatorName) + ' · ' + U.timeAgo(new Date(BF.botGames.rec(g.id).createdAt).getTime(), BF.clock.now()) + '</span></span><span class="faint num">' + U.compact(BF.world.playerCount(g.id)) + ' playing</span></a>').join('') + '</div></div></section>';
+      }
       h += '<section class="section">' + BF.ui.sectionHead('Popular Right Now', 'fire', { href: '#/discover?cat=Popular', label: 'See all' }) + '<div class="grid-cards">' + popular.slice(0, 10).map((g) => BF.ui.gameCard(g)).join('') + '</div></section>';
       h += '<section class="section">' + BF.ui.sectionHead('Trending', 'bolt', { href: '#/discover?cat=Trending', label: 'See all' }) + '<div class="row-scroll">' + trending.slice(0, 10).map((g) => BF.ui.gameCard(g)).join('') + '</div></section>';
       h += '<section class="section">' + BF.ui.sectionHead('New Games', 'sparkle', { href: '#/discover?cat=New', label: 'See all' }) + '<div class="row-scroll">' + newest.slice(0, 10).map((g) => BF.ui.gameCard(g)).join('') + '</div></section>';
@@ -130,6 +145,9 @@
       return h;
     },
     mount(root) {
+      // the activity feed updates live with the world
+      const feedEl = root.querySelector('#activity-feed');
+      if (feedEl) { if (feedOff) feedOff(); feedOff = BF.bus.on('world:tick', () => { if (document.body.contains(feedEl)) feedEl.innerHTML = activityHtml(); else { feedOff(); feedOff = null; } }); }
       const car = root.querySelector('#feature-carousel');
       if (!car) return;
       const slides = car.querySelectorAll('.fc-slide');

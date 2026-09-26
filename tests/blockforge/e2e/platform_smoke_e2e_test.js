@@ -4,7 +4,7 @@
  *   node tests/blockforge/e2e/platform_smoke_e2e_test.js [--shots <dir>]
  *
  * Covers: sign-in, daily reward, every page route, a shop purchase and the
- * "Not enough ForgeCoins." path, launching and leaving all 20 games (in 3D, plus
+ * "Not enough ForgeCoins." path, launching and leaving all 70 games (in 3D, plus
  * the Classic 2D setting), a bot answering a DM, creator games built from every
  * template, a Studio layout, an ad campaign with its sponsored slot and refund,
  * collecting creator earnings, save export/import, and a phone-sized viewport
@@ -115,7 +115,7 @@ async function signIn(page) {
 
   // ------------------------------------------------------------ games
   const games = await page.evaluate(() => BF.GAME_REGISTRY.map((g) => g.id));
-  check('20 built-in games are registered', games.length === 20, String(games.length));
+  check('70 built-in games are registered', games.length === 70, String(games.length));
   const keys = ['KeyW', 'KeyD', 'Space', 'KeyS', 'KeyA', 'KeyE', 'KeyJ'];
   const webgl = await page.evaluate(() => BF.g3d.supported());
   let in3d = 0;
@@ -340,6 +340,43 @@ async function signIn(page) {
   await shot(page, '04c-custom-game');
   await page.evaluate(() => BF.runtime.leave());
   await page.waitForTimeout(600);
+
+  // ------------------------------------------------------------ round 5: popups, ads pace, creators, community games
+  {
+    await page.evaluate(() => { location.hash = '#/home'; });
+    await page.waitForTimeout(500);
+    await page.click('#notif-btn');
+    await page.waitForTimeout(300);
+    await page.click('#nd-dnd');
+    await page.waitForTimeout(300);
+    const dnd = await page.evaluate(() => ({ on: BF.store.state.settings.notifications.dnd, bell: document.getElementById('notif-btn').classList.contains('dnd'), pops: BF.notify.allowsPopup({ type: 'invite' }, false) }));
+    check('Do Not Disturb from the bell silences pop-ups', dnd.on && dnd.bell && !dnd.pops, JSON.stringify(dnd));
+    const rich = await page.evaluate(() => { const lb = BF.leaderboards.global('coins'); const owners = new Set(BF.creatorEconomy.studios().map((s) => s.owner.id)); return { topOwner: owners.has(lb.rows[0].id), top: lb.rows[0].value, you: lb.you.rank }; });
+    check('studio owners are the richest players', rich.topOwner && rich.top > 1e8 && rich.you > 50, JSON.stringify(rich));
+    await page.evaluate(() => { location.hash = '#/leaderboards/creators'; });
+    await page.waitForTimeout(600);
+    check('Top Creators board lists studios with lifetime earnings', await page.evaluate(() => document.querySelectorAll('.lb-table tbody tr').length >= 20));
+    const bg = await page.evaluate(() => { BF.botGames.tick(); const g = BF.botGames.release(BF.clock.now()); return g ? g.id : null; });
+    await page.evaluate(() => { location.hash = '#/discover?cat=Community'; });
+    await page.waitForTimeout(700);
+    const listed = await page.evaluate((id) => !!document.querySelector('[data-game="' + id + '"]'), bg);
+    check('a newly released community game shows in Discover > Community', !!bg && listed, String(bg));
+    const before = page.errors.length;
+    await page.evaluate((id) => BF.play(id), bg);
+    await page.waitForTimeout(2600);
+    const ran = await page.evaluate(() => BF.runtime.active && !BF.runtime.session().crashedShown);
+    await page.evaluate(() => BF.runtime.leave());
+    await page.waitForTimeout(300);
+    check('a community game made by a bot is playable', ran && page.errors.length === before, page.errors.slice(before).join(' | '));
+    // an arcade game in Classic 2D
+    await page.evaluate(() => { BF.store.update('settings', (st) => { st.settings.gameplay.graphics = 'classic'; }); BF.play('pizza-rush'); });
+    await page.waitForTimeout(1500);
+    const c2 = await page.evaluate(() => ({ active: BF.runtime.active, use3d: BF.runtime.session().use3d }));
+    await page.evaluate(() => { BF.runtime.leave(); BF.store.update('settings', (st) => { st.settings.gameplay.graphics = 'auto'; }); });
+    await page.waitForTimeout(300);
+    check('new arcade games also run in Classic 2D', c2.active && c2.use3d === false && page.errors.length === before, JSON.stringify(c2));
+    await page.evaluate(() => { BF.notify.toggleDnd(false); });
+  }
 
   // ------------------------------------------------------------ mobile
   const phone = await newPage(browser, { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });

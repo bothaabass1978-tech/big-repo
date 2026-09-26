@@ -704,3 +704,17 @@ label.setting-row { cursor: pointer; }
 .team-card .tc-worth { display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; color: var(--gold, #ffc940); }
 .role-list { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
 .role-list .pill { text-decoration: none; }
+
+/* ---- Home: activity feed + fresh community games */
+.activity-feed, .fresh-list { display: flex; flex-direction: column; gap: 4px; }
+.act-row, .fresh-row { display: flex; align-items: center; gap: 10px; padding: 7px 8px; border-radius: 10px; color: inherit; text-decoration: none; }
+.act-row:hover, .fresh-row:hover { background: color-mix(in srgb, var(--accent, #ff7a2e) 10%, transparent); }
+.act-icon { flex: none; width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; background: color-mix(in srgb, var(--accent, #ff7a2e) 18%, transparent); color: var(--accent, #ff7a2e); }
+.act-icon.milestone { background: rgba(255, 90, 60, .18); color: #ff8a5c; }
+.act-icon.ad { background: rgba(70, 168, 255, .18); color: #7cc0ff; }
+.act-text { flex: 1; min-width: 0; font-size: 13.5px; }
+.act-time { font-size: 11.5px; white-space: nowrap; }
+.fresh-row img { width: 72px; height: 40px; object-fit: cover; border-radius: 6px; flex: none; }
+.fresh-row > span:nth-child(2) { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.fresh-row b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fresh-row .num { font-size: 12px; white-space: nowrap; }
