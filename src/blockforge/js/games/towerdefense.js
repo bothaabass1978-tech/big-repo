@@ -372,8 +372,12 @@
             flag.castShadow = false;
             const plat = V.group(terrain);
             plat.position.set(W + 70, 0, e.y + 110);
-            V.box(0, 0, 0, 110, 30, 90, '#8a909c', { parent: plat });
-            V.box(0, 30, 0, 100, 3, 80, '#6b4a2a', { parent: plat });
+            // a lookout deck big enough for the whole crew, with a railing and steps
+            V.box(0, 0, 0, 150, 30, 110, '#8a909c', { parent: plat });
+            V.box(0, 30, 0, 140, 3, 100, '#6b4a2a', { parent: plat });
+            for (const [x, z, w, d] of [[0, -50, 140, 3], [0, 50, 140, 3], [70, 0, 3, 100]]) V.box(x, 33, z, w, 10, d, '#8b5a2b', { parent: plat });
+            for (const [x, z] of [[-70, -50], [70, -50], [-70, 50], [70, 50]]) V.box(x, 33, z, 5, 14, 5, '#6b4226', { parent: plat });
+            for (let i = 0; i < 3; i++) V.box(-80 - i * 9, 0, 0, 10, 30 - i * 10, 40, '#7a808c', { parent: plat });
             terrain.userData.plat = plat;
           }
         }
@@ -485,7 +489,8 @@
             const crew = [{ id: 'me', av: ctx.player.avatar, name: ctx.player.name }].concat(Array.from(allies.values()).map((a) => ({ id: a.bot.id, av: a.bot.avatar, name: a.bot.displayName })));
             crew.forEach((c, i) => {
               const rig = V.actor(c.id, c.av, { scale: 8 });
-              const x = plat.position.x - 30 + (i % 3) * 30, z = plat.position.z - 18 + Math.floor(i / 3) * 36 + (i % 2) * 6;
+              // two rows of three, 40 px apart, so rigs (about 32 px across) never touch
+              const x = plat.position.x - 40 + (i % 3) * 40, z = plat.position.z - 22 + Math.floor(i / 3) * 44;
               rig.setPos(x, 33, z);
               rig.faceAngle(Math.PI * 0.75);
               if (phase === 'wave' && Math.random() < 0.004) rig.emote('cheer', 1.5);

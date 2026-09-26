@@ -622,7 +622,7 @@
             p.bob += dt * 8;
             let px, py;
             if (bt.target && l < 120) { const a = (i / bt.pets.length) * TAU + 1; px = bt.target.x + Math.cos(a) * (bt.target.r + 10); py = bt.target.y + Math.sin(a) * (bt.target.r + 8); }
-            else { const a = bt.a + Math.PI + (i - (bt.pets.length - 1) / 2) * 0.6; px = bt.x + Math.cos(a) * 34; py = bt.y + Math.sin(a) * 34; }
+            else { const a = bt.a + Math.PI + (i - (bt.pets.length - 1) / 2) * 0.75; px = bt.x + Math.cos(a) * 44; py = bt.y + Math.sin(a) * 44; }
             const ex = px - p.x, ey = py - p.y, el = Math.hypot(ex, ey);
             if (el > 2) { const k = Math.min(1, (240 * dt) / el); p.x += ex * k; p.y += ey * k; }
           });
@@ -956,7 +956,7 @@
           const t = ctx.time;
           const zi = zoneIndex(me.x);
           if (zi !== lastPreset) { lastPreset = zi; V.preset(PRESET[zi], { fogNear: 900, fogFar: 2600 }); }
-          V.look(me.x, 0, me.y, { dist: 470, pitch: 0.9, fov: 45, lerp: 0.14 }, dt);
+          V.look(me.x, 0, me.y, { dist: 420, pitch: 0.84, fov: 45, lerp: 0.14 }, dt);
           ZONES.forEach((z, i) => { veils[i].visible = !d.zones[z.id]; });
           for (const b of bars) {
             b.g.visible = !d.zones[b.zone.id];
@@ -1005,7 +1005,7 @@
           for (const sq of squad) {
             const hop = sq.hop > 0 ? Math.sin((sq.hop / 0.18) * Math.PI) * 10 : 0;
             const aim = sq.target && sq.target.alive && U.dist(sq.x, sq.y, sq.target.x, sq.target.y) < 60 ? Math.atan2(sq.target.y - sq.y, sq.target.x - sq.x) : null;
-            placePet(sq.pet.id, SPECIES[sq.pet.species], sq.pet.collar, sq.x, sq.y, Math.abs(Math.sin(sq.bob)) * 3 + hop, 30, aim, dt);
+            placePet(sq.pet.id, SPECIES[sq.pet.species], sq.pet.collar, sq.x, sq.y, Math.abs(Math.sin(sq.bob)) * 3 + hop, 26, aim, dt);
           }
           petPool.sweep();
           const rig = V.actor('me', ctx.player.avatar, { scale: 8.5 });
@@ -1046,7 +1046,13 @@
             if (s.hop > 0) s.hop -= dt;
             let tx, ty;
             if (s.target && s.target.alive) { const a = (i / Math.max(1, n)) * TAU + 0.6; tx = s.target.x + Math.cos(a) * (s.target.r + 12); ty = s.target.y + Math.sin(a) * (s.target.r + 10); }
-            else { s.target = null; const a = me.a + Math.PI + (i - (n - 1) / 2) * 0.55; tx = me.x + Math.cos(a) * 46; ty = me.y + Math.sin(a) * 46; }
+            else {
+              // trail behind the player on an arc wide enough that 30 px pets never touch
+              s.target = null;
+              const r = 50 + Math.max(0, n - 3) * 8, step = Math.min(0.95, 44 / r);
+              const a = me.a + Math.PI + (i - (n - 1) / 2) * step;
+              tx = me.x + Math.cos(a) * r; ty = me.y + Math.sin(a) * r;
+            }
             const dx = tx - s.x, dy = ty - s.y, l = Math.hypot(dx, dy);
             if (l > 900) { s.x = me.x; s.y = me.y; }
             else if (l > 2) { const k = Math.min(1, (T.petSpeed * (l > 260 ? 2 : 1) * dt) / l); s.x += dx * k; s.y += dy * k; }
@@ -1059,6 +1065,19 @@
               if (s.hitT > 0.3) { s.hitT = 0; s.hop = 0.18; parts.emit(s.target.x + (Math.random() - 0.5) * 20, s.target.y - 6, { count: 3, colors: pileColors(s.target.kind), speed: 90, life: 0.35 }); }
             }
           });
+
+          // keep pets from overlapping each other and the player
+          for (let i = 0; i < squad.length; i++) {
+            const a = squad[i];
+            for (let j = i + 1; j < squad.length; j++) {
+              const b = squad[j], dx = b.x - a.x, dy = b.y - a.y, l = Math.hypot(dx, dy) || 0.01;
+              // pets working a pile hold their slot on its ring so they keep hitting it
+              if ((a.target && a.target.alive) || (b.target && b.target.alive)) continue;
+              if (l < 42) { const k = (42 - l) / 2 / l; a.x -= dx * k; a.y -= dy * k; b.x += dx * k; b.y += dy * k; }
+            }
+            const dx = a.x - me.x, dy = a.y - me.y, l = Math.hypot(dx, dy) || 0.01;
+            if (l < 38 && !(a.target && a.target.alive)) { const k = (38 - l) / l; a.x += dx * k; a.y += dy * k; }
+          }
 
           // orbs
           for (let i = orbs.length - 1; i >= 0; i--) {

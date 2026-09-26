@@ -271,7 +271,7 @@
         V.ground(-2000, -2000, MW * TS + 2000, MH * TS + 2000, '#0d4f78', { y: -40 });
         const water = V.ground(-2000, -2000, MW * TS + 2000, MH * TS + 2000, '#1c93c7', { y: 0, opacity: 0.72, rough: 0.15, metal: 0.05 });
         water.receiveShadow = false;
-        const land = [], shallow = [], decks = [], trunks = [], crowns = [], rocks = [], bushes = [];
+        const land = [], shallow = [], decks = [], trunks = [], crowns = [], rocks = [], bushes = [], nuts = [];
         for (let y = 0; y < MH; y++) for (let x = 0; x < MW; x++) {
           const t = MAP[y * MW + x];
           const cx = x * TS + TS / 2, cz = y * TS + TS / 2;
@@ -282,8 +282,13 @@
             const grassy = t === GRASS || t === PALM || t === BUSH;
             land.push({ x: cx, y: -30, z: cz, w: TS, h: 30 + (grassy ? 10 : 6), d: TS, color: grassy ? U.shade('#5aab52', chk) : U.shade('#ead08a', chk) });
             if (t === PALM) {
-              trunks.push({ x: cx, y: 10, z: cz, w: 6, h: 44, d: 6, color: '#8b5a2b' });
-              crowns.push({ x: cx, y: 46, z: cz, w: 40, h: 12, d: 40, color: U.shade('#2fae62', chk * 3), rot: x });
+              // a ringed trunk with six drooping fronds and coconuts
+              for (let k = 0; k < 4; k++) trunks.push({ x: cx + k * 0.8, y: 10 + k * 11, z: cz, w: 7 - k * 0.6, h: 11.5, d: 7 - k * 0.6, color: k % 2 ? '#8b5a2b' : '#9c6a36' });
+              for (let k = 0; k < 6; k++) {
+                const a = (k / 6) * Math.PI * 2 + x * 0.7;
+                crowns.push({ x: cx + 2.4 + Math.cos(a) * 12, y: 51, z: cz - Math.sin(a) * 12, w: 26, h: 2.5, d: 9, color: U.shade('#2fae62', chk * 3 + (k % 2 ? 0.06 : -0.04)), rot: a, rz: -0.38 });
+              }
+              nuts.push({ x: cx + 5, y: 47, z: cz + 2, w: 6, h: 6, d: 6, color: '#6b4226' }, { x: cx, y: 47, z: cz - 4, w: 6, h: 6, d: 6, color: '#5a3a22' });
             } else if (t === ROCK) rocks.push({ x: cx, y: 4, z: cz, w: 30, h: 24, d: 28, color: U.shade('#7a8494', chk * 2), rot: y });
             else if (t === BUSH) bushes.push({ x: cx, y: 8, z: cz, w: 34, h: 26, d: 34, color: '#2f8f47' });
           }
@@ -292,7 +297,8 @@
         V.boxes(shallow, { shadow: false });
         V.boxes(decks);
         V.boxes(trunks, { geo: 'cylLo' });
-        V.boxes(crowns, { geo: 'cone4' });
+        V.boxes(crowns);
+        V.boxes(nuts, { geo: 'sphereLo' });
         V.boxes(rocks, { geo: 'dodeca', flat: true });
         V.boxes(bushes, { geo: 'sphereLo' });
         const crystals = [];
@@ -309,7 +315,7 @@
         };
         return function sync(dt) {
           const explorer = ctx.hasPass('explorer');
-          V.look(me.x, groundH(me.x, me.y) + 10, me.y, { dist: 560, pitch: 0.92, fov: 45, lerp: 0.12 }, dt);
+          V.look(me.x, groundH(me.x, me.y) + 10, me.y, { dist: 470, pitch: 0.84, fov: 45, lerp: 0.12 }, dt);
           crystals.forEach((c, i) => { c.rotation.y += dt * 0.8; c.position.y = 34 + Math.sin(ctx.time * 2 + i) * 4; });
           for (const sp of digs) {
             if (sp.done) continue;

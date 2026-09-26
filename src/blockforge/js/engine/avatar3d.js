@@ -17,6 +17,8 @@
   const PI = Math.PI;
   const g3 = () => BF.g3d;
   const INK = '#1b1b22';
+  /** Hat styles that sit over the crown of the head, so only hair below the brim shows. */
+  const COVERING_HATS = ['cap', 'beanie', 'explorer', 'wizard', 'viking', 'default'];
 
   function lookOf(id) {
     if (id && typeof id === 'object') return id;
@@ -316,7 +318,11 @@
       B.add(head);
       this.head = head;
       this.buildHead(head, headL, faceL, skin, !!hatL && hatL.style === 'helmet');
-      if (hairL && !(hatL && ['helmet', 'hood'].includes(hatL.style))) this.hair(head, hairL, !!hatL);
+      // Hats that cover the crown hide the top of the hair; sculpted heads (pumpkin, robot, crystal, void) have none.
+      const shape = headL.shape || 'block';
+      const bald = ['pumpkin', 'robot', 'crystal', 'void'].includes(shape);
+      const covered = !!hatL && COVERING_HATS.includes(hatL.style);
+      if (hairL && !bald && !(hatL && ['helmet', 'hood'].includes(hatL.style))) this.hair(head, hairL, covered, shape === 'round');
       if (hatL) this.hat(head, hatL);
       if (accL) this.acc(head, accL);
       if (neckL) this.neck(B, neckL);
@@ -368,35 +374,63 @@
       }
     },
 
-    hair(head, hl, hatOn) {
+    hair(head, hl, covered, round) {
       const c = hl.c1 || '#5a3a22';
-      const cap = () => this.part(head, 'box', 1.33, 0.34, 1.33, 0, 1.22, -0.02, c);
+      // The head is a 1.25 cube centred at y 0.66 (top 1.285, sides ±0.625).
+      const cap = () => {
+        if (covered) return;
+        if (round) this.part(head, 'cyl', 1.36, 0.36, 1.36, 0, 1.2, -0.02, c);
+        else this.part(head, 'box', 1.33, 0.36, 1.33, 0, 1.2, -0.02, c);
+      };
+      // under a hat: a short back and sides that end below the brim
+      const fringe = () => {
+        this.part(head, 'box', 1.33, 0.62, 0.16, 0, 0.84, -0.6, c);
+        for (const s of [-1, 1]) this.part(head, 'box', 0.12, 0.42, 0.5, s * 0.63, 0.92, 0.28, c);
+      };
       switch (hl.style) {
         case 'spiky':
           cap();
-          if (!hatOn) for (let i = 0; i < 7; i++) { const a = (i / 7) * PI * 2; const s = this.part(head, 'cone4', 0.36, 0.7, 0.36, Math.cos(a) * 0.38, 1.55, Math.sin(a) * 0.38 - 0.05, c); s.rotation.set(Math.sin(a) * 0.5, 0, -Math.cos(a) * 0.5); }
+          if (covered) { fringe(); break; }
+          for (let i = 0; i < 7; i++) { const a = (i / 7) * PI * 2; const sp = this.part(head, 'cone4', 0.36, 0.62, 0.36, Math.cos(a) * 0.36, 1.58, Math.sin(a) * 0.36 - 0.05, c); sp.rotation.set(Math.sin(a) * 0.45, 0, -Math.cos(a) * 0.45); }
+          this.part(head, 'cone4', 0.44, 0.74, 0.44, 0, 1.66, -0.02, c);
+          this.part(head, 'box', 1.33, 0.5, 0.16, 0, 0.9, -0.6, c);
           break;
         case 'long':
-          cap(); this.part(head, 'box', 1.36, 1.7, 0.28, 0, 0.4, -0.62, c); this.part(head, 'box', 0.18, 1.2, 1.1, -0.66, 0.62, -0.08, c); this.part(head, 'box', 0.18, 1.2, 1.1, 0.66, 0.62, -0.08, c);
+          cap();
+          this.part(head, 'box', 1.36, 1.7, 0.26, 0, 0.42, -0.64, c);
+          for (const s of [-1, 1]) this.part(head, 'box', 0.14, 1.2, 1.08, s * 0.66, 0.66, -0.08, c);
           break;
         case 'bun':
-          cap(); if (!hatOn) this.part(head, 'sphere', 0.62, 0.62, 0.62, 0, 1.58, -0.25, c);
+          cap();
+          if (covered) { fringe(); break; }
+          this.part(head, 'box', 1.33, 0.62, 0.16, 0, 0.9, -0.6, c);
+          this.part(head, 'sphere', 0.62, 0.56, 0.62, 0, 1.52, -0.3, c);
           break;
         case 'mohawk':
-          if (!hatOn) this.part(head, 'box', 0.3, 0.62, 1.28, 0, 1.55, -0.02, c); this.part(head, 'box', 1.29, 0.08, 1.29, 0, 1.28, 0, U.shade(c, -0.35));
+          if (covered) { fringe(); break; }
+          this.part(head, 'box', 1.27, 0.06, 1.27, 0, 1.3, 0, U.shade(c, -0.45));
+          for (let i = 0; i < 5; i++) { const sp = this.part(head, 'cone4', 0.34, 0.5 + (i === 2 ? 0.16 : i % 2 ? 0.08 : 0), 0.32, 0, 1.52 + (i === 2 ? 0.08 : i % 2 ? 0.04 : 0), 0.5 - i * 0.26, c); sp.rotation.y = PI / 4; }
+          this.part(head, 'box', 0.26, 0.2, 1.24, 0, 1.36, -0.02, c);
           break;
         case 'curly':
-          for (let i = 0; i < 9; i++) { const a = (i / 9) * PI * 2; this.part(head, 'sphereLo', 0.55, 0.55, 0.55, Math.cos(a) * 0.52, 1.18 + (i % 2) * 0.08, Math.sin(a) * 0.5 - 0.05, c); }
-          this.part(head, 'sphere', 1.1, 0.6, 1.1, 0, 1.3, 0, c);
+          if (covered) { for (const s of [-1, 1]) for (const z of [-0.35, 0.15]) this.part(head, 'sphereLo', 0.42, 0.42, 0.42, s * 0.6, 0.98, z, c); this.part(head, 'box', 1.3, 0.5, 0.2, 0, 0.9, -0.6, c); break; }
+          this.part(head, 'box', 1.3, 0.3, 1.3, 0, 1.18, -0.02, c);
+          for (let i = 0; i < 10; i++) { const a = (i / 10) * PI * 2; this.part(head, 'sphereLo', 0.5, 0.46, 0.5, Math.cos(a) * 0.52, 1.3 + (i % 2) * 0.05, Math.sin(a) * 0.52 - 0.04, c); }
+          this.part(head, 'sphere', 1.0, 0.5, 1.0, 0, 1.42, -0.02, c);
           break;
         case 'ponytail': {
-          cap(); this.part(head, 'box', 1.33, 0.7, 0.2, 0, 0.9, -0.62, c);
-          const tail = this.part(head, 'box', 0.32, 1.0, 0.32, 0, 0.6, -0.9, U.shade(c, -0.1)); tail.rotation.x = 0.35;
-          this.anims.push((t, rig) => { tail.rotation.x = 0.35 + Math.sin(t * 3) * 0.08 + rig.state.move * 0.4; });
+          cap(); this.part(head, 'box', 1.33, 0.7, 0.18, 0, 0.9, -0.62, c);
+          const tail = new THREE.Group(); tail.position.set(0, 1.1, -0.7); head.add(tail);
+          this.part(tail, 'box', 0.34, 0.2, 0.3, 0, 0, 0, U.shade(c, -0.25));
+          this.part(tail, 'box', 0.3, 1.0, 0.28, 0, -0.52, -0.06, c);
+          this.anims.push((t, rig) => { tail.rotation.x = 0.3 + Math.sin(t * 3) * 0.08 + rig.state.move * 0.35; });
           break;
         }
         default:
-          cap(); this.part(head, 'box', 1.33, 0.75, 0.2, 0, 0.92, -0.62, c); this.part(head, 'box', 0.14, 0.45, 0.4, -0.66, 0.98, 0.3, c); this.part(head, 'box', 0.14, 0.45, 0.4, 0.66, 0.98, 0.3, c);
+          cap();
+          if (covered) { fringe(); break; }
+          this.part(head, 'box', 1.33, 0.72, 0.18, 0, 0.94, -0.62, c);
+          for (const s of [-1, 1]) this.part(head, 'box', 0.12, 0.45, 0.4, s * 0.64, 0.98, 0.3, c);
       }
     },
 
@@ -404,14 +438,16 @@
       const c1 = l.c1 || '#ff7a2e', c2 = l.c2 || '#ffffff';
       switch (l.style) {
         case 'cap':
-          this.part(head, 'sphere', 1.38, 0.72, 1.38, 0, 1.26, 0, c1);
-          this.part(head, 'box', 1.2, 0.08, 0.72, 0, 1.24, 0.86, c2);
-          this.part(head, 'sphereLo', 0.14, 0.1, 0.14, 0, 1.62, 0, U.shade(c1, -0.2));
+          this.part(head, 'box', 1.35, 0.34, 1.35, 0, 1.2, 0, c1);
+          this.part(head, 'sphere', 1.35, 0.5, 1.35, 0, 1.36, 0, c1);
+          this.part(head, 'box', 1.22, 0.07, 0.62, 0, 1.08, 0.9, c2);
+          this.part(head, 'sphereLo', 0.16, 0.1, 0.16, 0, 1.61, 0, U.shade(c1, -0.2));
           break;
         case 'beanie':
-          this.part(head, 'sphere', 1.42, 1.0, 1.42, 0, 1.22, 0, c1);
-          this.part(head, 'cyl', 1.44, 0.3, 1.44, 0, 1.1, 0, c2);
-          this.part(head, 'sphere', 0.36, 0.36, 0.36, 0, 1.78, 0, c2);
+          this.part(head, 'box', 1.35, 0.5, 1.35, 0, 1.2, 0, c1);
+          this.part(head, 'sphere', 1.35, 0.56, 1.35, 0, 1.44, 0, c1);
+          this.part(head, 'box', 1.41, 0.26, 1.41, 0, 1.0, 0, c2);
+          this.part(head, 'sphere', 0.36, 0.36, 0.36, 0, 1.76, 0, c2);
           break;
         case 'explorer':
           this.part(head, 'cyl', 2.3, 0.06, 2.3, 0, 1.28, 0, U.shade(c1, -0.08));
@@ -445,9 +481,11 @@
           for (const x of [-0.5, 0, 0.5]) { this.part(head, 'box', 0.28, 0.32, 0.12, x, 1.8, 0.62, c1, { metal: 0.6, rough: 0.35 }); this.part(head, 'box', 0.12, 0.12, 0.06, x, 1.5, 0.7, c2, { glow: 0.5 }); }
           break;
         case 'viking':
-          this.part(head, 'sphere', 1.4, 0.78, 1.4, 0, 1.24, 0, c1, { metal: 0.5, rough: 0.4 });
-          this.part(head, 'cyl', 1.44, 0.18, 1.44, 0, 1.14, 0, U.shade(c1, -0.2), { metal: 0.5 });
-          for (const s of [-1, 1]) { const h = this.part(head, 'cone', 0.3, 0.95, 0.3, s * 0.85, 1.55, 0, c2); h.rotation.z = -s * 0.9; }
+          this.part(head, 'box', 1.35, 0.3, 1.35, 0, 1.18, 0, c1, { metal: 0.5, rough: 0.4 });
+          this.part(head, 'sphere', 1.35, 0.7, 1.35, 0, 1.33, 0, c1, { metal: 0.5, rough: 0.4 });
+          this.part(head, 'box', 1.41, 0.16, 1.41, 0, 1.04, 0, U.shade(c1, -0.2), { metal: 0.5 });
+          this.part(head, 'box', 0.14, 0.5, 0.08, 0, 0.9, 0.66, U.shade(c1, -0.2), { metal: 0.5 });
+          for (const s of [-1, 1]) { const h = this.part(head, 'cone', 0.3, 0.9, 0.3, s * 0.92, 1.5, 0, c2); h.rotation.z = -s * 0.95; }
           break;
         case 'horns':
           for (const s of [-1, 1]) { const h = this.part(head, 'cone', 0.3, 0.8, 0.3, s * 0.42, 1.62, 0, c1); h.rotation.z = -s * 0.35; this.part(head, 'cone', 0.12, 0.2, 0.12, s * 0.56, 1.98, 0, c2); }
@@ -458,17 +496,18 @@
           break;
         }
         case 'crown':
-          this.part(head, 'cyl', 1.44, 0.34, 1.44, 0, 1.4, 0, c1, { metal: 0.7, rough: 0.3 });
-          for (let i = 0; i < 6; i++) { const a = (i / 6) * PI * 2; this.part(head, 'cone', 0.22, 0.4, 0.22, Math.sin(a) * 0.62, 1.75, Math.cos(a) * 0.62, c1, { metal: 0.7, rough: 0.3 }); }
-          this.part(head, 'sphereLo', 0.2, 0.2, 0.2, 0, 1.42, 0.74, c2, { glow: 0.4 });
-          this.part(head, 'sphereLo', 0.16, 0.16, 0.16, 0.52, 1.42, 0.52, '#46a8ff', { glow: 0.4 });
-          this.part(head, 'sphereLo', 0.16, 0.16, 0.16, -0.52, 1.42, 0.52, '#4ad17f', { glow: 0.4 });
+          // a square band so it wraps the blocky head and any hair cap cleanly
+          for (const [x, z, w, d] of [[0, 0.68, 1.46, 0.1], [0, -0.68, 1.46, 0.1], [0.68, 0, 0.1, 1.46], [-0.68, 0, 0.1, 1.46]]) this.part(head, 'box', w, 0.32, d, x, 1.4, z, c1, { metal: 0.7, rough: 0.3 });
+          for (const [x, z] of [[-0.68, 0.68], [0, 0.68], [0.68, 0.68], [-0.68, -0.68], [0, -0.68], [0.68, -0.68], [-0.68, 0], [0.68, 0]]) this.part(head, 'cone4', 0.2, 0.38, 0.2, x, 1.74, z, c1, { metal: 0.7, rough: 0.3 });
+          this.part(head, 'sphereLo', 0.2, 0.2, 0.1, 0, 1.4, 0.74, c2, { glow: 0.4 });
+          this.part(head, 'sphereLo', 0.14, 0.14, 0.08, 0.42, 1.4, 0.74, '#46a8ff', { glow: 0.4 });
+          this.part(head, 'sphereLo', 0.14, 0.14, 0.08, -0.42, 1.4, 0.74, '#4ad17f', { glow: 0.4 });
           break;
         case 'halo': {
-          const h = new THREE.Group(); h.position.set(0, 1.95, 0); head.add(h);
+          const h = new THREE.Group(); h.position.set(0, 1.72, 0); head.add(h);
           const ring = this.part(h, 'torus', 1.6, 1.6, 1.6, 0, 0, 0, c1, { glow: 1.2, noShadow: true }); ring.rotation.x = PI / 2;
           for (let i = 0; i < 3; i++) { const a = (i / 3) * PI * 2; this.part(h, 'cone4', 0.12, 0.3, 0.12, Math.sin(a) * 0.8, 0.18, Math.cos(a) * 0.8, c2, { glow: 0.8, noShadow: true }); }
-          this.anims.push((t) => { h.rotation.y = t * 0.8; h.position.y = 1.95 + Math.sin(t * 2.4) * 0.07; });
+          this.anims.push((t) => { h.rotation.y = t * 0.8; h.position.y = 1.72 + Math.sin(t * 2.4) * 0.06; });
           break;
         }
         default:
@@ -513,14 +552,22 @@
     shoe(pivot, l) {
       const c1 = (l && l.c1) || '#39414f', c2 = (l && l.c2) || '#ffffff';
       const st = (l && l.style) || 'sneaker';
-      if (st === 'slipper') { this.part(pivot, 'sphere', 1.1, 0.5, 1.3, 0, -1.9, 0.1, c1); this.part(pivot, 'sphere', 0.35, 0.35, 0.35, 0, -1.75, 0.55, '#ffffff'); return; }
+      if (st === 'slipper') {
+        this.part(pivot, 'box', 1.02, 0.34, 1.26, 0, -1.83, 0.1, c1);
+        this.part(pivot, 'sphere', 1.02, 0.36, 0.5, 0, -1.72, 0.52, c1);
+        this.part(pivot, 'sphereLo', 0.3, 0.3, 0.3, 0, -1.55, 0.72, '#ffffff');
+        return;
+      }
       const h = st === 'boot' ? 0.95 : st === 'hightop' || st === 'rocket' ? 0.72 : 0.42;
-      this.part(pivot, 'box', 1.04, h, 1.2, 0, -2 + h / 2, 0.1, c1);
-      this.part(pivot, 'box', 1.06, 0.12, 1.24, 0, -1.94, 0.1, st === 'sneaker' ? '#f2f2f2' : c2);
+      // shoes stay inside the leg's width so the two feet never overlap mid-stride
+      this.part(pivot, 'box', 1.0, h, 1.2, 0, -2 + h / 2, 0.1, c1);
+      this.part(pivot, 'box', 1.0, 0.12, 1.24, 0, -1.94, 0.1, st === 'sneaker' ? '#f2f2f2' : c2);
       if (st === 'sneaker') this.part(pivot, 'box', 0.6, 0.06, 0.04, 0, -1.72, 0.71, c2, { noShadow: true });
       if (st === 'rocket') {
-        const fl = this.part(pivot, 'cone', 0.6, 0.8, 0.6, 0, -2.4, 0.1, c2, { glow: 1.4, noShadow: true }); fl.rotation.x = PI;
-        this.anims.push((t) => { fl.scale.y = 0.6 + Math.random() * 0.4; });
+        // the flame hangs from the sole: short on the ground, long in the air
+        const fp = new THREE.Group(); fp.position.set(0, -2, 0.1); pivot.add(fp);
+        const fl = this.part(fp, 'cone', 0.56, 1, 0.56, 0, -0.5, 0, c2, { glow: 1.4, noShadow: true }); fl.rotation.x = PI;
+        this.anims.push((t, rig) => { fp.scale.y = rig.state.air ? 0.7 + Math.random() * 0.4 : 0.001; fp.visible = !!rig.state.air; });
       }
     },
 
@@ -587,8 +634,10 @@
           break;
         }
         case 'shell':
-          this.part(B, 'sphere', 2.1, 2.3, 1.1, 0, 3.0, -0.6, c1);
-          this.part(B, 'sphere', 1.5, 1.7, 0.9, 0, 3.0, -0.78, c2, { opacity: 0.8 });
+          // a dome that sits on the back, clear of the arms (x ±1) and torso (z -0.5)
+          this.part(B, 'sphere', 1.9, 2.1, 1.0, 0, 3.0, -0.72, c1);
+          this.part(B, 'box', 1.86, 0.14, 0.22, 0, 1.98, -0.62, U.shade(c1, -0.25));
+          for (const [x, y] of [[0, 3.4], [-0.45, 2.75], [0.45, 2.75]]) { const p = this.part(B, 'cyl', 0.62, 0.08, 0.62, x, y, -1.2, c2); p.rotation.x = PI / 2; }
           break;
         default:
           this.part(B, 'box', 1.6, 1.5, 0.7, 0, 3.0, -0.84, U.shade(c1, -0.1));
@@ -691,7 +740,7 @@
       else if (mv > 0.05) {
         const k = Math.min(1, mv) * (st === 'ninja' ? 1.1 : 0.9);
         lL = sw * k; lR = -sw * k;
-        if (st === 'ninja' && mv > 0.6) { aL = aR = 1.2; lean = 0.35; }
+        if (st === 'ninja' && mv > 0.6) { aL = aR = 1.0; lean = 0.18; }
         else { aL = -sw * k * 0.9; aR = sw * k * 0.9; }
         bodyY = Math.abs(Math.cos(this.phase)) * 0.12 * k * (st === 'bouncy' ? 3 : 1);
         lean = lean || mv * 0.08;
@@ -699,7 +748,7 @@
         aL = idle * 0.05; aR = -idle * 0.05; aLz = -0.06; aRz = 0.06;
         bodyY = idle * 0.03;
         if (st === 'bouncy') bodyY = Math.abs(Math.sin(t * 4)) * 0.25;
-        if (st === 'ninja') { bodyY = -0.25; lL = -0.35; lR = 0.25; aL = 0.5; aR = -0.3; }
+        if (st === 'ninja') { bodyY = -0.1; lL = -0.35; lR = 0.25; aL = 0.5; aR = -0.3; }
         if (st === 'hero') { aLz = -0.75; aRz = 0.75; aL = aR = -0.2; lean = -0.08; }
         if (st === 'float') { bodyY = 0.5 + Math.sin(t * 1.6) * 0.18; lL = 0.25; lR = 0.1; }
       }

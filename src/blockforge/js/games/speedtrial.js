@@ -267,6 +267,21 @@
           const piles = [];
           for (const sg of c.segs) for (let k = 0; k < sg.len; k += 220) piles.push({ x: sg.x1 + sg.tx * k, y: -60, z: sg.y1 + sg.ty * k, w: 18, h: 60, d: 18, color: '#1b1e2a' });
           V.boxes(piles, { parent: trackG, shadow: false });
+          // a neon skyline far below and around the course
+          const r = U.rng('st-sky' + c.id), towers = [], caps = [];
+          let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+          for (const p of c.pts) { x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[0]); z0 = Math.min(z0, p[1]); z1 = Math.max(z1, p[1]); }
+          for (let i = 0; i < 70; i++) {
+            const x = x0 - 500 + r() * (x1 - x0 + 1000), z = z0 - 500 + r() * (z1 - z0 + 1000);
+            const gap = Math.min(...c.segs.map((sg) => BF.phys.distToSeg(x, z, sg.x1, sg.y1, sg.x2, sg.y2)));
+            if (gap < c.width + 160) continue;
+            // towers grow taller the farther they stand from the track, so none crowd the camera
+            const w = 40 + r() * 50, h = 30 + Math.min(1, (gap - c.width - 160) / 500) * (80 + r() * 240);
+            towers.push({ x, y: -60, z, w, h, d: w, color: U.shade('#161a2c', r() * 0.1) });
+            caps.push({ x, y: -60 + h, z, w: w + 2, h: 3, d: w + 2, color: r() < 0.5 ? c.color : '#b67cff' });
+          }
+          V.boxes(towers, { parent: trackG, shadow: false });
+          V.boxes(caps, { parent: trackG, shadow: false, glow: 1 });
           padMeshes = c.boostPads.map((pad) => {
             const g = V.group(trackG);
             g.position.set(pad.x, 2, pad.y);
@@ -300,7 +315,7 @@
             return;
           }
           if (built !== course) rebuild();
-          if (ball) V.look(ball.x + ball.vx * 0.35, 0, ball.y + ball.vy * 0.35, { dist: 620, pitch: 0.98, fov: 45, lerp: 0.14 }, dt);
+          if (ball) V.look(ball.x + ball.vx * 0.3, 0, ball.y + ball.vy * 0.3, { dist: 440, pitch: 0.82, fov: 48, lerp: 0.14 }, dt);
           padMeshes.forEach((g) => g.userData.chev.forEach((ch, k) => { ch.position.x = ((t * 60 + k * 18) % 54) - 27; }));
           gateMeshes.forEach((g, i) => { if (g.userData.last) return; g.userData.bar.material = V.mat(i === gate ? '#3fd08a' : i < gate ? '#5a606c' : course.color, { glow: i === gate ? 1.4 : 0.6 }); });
           if (ball) {
@@ -316,7 +331,10 @@
             const p = ghostPos(gh, gt);
             const m = ghostPool.use(gh, () => V.shape('sphere', 0, 0, 0, 26, 26, 26, gh.color, { opacity: 0.4, glow: 0.4, depthWrite: false, shadow: false }));
             m.position.set(p.x, 14, p.y);
-            V.label(p.x, 36, p.y, { name: gh.name, color: gh.color, bubble: gh.bot ? ctx.bubbleText(gh.bot.id) : null });
+            // ghosts sitting on top of the ball (the start line) keep quiet so tags do not pile up
+            const near = ball && Math.hypot(p.x - ball.x, p.y - ball.y) < 40;
+            m.visible = !near;
+            if (!near) V.label(p.x, 36, p.y, { name: gh.name, color: gh.color, bubble: gh.bot ? ctx.bubbleText(gh.bot.id) : null });
           }
           ghostPool.sweep();
           V.sweep();

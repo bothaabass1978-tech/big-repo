@@ -392,7 +392,10 @@
         const hut = V.group(); hut.position.set(B.hut.x, 0, B.hut.y);
         V.box(0, 0, 0, 100, 44, 60, '#a86b3c', { parent: hut });
         for (const sd of [-1, 1]) { const slope = V.box(0, 0, 0, 112, 6, 44, '#7a4a2a', { parent: hut }); slope.position.set(0, 56, sd * 16); slope.rotation.x = sd * 0.62; }
-        V.box(0, 44, 0, 100, 1, 1, '#7a4a2a', { parent: hut, shadow: false });
+        // closed gable ends: a diamond prism squashed into a triangle above the walls
+        { const gab = V.group(hut); gab.position.y = 44; gab.scale.set(1, 0.43, 1); const pr = V.box(0, 0, 0, 98, 42.4, 42.4, '#9a6034', { parent: gab }); pr.position.y = 0; pr.rotation.x = Math.PI / 4; }
+        V.box(0, 67, 0, 114, 4, 5, '#5a3a20', { parent: hut });
+        for (const x of [-30, 30]) V.box(x, 16, 30.5, 16, 14, 2, '#bfe6ff', { parent: hut, shadow: false });
         V.box(0, 0, 30.5, 18, 28, 2, '#5a3a20', { parent: hut });
         const bat = V.group(); bat.position.set(B.cannons.x, 0, B.cannons.y);
         V.box(0, 0, 0, 80, 10, 48, '#5a4a3a', { parent: bat }); V.box(0, 10, -16, 80, 16, 10, '#7a6a5a', { parent: bat });
@@ -437,7 +440,7 @@
 
         return function sync(dt) {
           const t = ctx.time;
-          V.look(me.x, 0, me.y, { dist: 560, pitch: 0.95, fov: 45, lerp: 0.12 }, dt);
+          V.look(me.x, 0, me.y, { dist: 480, pitch: 0.86, fov: 45, lerp: 0.12 }, dt);
           sea.position.y = -4 + Math.sin(t) * 1.5;
           lavaCore.material.emissiveIntensity = 1.3 + Math.sin(t * 3) * 0.4;
           for (const [id, g] of Object.entries(veils)) g.visible = !d.zones[id];

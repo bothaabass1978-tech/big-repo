@@ -72,6 +72,7 @@
     create(ctx) {
       const W = ctx.W, H = ctx.H;
       const V = ctx.g3;
+      if (V) V.sepAxis = 'z';
       // side view in 3D: X = x, Y = height above the ground line, the lane runs along Z = 0
       const parts = V ? V.particles2d(0, (x, y) => [x, GROUND - y, 20]) : new BF.Particles(600);
       const floats = V ? V.floaters2d(0, (x, y) => [x, GROUND - y + 10, 30]) : new BF.Floaters();

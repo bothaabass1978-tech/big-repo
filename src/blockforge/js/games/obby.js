@@ -130,6 +130,7 @@
       const built = custom && lay && lay.kind === 'obby' && BF.studio && BF.studio.validate('obby', lay).ok;
       const course = built ? BF.studio.obbyCourse(lay) : custom ? genCourse('obby:' + (ctx.config.seed || 7), T.stages[diff] || 8, diff) : genCourse('sky-obby-v1', 10, 'normal');
       const V = ctx.g3;
+      if (V) V.sepAxis = 'z';
       // side view in 3D: game x -> X, game y (down) -> -Y, the course runs along Z = 0
       const parts = V ? V.particles2d(0, (x, y) => [x, -y + 6, 0]) : new BF.Particles(400);
       const floats = V ? V.floaters2d(0, (x, y) => [x, -y, 30]) : new BF.Floaters();

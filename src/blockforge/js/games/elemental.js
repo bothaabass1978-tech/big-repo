@@ -472,7 +472,21 @@
           }
           zonePool.sweep();
           for (const w of walls) {
-            wallPool.use(w, () => { const len = Math.hypot(w.x2 - w.x1, w.y2 - w.y1); const b = V.box((w.x1 + w.x2) / 2, 0, (w.y1 + w.y2) / 2, len, 46, 16, '#7a5a34', { flat: true }); b.rotation.y = -Math.atan2(w.y2 - w.y1, w.x2 - w.x1); return b; });
+            // a row of uneven stone blocks that rises out of the floor
+            const g = wallPool.use(w, () => {
+              const len = Math.hypot(w.x2 - w.x1, w.y2 - w.y1), grp = V.group();
+              grp.position.set((w.x1 + w.x2) / 2, 0, (w.y1 + w.y2) / 2);
+              grp.rotation.y = -Math.atan2(w.y2 - w.y1, w.x2 - w.x1);
+              const n = 5, seg = len / n;
+              for (let i = 0; i < n; i++) {
+                const h = 36 + ((i * 7) % 3) * 7;
+                V.box(-len / 2 + seg * (i + 0.5), 0, 0, seg - 2, h, 18, U.shade('#8a7a62', (i % 2 ? -0.08 : 0.04)), { parent: grp, flat: true });
+                V.box(-len / 2 + seg * (i + 0.5), h, 0, seg - 6, 4, 14, '#6f6250', { parent: grp, flat: true });
+              }
+              grp.userData.born = t;
+              return grp;
+            });
+            g.position.y = -46 * Math.max(0, 1 - (t - g.userData.born) / 0.25);
           }
           wallPool.sweep();
           reticle.visible = !!(me && me.useMouse && !me.dead && phase === 'play');

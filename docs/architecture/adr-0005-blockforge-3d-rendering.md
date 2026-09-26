@@ -10,7 +10,7 @@ Accepted
 
 ## Last Verified
 
-2026-09-25
+2026-09-26
 
 ## Decision Makers
 
@@ -116,6 +116,30 @@ BF.props3d.pet / car / zombie / ship                    merged, vertex-coloured 
   Auto picks Low on screens under 600 px.
 - Instanced meshes whose contents change every frame set
   `frustumCulled = false`, because their bounds are computed once while empty.
+
+### Fit and spacing rules (added 2026-09-26)
+
+Added after player feedback that models clipped through each other.
+
+- **Personal space.** `World.separate()` runs every frame before rigs animate.
+  Characters closer than 1.35 × their combined scale are eased apart, at most
+  2.2 × scale, and only in what is drawn. Game positions, collisions and tests
+  are unchanged. Side-view games limit the push to one axis
+  (`World.sepAxis = 'z'` for Obby, Siege and Mansion, `'x'` for Miners) so no
+  one is pushed off a ledge. `actor(id, av, {solid: false})` opts a rig out.
+  Name tags follow the nudge and step upward instead of overlapping.
+- **Avatar fit.** The head is a 1.25 cube (top 1.285, sides ±0.625).
+  - Hats that cover the crown (cap, beanie, explorer, wizard, viking) hide the
+    top of the hair; only a short fringe below the brim remains.
+  - Sculpted heads (pumpkin, robot, crystal, void) never get hair.
+  - Crowns are square bands so they wrap a blocky head.
+  - Shoes stay inside the leg's width.
+  - Rocket-boot flames only show in the air.
+  - Back items stay clear of the torso (z −0.5) and arms (x ±1).
+- **Instanced tilt.** `World.boxes()` items accept `rx` and `rz` as well as
+  `rot`, for things like drooping palm fronds.
+- **Checks.** A "fitting room" render of every wearable (front and back) and
+  close orbit shots around the player in each game are used to review fit.
 
 ## Alternatives Considered
 

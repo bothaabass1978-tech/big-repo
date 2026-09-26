@@ -361,7 +361,7 @@
           const t = ctx.time;
           const key = layer + '|' + d.owned.join(',') + '|' + auto;
           if (key !== builtKey) rebuild();
-          V.look(me.x, 0, me.y - 50, { dist: 560, pitch: 0.95, fov: 45, lerp: 0.12 }, dt);
+          V.look(me.x, 0, me.y - 50, { dist: 480, pitch: 0.86, fov: 45, lerp: 0.12 }, dt);
           for (const tex of belts) tex.offset.x = -((t * T.beltSpeed) / 48) % 1;
           lamps.forEach((l, i) => { l.material.emissiveIntensity = 0.9 + Math.sin(t * 3 + i) * 0.3; });
           furnaceGlow.forEach((f, i) => { f.scale.y = 26 * (0.8 + Math.sin(t * 12 + i) * 0.2); });

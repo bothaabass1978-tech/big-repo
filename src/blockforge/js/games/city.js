@@ -657,7 +657,7 @@
 
         return function sync(dt) {
           const t = ctx.time;
-          V.look(me.x, 0, me.y, { dist: car ? 660 : 520, pitch: 0.92, fov: 45, lerp: 0.12 }, dt);
+          V.look(me.x, 0, me.y, { dist: car ? 600 : 450, pitch: 0.84, fov: 45, lerp: 0.12 }, dt);
           // fountain spray
           sprayT -= dt;
           if (CITY.fountain && sprayT <= 0 && nearMe(CITY.fountain.x, CITY.fountain.y, 700)) { sprayT = 0.12; V.fx.emit(CITY.fountain.x, 40, CITY.fountain.y, { count: 3, color: '#dff4ff', speed: 60, life: 0.7, size: 4, gravity: 260, up: 1 }); }

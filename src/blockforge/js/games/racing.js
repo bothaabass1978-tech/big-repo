@@ -552,7 +552,7 @@
           for (const sd of [-1, 1]) V.box(-21, 8, sd * 7, 2, 3, 5, '#ff3b3b', { parent: body, glow: 0.8, shadow: false });
           if (prem) { V.box(-19, 17, 0, 4, 2, 22, '#1b1b22', { parent: body }); for (const sd of [-1, 1]) V.box(-18, 12, sd * 8, 2, 6, 2, '#1b1b22', { parent: body }); }
           grp.userData.wheels = [];
-          for (const [x, z] of [[13, 12], [13, -12], [-13, 12], [-13, -12]]) {
+          for (const [x, z] of [[13, 13.6], [13, -13.6], [-13, 13.6], [-13, -13.6]]) {
             const w = V.shape('cyl', x, 5, z, 10, 5, 10, '#15151c', { parent: grp });
             w.rotation.x = Math.PI / 2;
             grp.userData.wheels.push(w);

@@ -418,7 +418,7 @@
       const mesh = new THREE.InstancedMesh(geo(opts.geo || 'box'), opts.material || mat('#ffffff', opts), items.length);
       const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), p = V(), s = V(), c = new THREE.Color(), e = new THREE.Euler();
       items.forEach((it, i) => {
-        e.set(0, it.rot || 0, 0);
+        e.set(it.rx || 0, it.rot || 0, it.rz || 0);
         q.setFromEuler(e);
         p.set(it.x, (it.y || 0) + it.h / 2, it.z);
         s.set(it.w, it.h, it.d);
@@ -555,7 +555,7 @@
       const rig = BF.char3d.build(avatar, o);
       rig.group.scale.setScalar((o && o.scale) || 14);
       this.scene.add(rig.group);
-      this.actors.set(id, { rig, seen: true });
+      this.actors.set(id, { rig, seen: true, solid: !(o && o.solid === false) });
       return rig;
     },
 
@@ -599,7 +599,31 @@
     /** Draw queued labels and floating texts on the HUD canvas, then clear the queue. */
     drawOverlay(g) {
       const G = BF.gfx;
-      const L = this.labels.map((l) => Object.assign(this.toScreen(l.x, l.y, l.z), { o: l.o })).filter((l) => l.on);
+      // tags follow the personal-space nudge of the character they belong to
+      const moved = [];
+      for (const a of this.actors.values()) if (a.off && a.base && (a.off.x || a.off.z)) moved.push(a);
+      const L = this.labels.map((l) => {
+        let x = l.x, z = l.z;
+        for (const a of moved) {
+          const r = a.rig.group.scale.x * 1.2;
+          if (Math.abs(a.base.x - x) < r && Math.abs(a.base.z - z) < r) { x += a.off.x; z += a.off.z; break; }
+        }
+        return Object.assign(this.toScreen(x, l.y, z), { o: l.o });
+      }).filter((l) => l.on);
+      // nearest first gets its spot; farther tags that would overlap it step upward
+      L.sort((a, b) => a.z - b.z);
+      const placed = [];
+      for (const l of L) {
+        const w = l.o.name ? Math.min(160, 14 + l.o.name.length * 6.5) : 40;
+        let y = l.y;
+        for (let tries = 0; tries < 6; tries++) {
+          const hit = placed.find((p) => Math.abs(p.x - l.x) < (p.w + w) / 2 && Math.abs(p.y - y) < 17);
+          if (!hit) break;
+          y = hit.y - 18;
+        }
+        l.y = y; l.w = w;
+        placed.push(l);
+      }
       L.sort((a, b) => b.z - a.z);
       for (const l of L) {
         const o = l.o;
@@ -711,7 +735,54 @@
       if (this.shakeT > 0) this.shakeT -= dt;
       this.fx.update(dt);
       for (let i = this.texts.length - 1; i >= 0; i--) { this.texts[i].t += dt; if (this.texts[i].t > 1.1) this.texts.splice(i, 1); }
+      this.separate(dt);
       for (const a of this.actors.values()) a.rig.tick(dt);
+    },
+
+    /**
+     * Render-only personal space: characters standing on the same spot (spawn points,
+     * crowded doors, bots walking through you) are eased apart so their meshes never
+     * interpenetrate. Game positions are untouched; only what is drawn this frame moves.
+     */
+    separate(dt) {
+      const list = [];
+      for (const a of this.actors.values()) {
+        const g = a.rig.group;
+        if (a.solid === false || !g.visible || g.parent !== this.scene) { a.off = null; continue; }
+        // the game did not move this rig since last frame: undo our previous nudge first
+        if (a.shown && g.position.equals(a.shown)) g.position.copy(a.base);
+        a.base = (a.base || new THREE.Vector3()).copy(g.position);
+        a.want = (a.want || new THREE.Vector3()).set(0, 0, 0);
+        a.off = a.off || new THREE.Vector3();
+        list.push(a);
+      }
+      for (let i = 0; i < list.length; i++) {
+        const A = list[i], sa = A.rig.group.scale.x;
+        for (let j = i + 1; j < list.length; j++) {
+          const B = list[j], sb = B.rig.group.scale.x;
+          if (Math.abs(A.base.y - B.base.y) > (sa + sb) * 3) continue;
+          let dx = B.base.x - A.base.x, dz = B.base.z - A.base.z;
+          const min = (sa + sb) * 1.35;
+          let l = Math.hypot(dx, dz);
+          if (l >= min) continue;
+          // side-view games only spread along one axis so nobody is pushed off a ledge
+          if (this.sepAxis === 'z') { dx = 0; if (Math.abs(dz) < 0.01) dz = (i + j) % 2 ? 1 : -1; }
+          else if (this.sepAxis === 'x') { dz = 0; if (Math.abs(dx) < 0.01) dx = (i + j) % 2 ? 1 : -1; }
+          else if (l < 0.01) { const k = (i * 7 + j * 13) % 8; dx = Math.cos(k); dz = Math.sin(k); }
+          l = Math.hypot(dx, dz);
+          const push = (min - l) / 2;
+          A.want.x -= (dx / l) * push; A.want.z -= (dz / l) * push;
+          B.want.x += (dx / l) * push; B.want.z += (dz / l) * push;
+        }
+      }
+      const k = Math.min(1, dt * 10);
+      for (const a of list) {
+        const cap = a.rig.group.scale.x * 2.2, wl = Math.hypot(a.want.x, a.want.z);
+        if (wl > cap) a.want.multiplyScalar(cap / wl);
+        a.off.lerp(a.want, k);
+        a.rig.group.position.set(a.base.x + a.off.x, a.base.y, a.base.z + a.off.z);
+        a.shown = (a.shown || new THREE.Vector3()).copy(a.rig.group.position);
+      }
     },
 
     render() {
