@@ -363,10 +363,182 @@
     },
   };
 
+  // ------------------------------------------------------------ scenes for the arcade engines (one per engine, themed by variant)
+
+  const V2 = (game) => (game.config && game.config.variant) || '';
+  const TYPE_SCENES = {
+    runner(A, c, game) {
+      const W = A.W, v = V2(game);
+      const th = { metro: ['day', '#454a57', '#c9ced8'], lava: ['dusk', '#2a1f1e', '#ff5a2e'], jungle: ['day', '#6f6246', '#4a8f3a'], candy: ['sunset', '#ff8fc7', '#ffffff'], hyper: ['space', '#161c3a', '#39f3ff'] }[v] || ['day', '#454a57', '#c9ced8'];
+      W.preset(th[0]); if (th[0] !== 'day') W.stars(200);
+      A.box(400, -8, 0, 260, 8, 2400, th[1]);
+      for (const x of [340, 400, 460]) A.box(x, 0, 0, 4, 2, 2400, th[2], { glow: v === 'hyper' || v === 'lava' ? 1 : 0 });
+      const deco = [];
+      const r = U.rng('rt:' + game.id);
+      for (let i = 0; i < 30; i++) { const side = i % 2 ? 1 : -1, z = 300 - i * 70; deco.push({ x: 400 + side * (190 + r() * 120), y: 0, z, w: 60 + r() * 50, h: v === 'metro' ? 120 + r() * 220 : 40 + r() * 120, d: 60, color: v === 'jungle' ? '#2f8f47' : v === 'candy' ? U.pick(['#ff5aa8', '#7cf5ff', '#ffe066'], r) : v === 'lava' ? '#2a1c1a' : v === 'hyper' ? '#161c3a' : U.shade('#5a6e8a', r() * 0.2) }); }
+      W.boxes(deco);
+      if (v === 'metro') { A.box(460, 0, -120, 56, 74, 180, '#3a7bd5'); A.box(460, 42, -29, 44, 18, 2, '#bfe6ff', { glow: 0.5 }); }
+      if (v === 'lava') A.box(400, 0, 330, 1200, 160, 30, '#ff4a1f', { glow: 1.2 });
+      if (v === 'jungle') A.box(400, -6, 60, 260, 8, 70, '#0b0c10');
+      if (v === 'candy') { A.shape('sphere', 340, 10, 40, 50, 30, 50, '#7cf5ff', { glow: 0.5 }); }
+      if (v === 'hyper') A.box(340, 12, 20, 60, 5, 5, '#ff3df0', { glow: 1.5 });
+      A.guy(400, 30, 180, { rot: Math.PI, move: 1.3, air: true, scale: 11 });
+      A.guy(340, 0, 140, { rot: Math.PI, move: 1.3, scale: 10 });
+      A.guy(460, 0, 120, { rot: Math.PI, move: 1.3, scale: 10 });
+      for (let i = 0; i < 8; i++) { const m = A.shape('cyl', 400, 40 + Math.sin(i / 7 * Math.PI) * 40, 130 - i * 30, 14, 4, 14, '#ffd23f', { glow: 0.5, metal: 0.6 }); m.rotation.x = Math.PI / 2; }
+      A.look(400, 40, 170, { dist: 190, pitch: 0.28, yaw: 0.35, fov: 55 });
+    },
+    party(A, c, game) {
+      const W = A.W, v = V2(game);
+      W.preset(v === 'hexfall' ? 'space' : v === 'meteor' ? 'sunset' : v === 'color' || v === 'sumo' ? 'arena' : 'day'); if (v === 'hexfall') W.stars(300);
+      const cols = ['#ff4a5a', '#3a8bff', '#3fd08a', '#ffd23f', '#b67cff', '#ff8a2e'];
+      const tiles = [];
+      const r = U.rng('pt:' + game.id);
+      if (v === 'sumo' || v === 'meteor') A.shape('cyl', 400, -12, 300, 460, 24, 460, v === 'sumo' ? '#e8d8b0' : '#6a5a4a');
+      else for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) { if (v === 'hexfall' && r() < 0.25) continue; tiles.push({ x: 225 + x * 50, y: -10, z: 125 + y * 50, w: 46, h: 10, d: 46, color: v === 'hexfall' ? '#7cf5ff' : cols[Math.floor(r() * cols.length)] }); }
+      if (tiles.length) W.boxes(tiles);
+      if (v === 'hexfall') { const low = []; for (let i = 0; i < 40; i++) low.push({ x: 225 + (i % 8) * 50, y: -150, z: 125 + Math.floor(i / 8) * 60, w: 46, h: 10, d: 46, color: '#b67cff' }); W.boxes(low); }
+      if (v === 'meteor') for (let i = 0; i < 3; i++) { A.shape('dodeca', 330 + i * 80, 160 + i * 50, 260 - i * 30, 40, 40, 40, '#5a3a2a'); A.glow('sphere', 330 + i * 80, 172 + i * 50, 262 - i * 30, 52, '#ff7a2e', 1.2).material.opacity = 0.6; }
+      if (v === 'sumo') A.shape('cyl', 400, 1, 300, 140, 2, 140, '#ffd23f', { glow: 0.6 });
+      A.guy(360, 0, 300, { rot: 0.6, move: 0.8, attack: true, scale: 11 });
+      A.guy(430, 40, 290, { rot: -2, air: true, scale: 11 });
+      A.guy(470, 0, 350, { rot: -2.4, emote: 'cheer', scale: 11 });
+      A.guy(320, 0, 380, { rot: 0.9, emote: 'dance', scale: 10 });
+      for (let i = 0; i < 30; i++) A.glow('box', 250 + r() * 300, 60 + r() * 200, 200 + r() * 200, 5, cols[i % 6], 1);
+      A.look(400, 30, 320, { dist: 330, pitch: 0.5, yaw: 0.3, fov: 45 });
+    },
+    tag(A, c, game) {
+      const W = A.W, v = V2(game);
+      W.preset(v === 'hide' ? 'indoor' : v === 'infection' ? 'dusk' : v === 'potato' ? 'arena' : 'day');
+      W.gridFloor(-400, -400, 1200, 1200, v === 'freeze' ? '#e8f2ff' : v === 'infection' ? '#1d2a22' : v === 'hide' ? '#8a6a4a' : v === 'potato' ? '#3a3048' : '#5aab52', 'rgba(0,0,0,.1)', 40);
+      A.box(300, 0, 200, 80, 50, 60, v === 'freeze' ? '#9fc6ee' : '#8a909c'); A.box(560, 0, 220, 60, 90, 60, v === 'hide' ? '#7a5236' : '#b07a45');
+      A.guy(360, 0, 300, { rot: 0.3, move: 1.3, scale: 11 });
+      A.guy(470, 0, 280, { rot: 2.9, move: 1.3, attack: true, scale: 11 });
+      A.guy(540, 0, 340, { rot: 2.6, move: 1, scale: 10 });
+      if (v === 'freeze') A.box(540, 0, 340, 34, 70, 34, '#bfe6ff', { opacity: 0.5, glow: 0.3 });
+      if (v === 'infection') for (const [x, z] of [[470, 280], [540, 340]]) { const m = A.shape('ring', x, 2, z, 50, 50, 1, '#6fff8a', { glow: 1.2 }); m.rotation.x = -Math.PI / 2; }
+      if (v === 'hide') { A.light(470, 70, 280, '#fff3c8', 260, 360); W.hemi.intensity = 0.5; }
+      if (v === 'flag') { A.box(360, 0, 260, 4, 80, 4, '#e8ecf1'); A.box(376, 56, 260, 30, 22, 2, '#ff5a6a', { glow: 0.6 }); }
+      if (v === 'potato') { A.shape('sphere', 360, 90, 300, 26, 22, 22, '#c8913a'); A.glow('sphere', 360, 108, 300, 8, '#ffd23f', 2); }
+      A.look(440, 30, 300, { dist: 250, pitch: 0.42, yaw: -0.3, fov: 45 });
+    },
+    fishing(A, c, game) {
+      const W = A.W, v = V2(game);
+      W.preset(v === 'lava' ? 'dusk' : v === 'deep' || v === 'koi' ? 'sunset' : 'day');
+      const water = v === 'lava' ? '#ff5a1f' : v === 'ice' ? '#1f5f8a' : v === 'koi' ? '#3aa88a' : v === 'deep' ? '#1a5a8a' : '#2a8fc8';
+      A.box(400, -30, 300, 3000, 2, 3000, water, { glow: v === 'lava' ? 0.9 : 0, opacity: 0.95 });
+      if (v === 'ice') A.box(400, -28, 300, 3000, 4, 3000, '#e8f6ff');
+      if (v === 'ice') A.shape('cyl', 470, -26, 360, 90, 4, 90, '#1f5f8a');
+      if (v === 'deep') { A.box(380, -40, 240, 260, 34, 200, '#f4f1ea'); A.box(380, -8, 240, 240, 4, 180, '#b07a45'); }
+      else if (v !== 'ice') { for (let z = 160; z < 320; z += 20) A.box(380, -12, z, 120, 6, 18, v === 'lava' ? '#3a3a3a' : '#8b5a2b'); }
+      if (v === 'koi') for (let i = 0; i < 8; i++) A.shape('cyl', 300 + i * 40, -28, 380 + (i % 3) * 30, 36, 2, 36, '#3f9a3a');
+      const guy = A.guy(380, v === 'ice' ? -24 : -6, 280, { rot: 0, scale: 11, hold: 'shovel' });
+      void guy;
+      const col = { lake: '#ffc940', ice: '#bfe6ff', deep: '#b67cff', lava: '#ff8a2e', koi: '#ff8a5c' }[v] || '#ffc940';
+      const fish = new THREE.Group(); fish.position.set(470, 40, 360); fish.rotation.z = 0.7; W.scene.add(fish);
+      W.shape('sphere', 0, 0, 0, 70, 30, 26, col, { parent: fish, glow: 0.3 }); const tail = W.shape('cone4', -46, 0, 0, 24, 30, 6, col, { parent: fish }); tail.rotation.z = Math.PI / 2; W.shape('sphere', 24, 6, 11, 6, 6, 4, '#141018', { parent: fish });
+      for (let i = 0; i < 16; i++) A.glow('sphere', 470 + Math.cos(i) * 40, -20 + (i % 4) * 8, 360 + Math.sin(i) * 40, 5, '#dff4ff', 0.8);
+      A.look(420, 20, 320, { dist: 230, pitch: 0.3, yaw: -0.6, fov: 50 });
+    },
+    farm(A, c, game) {
+      const W = A.W, v = V2(game);
+      W.preset(v === 'mushroom' ? 'night' : v === 'space' ? 'space' : v === 'pumpkin' ? 'sunset' : 'day'); if (v === 'mushroom' || v === 'space') W.stars(300);
+      W.gridFloor(-400, -400, 1200, 1200, v === 'space' ? '#8a8f9e' : v === 'mushroom' ? '#2a3a2a' : v === 'pumpkin' ? '#a8a04a' : '#6cbf5a', 'rgba(0,0,0,.06)', 60);
+      const rows = [];
+      const crop = { valley: '#ff8a2e', pumpkin: '#ff6a1a', space: '#bfe6ff', honey: '#ff5aa8', mushroom: '#7cf5ff' }[v] || '#ff8a2e';
+      for (let i = 0; i < 4; i++) rows.push({ x: 280 + i * 80, y: 0, z: 330, w: 60, h: 5, d: 200, color: '#7a5236' });
+      W.boxes(rows);
+      for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) A.shape(v === 'mushroom' ? 'cone' : 'sphere', 280 + i * 80, 16, 260 + j * 45, v === 'pumpkin' ? 30 : 18, v === 'pumpkin' ? 24 : 18, v === 'pumpkin' ? 30 : 18, crop, { glow: v === 'mushroom' ? 1 : 0.1 });
+      if (v === 'honey') { A.shape('dodeca', 560, 50, 230, 90, 100, 90, '#ffc940'); for (let i = 0; i < 12; i++) A.glow('sphere', 380 + Math.cos(i) * 60, 70 + (i % 3) * 12, 290 + Math.sin(i) * 60, 7, '#ffd23f', 0.8); }
+      else if (v === 'space') { const d = A.shape('sphere', 400, 0, 300, 700, 400, 600, '#bfe6ff', { opacity: 0.15 }); d.material.side = THREE.DoubleSide; }
+      else { A.box(560, 0, 200, 140, 100, 110, '#b83a3a'); A.box(560, 100, 200, 150, 50, 120, '#6b2a2a', { geo: 'cone4' }); }
+      A.guy(420, 0, 400, { rot: -2.6, move: 0.4, hold: 'shovel', scale: 11 });
+      A.guy(320, 0, 420, { rot: -1.2, emote: 'wave', scale: 10 });
+      A.look(420, 20, 340, { dist: 280, pitch: 0.42, yaw: -0.25, fov: 45 });
+    },
+    restaurant(A, c, game) {
+      const W = A.W, v = V2(game);
+      W.preset(v === 'icecream' ? 'day' : v === 'taco' ? 'sunset' : 'indoor');
+      W.gridFloor(-400, -400, 1200, 1200, '#e8d8c0', 'rgba(0,0,0,.1)', 40, { check: true });
+      A.box(400, 0, 180, 700, 160, 20, { pizza: '#c85a3a', burger: '#3a7bd5', sushi: '#2a2a2a', icecream: '#ff9fc7', taco: '#2a9a6a' }[v] || '#c85a3a');
+      A.box(400, 0, 320, 420, 44, 40, '#b07a45'); A.box(400, 44, 320, 430, 5, 46, '#e8ecf1');
+      const stack = { pizza: ['#f4e1b0', '#d8382a', '#ffd23f', '#b8322a'], burger: ['#e0a85a', '#8a4a2a', '#ffd23f', '#6fd66b', '#e0a85a'], sushi: ['#ffffff', '#1f3a2a', '#ff8a5c'], icecream: ['#e0a85a', '#fff4d6', '#ff7aa8', '#9fefc8'], taco: ['#f4d890', '#8a4a2a', '#e03e3e', '#ffd23f'] }[v] || ['#ffd23f'];
+      for (let k = 0; k < 3; k++) stack.forEach((col, i) => A.shape(v === 'icecream' && i ? 'sphere' : 'cyl', 330 + k * 70, 52 + i * 8, 320, 36 - i * (v === 'icecream' ? 4 : 1), 8, 36 - i * (v === 'icecream' ? 4 : 1), col));
+      A.guy(400, 0, 260, { rot: Math.PI / 2, move: 0.6, emote: 'cheer', scale: 11 });
+      A.guy(320, 20, 390, { rot: -Math.PI / 2, mode: 'sit', scale: 10 });
+      A.guy(480, 20, 390, { rot: -Math.PI / 2, mode: 'sit', scale: 10 });
+      A.box(610, 0, 240, 90, 90, 80, '#5a5f6a'); A.box(610, 30, 282, 60, 30, 2, '#ff8a2e', { glow: 0.9 });
+      A.look(400, 30, 320, { dist: 300, pitch: 0.55, yaw: 0.2, fov: 45 });
+    },
+    flight(A, c, game) {
+      const W = A.W, v = V2(game);
+      W.preset(v === 'dragon' ? 'dusk' : v === 'wingsuit' || v === 'jet' ? 'sunset' : v === 'paper' ? 'indoor' : 'day');
+      const r = U.rng('fl:' + game.id);
+      if (v === 'wingsuit') for (let i = 0; i < 16; i++) { A.box(220, -200, 400 - i * 60, 120, 400 + r() * 200, 60, '#b0643a'); A.box(580, -200, 400 - i * 60, 120, 400 + r() * 200, 60, '#a05a34'); }
+      else if (v !== 'paper') for (let i = 0; i < 20; i++) A.box(200 + r() * 400, -120 - r() * 100, -200 + r() * 700, 120, 40, 120, v === 'jet' ? '#3a3f5a' : '#6cbf5a');
+      else { A.box(400, -60, 300, 1400, 40, 1400, '#c8a878'); A.box(400, -40, 100, 300, 180, 60, '#8b5a2b'); }
+      for (let i = 0; i < 4; i++) { const m = A.shape('torus', 400 + (i % 2 ? 40 : -40), 60 + i * 10, 250 - i * 160, 100, 100, 18, '#ffd23f', { glow: 0.9 }); m.rotation.y = 0; }
+      const rider = A.guy(400, 40, 330, { rot: Math.PI, mode: v === 'dragon' || v === 'paper' ? 'sit' : 'swim', scale: 11 });
+      void rider;
+      if (v === 'dragon') { A.shape('sphere', 400, 20, 330, 40, 30, 110, '#3a8a4a'); for (const sd of [-1, 1]) { const w = A.box(400 + sd * 60, 20, 330, 100, 4, 60, '#2a6a3a'); w.rotation.z = sd * 0.4; } A.glow('sphere', 400, 30, 240, 26, '#ff8a2e', 1.4); }
+      if (v === 'jet') for (const sd of [-1, 1]) A.glow('cone', 400 + sd * 6, 34, 342, 8, '#ff8a2e', 1.4).rotation.x = Math.PI;
+      if (v === 'paper') { const p = A.shape('cone4', 400, 28, 330, 70, 90, 12, '#f8f8f4'); p.rotation.x = -Math.PI / 2; p.rotation.y = Math.PI / 4; }
+      for (let i = 0; i < 12; i++) A.box(r() * 900 - 50, 180 + r() * 150, -300 + r() * 600, 120, 30, 70, '#ffffff');
+      A.look(400, 60, 360, { dist: 190, pitch: 0.2, yaw: 0.4, fov: 55 });
+    },
+    golf(A, c, game) {
+      const W = A.W, v = V2(game);
+      W.preset(v === 'neon' ? 'night' : v === 'space' ? 'space' : v === 'castle' ? 'dusk' : v === 'candy' ? 'sunset' : 'day'); if (v === 'neon' || v === 'space') W.stars(300);
+      const green = { classic: '#4ab84a', neon: '#141a3a', candy: '#ffb3d9', space: '#4a4f6a', castle: '#5a8a4a' }[v] || '#4ab84a';
+      const wall = { classic: '#b07a45', neon: '#39f3ff', candy: '#ffffff', space: '#8a8fae', castle: '#8a8f9e' }[v] || '#b07a45';
+      A.box(400, -6, 300, 520, 6, 300, U.shade(wall, -0.3)); A.box(400, -1, 300, 490, 2, 270, green, { glow: v === 'neon' ? 0.15 : 0 });
+      W.boxes([{ x: 400, y: 0, z: 160, w: 520, h: 18, d: 14, color: wall }, { x: 400, y: 0, z: 440, w: 520, h: 18, d: 14, color: wall }, { x: 145, y: 0, z: 300, w: 14, h: 18, d: 270, color: wall }], { glow: v === 'neon' ? 1 : 0 });
+      if (v === 'classic') { A.box(470, 0, 230, 70, 110, 40, '#e8d8c0'); for (let k = 0; k < 4; k++) { const b = A.box(470, 70, 252, 10, 60, 3, '#ffffff'); b.rotation.z = k * Math.PI / 2 + 0.3; } }
+      if (v === 'castle') { A.box(470, 0, 200, 60, 140, 40, '#8a8f9e'); A.box(530, 0, 200, 60, 140, 40, '#8a8f9e'); }
+      if (v === 'space') { A.glow('sphere', 460, 30, 320, 50, '#b67cff', 0.9); A.shape('torus', 460, 30, 320, 90, 90, 20, '#ffe066', { glow: 0.8 }).rotation.x = 1.2; }
+      if (v === 'candy') A.shape('sphere', 430, 10, 280, 44, 30, 44, '#7cf5ff');
+      if (v === 'neon') A.box(430, 0, 300, 24, 22, 60, '#ff4fd8', { glow: 1 });
+      A.shape('cyl', 580, 0.6, 330, 26, 1.4, 26, '#0a0a0a'); A.box(580, 0, 330, 3, 80, 3, '#e8ecf1'); A.box(594, 60, 330, 26, 16, 1.5, '#e03e3e', { glow: 0.3 });
+      A.shape('sphere', 330, 7, 330, 14, 14, 14, '#ffffff', { glow: v === 'neon' ? 0.7 : 0 });
+      A.guy(300, 0, 330, { rot: 0, hold: 'hammer', holdColor: '#c8ccd4', attack: true, scale: 11 });
+      A.guy(260, 0, 420, { rot: 0.4, emote: 'cheer', scale: 10 });
+      A.look(420, 10, 330, { dist: 300, pitch: 0.55, yaw: 0.25, fov: 45 });
+    },
+    spooky(A, c, game) {
+      const W = A.W, v = V2(game);
+      W.preset(v === 'frost' ? 'night' : 'indoor', { fogNear: 250, fogFar: 900 }); W.hemi.intensity = 0.3; W.sun.intensity = 0.25;
+      const wall = { arcade: '#3a2a5a', halls: '#d8c86a', cottage: '#7a5a3a', hotel: '#d8c8a8', frost: '#8a9aae' }[v] || '#3a2a5a';
+      const floor = { arcade: '#2a1f3a', halls: '#8a7a3a', cottage: '#5a3f2a', hotel: '#6a1f2a', frost: '#e8f4ff' }[v] || '#2a1f3a';
+      W.gridFloor(-400, -400, 1200, 1200, floor, 'rgba(0,0,0,.2)', 56);
+      for (let i = 0; i < 10; i++) { A.box(300, 0, 500 - i * 56, 56, 110, 56, U.shade(wall, (i % 3) * 0.03)); A.box(540, 0, 500 - i * 56, 56, 110, 56, U.shade(wall, (i % 2) * 0.03)); }
+      A.light(420, 70, 380, v === 'halls' ? '#fffbe0' : '#fff0d0', 220, 380);
+      A.guy(420, 0, 390, { rot: -Math.PI / 2, move: 1.3, scale: 11 });
+      const mcol = { arcade: '#c8742a', halls: '#141018', cottage: '#e8f4ff', hotel: '#0a0a14', frost: '#f4faff' }[v] || '#141018';
+      A.box(420, 0, 200, 50, 130, 34, mcol, { opacity: v === 'cottage' ? 0.55 : 1 }); A.box(420, 130, 200, 44, 40, 34, mcol, { opacity: v === 'cottage' ? 0.55 : 1 });
+      for (const sd of [-1, 1]) A.glow('sphere', 420 + sd * 10, 150, 218, 8, v === 'frost' ? '#46a8ff' : '#ff2a2a', 2.5);
+      A.glow('box', 480, 20, 330, 14, { arcade: '#ffd23f', halls: '#46a8ff', cottage: '#ffc940', hotel: '#ffe066', frost: '#ff8a2e' }[v] || '#ffd23f', 1.4);
+      A.look(420, 60, 420, { dist: 220, pitch: 0.25, yaw: 0, fov: 55 });
+    },
+    quiz(A, c, game) {
+      const W = A.W, v = V2(game);
+      W.preset(v === 'science' ? 'space' : v === 'world' ? 'sunset' : v === 'math' ? 'arena' : 'day'); if (v === 'science') W.stars(300);
+      A.box(400, -30, 300, 560, 30, 400, v === 'math' ? '#2a3148' : '#e8ecf1');
+      const pads = v === 'truefalse' ? [['#3fd08a', 320, 300], ['#ff4a5a', 480, 300]] : [['#ff4a5a', 330, 230], ['#3a8bff', 470, 230], ['#ffd23f', 330, 370], ['#3fd08a', 470, 370]];
+      pads.forEach(([col, x, z], i) => A.box(x, i === 2 ? -80 : 0, z, 110, 10, 110, col, { glow: 0.3 }));
+      A.box(400, -30, 60, 400, 200, 12, '#141a2a');
+      A.guy(330, 10, 230, { rot: -1.4, emote: 'cheer', scale: 11 });
+      A.guy(470, 10, 370, { rot: -2, emote: 'laugh', scale: 11 });
+      A.guy(330, -40, 370, { rot: -1.6, air: true, scale: 10 });
+      A.glow('octa', 400, 150, 70, 40, '#ffe066', 1);
+      A.look(400, 20, 330, { dist: 380, pitch: 0.55, yaw: 0.15, fov: 45 });
+    },
+  };
+
   const TEMPLATE_SCENE = { arena: 'block-battlegrounds', racing: 'skyline-racers', obby: 'sky-obby', simulator: 'pet-world', towerdefense: 'towerfall-legends', custom: 'sky-obby' };
 
   function sceneFor(game) {
     if (SCENES[game.id]) return { fn: SCENES[game.id], color: null };
+    if (TYPE_SCENES[game.gameType] && game.builtIn) return { fn: (A, c) => TYPE_SCENES[game.gameType](A, c, game), color: null };
     const tpl = TEMPLATE_SCENE[game.template] || 'block-battlegrounds';
     return { fn: SCENES[tpl], color: (game.thumbnail && game.thumbnail.color) || '#ff7a2e' };
   }
@@ -417,10 +589,33 @@
   // ------------------------------------------------------------ rendering + cache
 
   function keyOf(game) {
-    const custom = !SCENES[game.id];
+    const custom = !SCENES[game.id] && !game.builtIn;
     return VERSION + ':' + (custom ? 'ug:' + (game.template || '') + ':' + ((game.thumbnail && game.thumbnail.color) || '') + ':' + game.name : game.id);
   }
   const storeKey = (k) => 'bf.thumb3d.' + k;
+  /** Most renders kept in localStorage (the rest re-render per visit), so thumbnails never crowd out saves. */
+  const STORE_MAX = 28;
+  let swept = false;
+  /** Drop renders from older versions of the thumbnail art (once per page load). */
+  function sweepOld() {
+    if (swept) return;
+    swept = true;
+    try {
+      const dead = [];
+      for (let i = 0; i < localStorage.length; i++) { const key = localStorage.key(i); if (key && key.indexOf('bf.thumb3d.') === 0 && key !== 'bf.thumb3d.index' && key.indexOf('bf.thumb3d.' + VERSION + ':') !== 0) dead.push(key); }
+      dead.forEach((key) => localStorage.removeItem(key));
+    } catch (e) { /* no storage */ }
+  }
+  function persist(k, url) {
+    sweepOld();
+    try {
+      const idx = JSON.parse(localStorage.getItem('bf.thumb3d.index') || '[]').filter((x) => x !== k);
+      idx.push(k);
+      while (idx.length > STORE_MAX) localStorage.removeItem(storeKey(idx.shift()));
+      localStorage.setItem(storeKey(k), url);
+      localStorage.setItem('bf.thumb3d.index', JSON.stringify(idx));
+    } catch (e) { /* storage full or blocked: memory cache only */ }
+  }
 
   function render(game) {
     const { fn, color } = sceneFor(game);
@@ -434,7 +629,7 @@
       c.width = PX_W; c.height = PX_H;
       c.getContext('2d').drawImage(renderer.domElement, 0, 0);
       letter(c, game.name || '', color || game.accent || '#ff7a2e');
-      return c.toDataURL('image/jpeg', 0.84);
+      return c.toDataURL('image/jpeg', 0.8);
     } finally {
       W.scene.traverse((o) => { if (o.userData && o.userData.dispose) o.userData.dispose(); });
       W.dispose();
@@ -459,7 +654,7 @@
     try { url = render(job.game); } catch (e) { console.error(e); }
     if (url) {
       mem.set(k, url);
-      try { localStorage.setItem(storeKey(k), url); } catch (e) { /* storage full or blocked: memory cache only */ }
+      persist(k, url);
       job.from.forEach((f) => swap(f, url));
       if (BF.bus) BF.bus.emit('thumb3d:ready', { key: k });
     }

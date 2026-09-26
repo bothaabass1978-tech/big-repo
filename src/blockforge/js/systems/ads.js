@@ -24,7 +24,14 @@
     discover: { label: 'Discover · Featured slot', share: 0.3, ctr: 1 },
     search: { label: 'Search · Top result', share: 0.25, ctr: 1.5 },
   };
-  const LIMITS = { minBudget: 50, maxBudget: 250000, maxActive: 5, headline: [8, 60] };
+  /** How fast a campaign spends its budget: roughly `minutes` from launch to empty. */
+  const PACES = {
+    steady: { label: 'Steady', minutes: 60, desc: 'About an hour' },
+    fast: { label: 'Fast', minutes: 10, desc: 'About 10 minutes' },
+    blitz: { label: 'Blitz', minutes: 2, desc: 'About 2 minutes' },
+    burst: { label: 'Burst', minutes: 0.5, desc: 'About 30 seconds' },
+  };
+  const LIMITS = { minBudget: 50, maxBudget: 50000000, maxActive: 10, headline: [8, 60] };
   const BASE_CTR = 0.024;
   const CLICK_TO_VISIT = 0.78;
   const HIST_MAX = 90;
@@ -47,7 +54,8 @@
     const len = (c.headline || '').length;
     const copy = len >= 16 && len <= 48 ? 1.12 : 1;
     const placement = c.placements.reduce((a, p) => a + PLACEMENTS[p].share * PLACEMENTS[p].ctr, 0) / c.placements.reduce((a, p) => a + PLACEMENTS[p].share, 0);
-    const fatigue = 1 / (1 + c.impressions / 60000);
+    // viewers tire of the same ad, but big campaigns keep working (square-root falloff)
+    const fatigue = 1 / Math.sqrt(1 + c.impressions / 250000);
     return BASE_CTR * q * copy * placement * fatigue;
   }
 
@@ -66,7 +74,34 @@
   const ads = (BF.ads = {
     TIERS,
     PLACEMENTS,
+    PACES,
     LIMITS,
+
+    /**
+     * Impressions a campaign buys in `seconds`. Paced campaigns spend their
+     * budget over the pace's minutes; older campaigns without a pace use the
+     * tier's rate. Randomness is injectable for tests.
+     */
+    impressionsFor(c, seconds, rnd) {
+      const r = rnd == null ? Math.random() : rnd;
+      const tier = TIERS[c.tier] || TIERS.standard;
+      const pace = PACES[c.pace];
+      if (pace) {
+        const spend = (c.budget / (pace.minutes * 60)) * seconds * (0.85 + r * 0.3);
+        return Math.max(1, Math.round((spend / tier.cpm) * 1000));
+      }
+      const share = c.placements.reduce((s2, p) => s2 + (PLACEMENTS[p] ? PLACEMENTS[p].share : 0), 0);
+      return Math.round(tier.rate * share * (seconds / 60) * (0.7 + r * 0.6));
+    },
+
+    /** Change how fast a running campaign spends. */
+    setPace(id, pace) {
+      const c = ads.get(id);
+      if (!c || !PACES[pace] || (c.status !== 'active' && c.status !== 'paused')) return { ok: false };
+      BF.store.update('ads', () => { c.pace = pace; });
+      BF.bus.emit('ads:changed', { id });
+      return { ok: true };
+    },
 
     /** Every campaign, newest first. */
     list(gameId) {
@@ -95,8 +130,10 @@
       const fake = { headline: o.headline || '', placements: places, impressions: impressions / 2 };
       const clicks = Math.round(impressions * ctrOf(fake, ug));
       const visits = Math.round(clicks * CLICK_TO_VISIT);
-      const passEv = (ug.passes || []).reduce((a, p) => a + 0.012 * BF.creator.quality(ug) * Math.max(0.3, 1 - p.price / 3000) * Math.floor(p.price * 0.7), 0);
-      return { impressions, clicks, visits, minutes: Math.max(1, Math.round(impressions / (tier.rate * share))), earn: Math.round(visits * (BF.creator.VISIT_PAYOUT + passEv)) };
+      const passEv = (ug.passes || []).reduce((a, p) => a + BF.creator.passDemand(p.price, BF.creator.quality(ug)) * Math.floor(p.price * 0.7), 0);
+      const pace = PACES[o.pace];
+      const minutes = pace ? pace.minutes : Math.max(1, Math.round(impressions / (tier.rate * share)));
+      return { impressions, clicks, visits, minutes, earn: Math.round(visits * (BF.creator.VISIT_PAYOUT + passEv)) };
     },
 
     /** Check a campaign form. Returns {field: message}. */
@@ -129,7 +166,7 @@
       if (!pay.ok) return { ok: false, errors: { budget: 'Not enough ForgeCoins.' } };
       const c = {
         id: U.uid('ad'), gameId: ug.id, headline: String(o.headline).trim(), tier: o.tier,
-        placements: o.placements.filter((p) => PLACEMENTS[p]), budget, spent: 0,
+        placements: o.placements.filter((p) => PLACEMENTS[p]), budget, spent: 0, pace: PACES[o.pace] ? o.pace : 'fast',
         impressions: 0, clicks: 0, visits: 0, status: 'active', createdAt: BF.clock.now(), endedAt: 0, refunded: 0, hist: [],
       };
       BF.store.update(['ads', 'created'], (s) => {
@@ -198,8 +235,7 @@
         if (!ug) { c.status = 'stopped'; c.endedAt = BF.clock.now(); touched = true; continue; }
         if (!eligible(ug)) continue; // drafts and private games do not spend
         const tier = TIERS[c.tier] || TIERS.standard;
-        const share = c.placements.reduce((s2, p) => s2 + (PLACEMENTS[p] ? PLACEMENTS[p].share : 0), 0);
-        let imps = Math.round(tier.rate * share * (seconds / 60) * (0.7 + Math.random() * 0.6));
+        let imps = ads.impressionsFor(c, seconds);
         const affordable = Math.floor((remaining(c) / tier.cpm) * 1000);
         imps = Math.min(imps, affordable);
         if (imps <= 0) { finish(c, 'spent'); touched = true; continue; }

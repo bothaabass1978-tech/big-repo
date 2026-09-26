@@ -140,6 +140,22 @@
       (you ? '<p class="faint" style="margin-top:10px;font-size:12.5px">You are ranked <b>#' + U.fmt(you.rank) + '</b>.</p>' : '<p class="faint" style="margin-top:10px;font-size:12.5px">Play to get on this board.</p>');
   };
 
+  /** Top Creators: studios, bot creators and you, by lifetime earnings. */
+  function creatorsTable(lb) {
+    const medal = (r) => (r <= 3 ? '<span class="medal m' + r + '">' + r + '</span>' : '<span class="rank num">' + r + '</span>');
+    const who = (r) => {
+      if (r.me) return '<a class="lb-player" href="#/create">' + BF.ui.avatarChip(BF.store.state.avatar, { size: 'sm' }) + '<span><b>' + esc(r.name) + '</b> <span class="pill accent">You</span></span></a>';
+      if (r.kind === 'studio') return '<a class="lb-player" href="#/creator/' + encodeURIComponent(r.name) + '">' + BF.ui.avatarChip(r.bot.avatar, { size: 'sm' }) + '<span><b>' + esc(r.name) + '</b><span class="faint"> · owned by ' + esc(r.bot.displayName) + '</span></span></a>';
+      return '<a class="lb-player" href="#/user/' + r.bot.id + '/creations">' + BF.ui.avatarChip(r.bot.avatar, { size: 'sm' }) + '<span><b>' + esc(r.name) + '</b><span class="faint"> @' + esc(r.bot.username) + ' · indie creator</span></span></a>';
+    };
+    const row = (r) => '<tr class="' + (r.me ? 'me' : '') + '"><td>' + medal(r.rank) + '</td><td>' + who(r) + '</td><td class="r num hide-sm">' + r.games + '</td><td class="r num hide-sm">' + U.compact(r.playing) + '</td><td class="r num"><b>' + U.compact(r.lifetime) + '</b><div class="faint" style="font-size:11px">+' + U.compact(Math.round(r.perMin)) + '/min</div></td></tr>';
+    let body = lb.rows.map(row).join('');
+    if (lb.you && lb.you.rank > lb.rows.length) body += '<tr class="gap"><td colspan="5">…</td></tr>' + row(lb.you);
+    return '<p class="faint" style="margin-bottom:12px">Lifetime ForgeCoins earned from visits and game-pass sales. Studio owners keep ' + Math.round(BF.creatorEconomy.T.ownerShare * 100) + '% personally, which is why they top the Richest board.</p>' +
+      '<div class="table-wrap"><table class="table lb-table"><thead><tr><th style="width:70px">Rank</th><th>Creator</th><th class="r hide-sm">Games</th><th class="r hide-sm">Playing</th><th class="r">Earned</th></tr></thead><tbody>' + body + '</tbody></table></div>' +
+      (lb.you ? '<p class="faint" style="margin-top:10px;font-size:12.5px">You are ranked <b>#' + U.fmt(lb.you.rank) + '</b> of ' + U.fmt(lb.total) + ' creators.</p>' : '');
+  }
+
   let lbGlobal = 'level';
   let lbGame = 'block-battlegrounds';
   let lbGameStat = null;
@@ -148,10 +164,12 @@
     title: 'Leaderboards',
     nav: 'leaderboards',
     render(params) {
-      const scope = params.scope === 'games' ? 'games' : 'global';
-      const tabs = BF.ui.tabs([{ id: 'global', label: 'Global', href: '#/leaderboards', icon: 'globe' }, { id: 'games', label: 'Games', href: '#/leaderboards/games', icon: 'gamepad' }], scope);
+      const scope = params.scope === 'games' ? 'games' : params.scope === 'creators' ? 'creators' : 'global';
+      const tabs = BF.ui.tabs([{ id: 'global', label: 'Global', href: '#/leaderboards', icon: 'globe' }, { id: 'creators', label: 'Top Creators', href: '#/leaderboards/creators', icon: 'anvil' }, { id: 'games', label: 'Games', href: '#/leaderboards/games', icon: 'gamepad' }], scope);
       let body;
-      if (scope === 'global') {
+      if (scope === 'creators') {
+        body = creatorsTable(BF.creatorEconomy.topCreators(50));
+      } else if (scope === 'global') {
         const def = BF.leaderboards.GLOBAL.find((d) => d.key === lbGlobal);
         const lb = BF.leaderboards.global(lbGlobal);
         body = '<div class="chips" style="margin-bottom:14px">' + BF.leaderboards.GLOBAL.map((d) => '<button class="chip' + (d.key === lbGlobal ? ' on' : '') + '" data-lbg="' + d.key + '">' + (d.icon === 'coin' ? BF.coinIcon(14) : BF.icon(d.icon, 14)) + esc(d.label) + '</button>').join('') + '</div>' + BF.pages.lbTable(lb.rows, lb.you, { label: def.label, format: 'num' });

@@ -658,7 +658,16 @@
       if (!s.paused) {
         const pool = s.active.length ? s.active : s.all;
         const bot = U.pick(pool);
-        if (bot && Math.random() < BF.PERSONALITIES[bot.personality].chatty * 0.8) botChat(bot, BF.dialogue.line(bot, 'idle', s.game));
+        if (bot && Math.random() < BF.PERSONALITIES[bot.personality].chatty * 0.8) {
+          const line = BF.dialogue.line(bot, 'idle', s.game);
+          botChat(bot, line);
+          // other players sometimes answer each other, like a real server
+          const other = U.pick(pool.filter((b) => b.id !== bot.id));
+          if (other && BF.chat.banter && Math.random() < 0.38) {
+            botChat(other, BF.chat.banter(other, bot, line), 1400 + Math.random() * 2200);
+            if (Math.random() < 0.3) botChat(bot, BF.chat.banter(bot, other, 'lol'), 4200 + Math.random() * 2500);
+          }
+        }
       }
       scheduleBotChat();
     }, delay));
@@ -772,13 +781,18 @@
     const history = mine.slice(-9, -1).map((l) => ({ from: l.who === 'me' ? 'me' : 'bot', text: l.text }));
     BF.chat.reply(bot, text, { channel: 'game', game: s.game, audience: s.all, history }).then((r) => {
       if (s !== sess || !r || !r.text) { if (s === sess) s.bubbles.delete(bot.id); return; }
-      const wait = Math.max(0, delay + Math.min(3000, 600 + r.text.length * 28) - (Date.now() - started));
-      s.timers.push(setTimeout(() => {
-        if (s !== sess) return;
-        botChat(bot, r.text);
-        s.partner = { id: bot.id, t: s.ctx ? s.ctx.time : 0 };
-        if (r.after) { try { r.after(); } catch (e) { /* best-effort action */ } }
-      }, wait));
+      const parts = (r.parts && r.parts.length ? r.parts : [r.text]).filter(Boolean);
+      const wait = Math.max(0, delay + Math.min(3000, 600 + parts[0].length * 28) - (Date.now() - started));
+      let at = wait;
+      parts.forEach((p, i) => {
+        if (i) at += 400 + Math.min(2200, p.length * 40) + Math.random() * 400;
+        s.timers.push(setTimeout(() => {
+          if (s !== sess) return;
+          botChat(bot, p);
+          s.partner = { id: bot.id, t: s.ctx ? s.ctx.time : 0 };
+        }, at));
+      });
+      if (r.after) s.timers.push(setTimeout(() => { if (s === sess) { try { r.after(); } catch (e) { /* best-effort action */ } } }, at));
     }, () => {});
   }
 

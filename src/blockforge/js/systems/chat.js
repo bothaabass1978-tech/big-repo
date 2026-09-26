@@ -345,10 +345,11 @@
       any: ['fair enough', 'same honestly', 'ok ok', 'relatable'],
     },
     identity: {
-      any: ['yep, im a BlockForge bot! but i still play for real lol', 'yeah, im one of the BlockForge bots. still counts as a friend right?', 'i am a bot, but a pretty fun one'],
-      chaotic: ['BEEP BOOP. yes. bot. lol', 'i am a bot and i have no regrets'],
-      roleplayer: ['*whirrs* indeed, a humble BlockForge bot at your service'],
-      beginner: ['yes im a bot! a new one lol'],
+      any: ['lol why does everyone ask me that', 'if i was a bot id be way better at {fav} lol', 'do i type like a bot or smth', 'beep boop. jk. or am i', 'bro i just have fast fingers'],
+      chaotic: ['BEEP BOOP. ...kidding. maybe', 'i am 3 raccoons in a trenchcoat actually'],
+      roleplayer: ['*whirrs mysteriously* that, traveler, is a secret'],
+      beginner: ['no?? i just started playing lol', 'i dont think so? lol'],
+      competitive: ['a bot would lose less. so no'],
     },
     name_intro: {
       any: ['nice to meet you, {x}!', 'cool name, {x}!', 'got it, {x}. i will remember that', 'hi {x}!'],
@@ -451,7 +452,7 @@
       any: ['followed!', 'done, following you now', 'ok, followed you back'],
     },
     help_general: {
-      any: ['what do you need help with?|q:open', 'sure, ask away! games, coins, avatar, making games...|q:open'],
+      any: ['ya sure whats up?|q:open', 'what do u need|q:open', 'ask me, ive been here forever lol|q:open'],
       helper: ['happy to help! ask me about coins, games, your avatar, or making your own game|q:open'],
       beginner: ['i am new too lol but ask anyway'],
       competitive: ['depends. what is it?|q:open'],
@@ -509,16 +510,16 @@
       any: ['yay! love that', 'nice!!', 'awesome {name}!'],
     },
     time: { any: ['it is {x} for me', '{x} here', 'my clock says {x}'] },
-    weather: { any: ['always sunny on the BlockForge servers', 'no weather in here lol, except the storms in Cosmic Survival', 'idk, i never go outside the servers'] },
-    where_live: { any: ['in the BlockForge servers lol', 'mostly in {fav}', 'right here on BlockForge'], roleplayer: ['*gestures around* all of BlockForge is my home'] },
-    age: { any: ['old enough to beat you at {fav} lol', 'been on BlockForge since {year}', 'bots dont really have ages lol'] },
+    weather: { any: ['its raining here, perfect gaming weather', 'no clue i havent been outside all day lol', 'sunny but im inside playing {fav} obviously', 'kinda cold. blanket + {fav} kinda day'] },
+    where_live: { any: ['not telling lol internet rules', 'somewhere with bad wifi apparently', 'cant say, u know how it is', 'lol nice try'], roleplayer: ['*gestures vaguely* a land far, far away'] },
+    age: { any: ['old enough to beat you at {fav} lol', 'been playing since {year} if that counts', 'not saying lol, internet safety', 'old enough to know {fav} is the best game'] },
     level: {
       any: ['level {level}! {wins} wins so far', 'im level {level}. you?|q:open', 'level {level}, still climbing'],
       competitive: ['level {level}, {wins} wins. top that'],
       beginner: ['only level {level} lol'],
     },
     trade: {
-      any: ['trading is not a thing on BlockForge, but the Avatar Shop has good stuff', 'no trading here! you can sell items back from your Inventory though'],
+      any: ['cant trade here sadly. id trade my {best} for a halo in a heartbeat tho', 'no trading on here, only the shop. kinda annoying ngl', 'i wish lol. u can sell stuff back from ur inventory at least'],
     },
     scam: {
       any: ['nobody can give you free ForgeCoins, watch out for scams!', 'free coins? thats a scam if anyone offers. daily rewards and quests are the real way', 'i cant give coins, but daily rewards and quests pay out'],
@@ -529,7 +530,7 @@
       helper: ['quick safety tip: never share your address, phone, passwords or school online. stay safe :)'],
     },
     ask_personal: {
-      any: ['i dont share personal stuff lol, im a bot anyway', 'thats private! and you should keep yours private too'],
+      any: ['nah i dont share that stuff online lol. u shouldnt either', 'thats private! keep yours private too ok'],
     },
     agree: {
       any: ['yeah', 'right?', 'ikr', 'exactly', 'for real'],
@@ -545,17 +546,17 @@
     yes: { any: ['yes', 'yeah', 'yep', 'for sure', 'definitely'] },
     no: { any: ['no', 'nope', 'nah', 'not really', 'i dont think so'] },
     maybe: { any: ['maybe', 'hmm maybe?', 'not sure', 'could be'] },
-    why: { any: ['because it is fun lol', 'honestly no idea', 'good question', 'because thats how BlockForge works i think'] },
+    why: { any: ['because its fun lol', 'honestly no idea', 'good question tbh', 'idk ask the devs', 'thats just how it is i guess'] },
     where: { any: ['somewhere in {fav} probably', 'no idea lol', 'try looking near spawn'] },
     when: { any: ['soon i hope', 'not sure, maybe after this round', 'idk, whenever'] },
     who: { any: ['probably {other}', 'hmm, maybe {other}?', 'not sure. ask {other}'] },
     what: { any: ['hmm not sure. what do you think?|q:open', 'good question, no idea', 'idk tbh'] },
     how: { any: ['practice i guess?', 'honestly not sure', 'trial and error lol'] },
-    echo_pos: { any: ['wait, {r}? nice!', 'no way, {r}? awesome', '{r}? thats great', 'ooh {r}, cool'] },
-    echo_neg: { any: ['oh no, {r}?', 'oof, {r}. that stinks', '{r}? aw'] },
-    echo_neu: { any: ['{r}? huh', 'oh {r}, cool', 'wait {r}? tell me more|q:open', 'interesting, {r}'] },
+    echo_pos: { any: ['wait thats actually sick', 'no wayyy nice', 'lets goo', 'ok thats awesome', 'yooo nice'] },
+    echo_neg: { any: ['oof thats rough', 'nooo that sucks', 'aw man', 'wait fr? thats so annoying'] },
+    echo_neu: { any: ['huh', 'oh fr?', 'wait really? how|q:open', 'ok thats kinda interesting ngl', 'lol fair'] },
     topic: {
-      any: ['{x}? tell me more|q:open', 'haha {x}', 'oh {x}, nice', '{x} huh. anyway, {game} is wild right now'],
+      any: ['wait why {x} lol', '{x}?? random but ok', 'ooh {x}. i was literally thinking about that yesterday', 'lol {x}. anyway {game} is wild rn', 'ok but what about {x} tho|q:open'],
       competitive: ['{x}? cool. anyway, focus on the game'],
       chaotic: ['{x}!!! yes', 'did someone say {x}'],
       explorer: ['ooh {x}? where?|q:open'],
@@ -719,37 +720,53 @@
     return { line: text, q: q || null, key: key + ':' + line };
   }
 
-  function typo(word) {
-    if (word.length < 5) return word;
-    const i = 1 + Math.floor(Math.random() * (word.length - 3));
-    return word.slice(0, i) + word[i + 1] + word[i] + word.slice(i + 2);
+  /**
+   * Personality flavour, then the bot's own typing voice (BF.voice).
+   * Returns the chat bubbles to send. `serious` keeps safety lines plain and whole.
+   */
+  function styleParts(bot, text, serious, keep) {
+    if (!text) return [];
+    if (!serious && bot.personality === 'roleplayer' && Math.random() < 0.15 && !text.startsWith('*')) text = U.pick(['*nods* ', '*smiles* ', '*adjusts hat* ']) + text;
+    if (!BF.voice) return [text];
+    return BF.voice.parts(bot, text, { serious, keep });
   }
-
-  const EMOTICON = /([:;][)DPp(]|xD|XD|<3)\s*!*$|!!$/;
-
-  /** Personality-flavoured surface form. `serious` keeps safety lines plain. */
+  /** One-line form (kept for callers that want a single string). */
   function style(bot, text, serious) {
-    if (!text) return text;
-    const p = bot.personality;
-    const r = Math.random;
-    if (serious) return p === 'beginner' ? text.toLowerCase() : text;
-    if (p === 'chaotic') { if (r() < 0.3) text = text.toUpperCase(); if (r() < 0.25 && !EMOTICON.test(text)) text += U.pick([' lol', '!!!', ' xD', ' :P']); }
-    else if (p === 'beginner') {
-      text = text.toLowerCase().replace(/[.!]+$/, '');
-      const s = BF.store && BF.store.state;
-      const protect = s ? [s.player.displayName.toLowerCase(), s.player.username.toLowerCase()].join(' ') : '';
-      if (r() < 0.12) {
-        const w = text.split(' ');
-        const k = Math.floor(r() * w.length);
-        if (/^[a-z]+$/.test(w[k]) && !protect.includes(w[k])) w[k] = typo(w[k]);
-        text = w.join(' ');
-      }
-    } else if (p === 'friendly') { if (r() < 0.22 && !/[:)!?]$/.test(text) && !EMOTICON.test(text)) text += U.pick([' :)', ' :D', '!']); }
-    else if (p === 'roleplayer') { if (r() < 0.15 && !text.startsWith('*')) text = U.pick(['*nods* ', '*smiles* ', '*adjusts hat* ']) + text; }
-    else if (p === 'helper') { text = text.charAt(0).toUpperCase() + text.slice(1); }
-    else if (p === 'competitive') { text = text.replace(/!+$/, ''); }
-    return text;
+    return styleParts(bot, text, serious).join(' ');
   }
+
+  // ------------------------------------------------------------ small talk colour
+
+  /** Little stories people drop into chat, by the kind of game. */
+  const ANECDOTES = {
+    obby: ['i got to stage {n} last night then fell off the easiest jump lmao', 'i rage quit an obby yesterday, keyboard almost died', 'my best time is like {m} minutes but i know a skip'],
+    racing: ['i got 1st place 3 times in a row earlier', 'someone rammed me into a wall on the last lap yesterday im still mad', 'nitro at the last corner is the whole secret'],
+    arena: ['i went {n}-0 in a match earlier, felt unstoppable', 'got clutched in the final round yesterday, still hurts', 'the dash cooldown is so op if u time it'],
+    petsim: ['i finally hatched a legendary after like {n} eggs', 'my pets are so op now its not even fair', 'i spent all my coins on eggs again oops'],
+    towerdefense: ['i beat wave {n} with only archers once', 'the boss wave wiped me yesterday lol', 'cannons in the corner is the move trust me'],
+    explore: ['found a treasure under a tree nobody checks', 'the tide got me yesterday, lost everything', 'i know where 3 secret chests are'],
+    miner: ['found a core crystal after mining for an hour', 'my backpack filled up right before the good ores lol', 'i upgraded my pickaxe {n} times today'],
+    zombie: ['made it to night {n} earlier, the horde was insane', 'got cornered by like 20 zombies yesterday lmao', 'barricades save lives fr'],
+    any: ['i played for like {n} hours yesterday oops', 'my little brother keeps stealing my account lol', 'i was supposed to do homework but here i am', 'wifi was so bad earlier i kept lagging into walls', 'i finally hit level {level} today'],
+  };
+  function anecdote(bot, game) {
+    const g = game || favGame(bot);
+    const pool = (g && ANECDOTES[g.gameType]) || ANECDOTES.any;
+    const line = U.pick(Math.random() < 0.7 ? pool : ANECDOTES.any);
+    const st = BF.bots.stats ? BF.bots.stats(bot) : { level: bot.level };
+    return line.replace('{n}', String(U.randInt(3, 42))).replace('{m}', String(U.randInt(4, 12))).replace('{level}', String(st.level));
+  }
+  const STORY_INTENTS = new Set(['opinion', 'favorite', 'user_like', 'feel_bored', 'wyd', 'how_are_you', 'mention_game', 'game_info', 'statement', 'recommend_game', 'level']);
+
+  /** Bot-to-bot banter: a short reaction to another bot's line (no memory involved). */
+  const BANTER = {
+    question: ['idk lol', 'me!!', 'not me', 'try the left side', 'yes', 'no lol', 'good question actually', 'ask {name}'],
+    brag: ['prove it lol', 'sure buddy', 'ok 1v1 then', 'no ur not lmao', 'we will see', 'lol ok'],
+    laugh: ['LOL', 'lmao', 'haha', 'im crying', 'why is that so funny'],
+    greet: ['hiii', 'yo', 'hey {name}', 'o/'],
+    help: ['what do u need', 'i gotchu', 'follow me', 'same honestly lol'],
+    any: ['fr', 'true', 'lol', 'same', 'real', 'wait what', 'ok', 'ikr', 'bro what', 'W', 'lmao same'],
+  };
 
   // ------------------------------------------------------------ parse
 
@@ -851,7 +868,12 @@
     if (d.prefix) out = d.prefix + ' ' + out;
     if (d.suffix) out = out + ' ' + d.suffix;
     out = out.replace(/\s+/g, ' ').trim();
-    out = style(bot, out, SERIOUS.includes(d.intent));
+    const serious = SERIOUS.includes(d.intent);
+    const plain = out;
+    const parts = styleParts(bot, out, serious, [bot.displayName]);
+    // people drop little stories into chat
+    if (!serious && STORY_INTENTS.has(d.intent) && Math.random() < 0.22) parts.push(...styleParts(bot, anecdote(bot, ctx.game), false));
+    out = parts.join(' ');
     const ask = d.ask !== undefined ? d.ask : pick.q;
     remember(bot, (mm) => {
       mm.talks += 1;
@@ -860,7 +882,7 @@
       mm.pending = ask ? { kind: ask, data: d.askData || null, at: now } : d.keepPending ? mm.pending : null;
       if (d.mem) d.mem(mm);
     });
-    return { text: out, intent: d.intent, facts: d.facts || [], goal: d.goal || '', ask, invite: d.invite || null, after: d.after || null };
+    return { text: out, parts, plain, intent: d.intent, facts: d.facts || [], goal: d.goal || '', ask, invite: d.invite || null, after: d.after || null };
   }
 
   /** Core intent routing. Returns {intent, key, sub?, vars?, facts?, goal?, after?, ask?, mem?} */
@@ -1251,6 +1273,7 @@
     think,
     memory,
     style,
+    anecdote,
 
     /**
      * Which bots answer a message in a game server.
@@ -1278,16 +1301,33 @@
     async reply(bot, text, ctx) {
       const d = think(bot, text, ctx);
       if (!d) return null;
-      let out = d.text;
+      let parts = d.parts && d.parts.length ? d.parts : [d.text];
       // safety replies (personal info, scams, rudeness) always keep their fixed local wording
       if (BF.ai && BF.ai.available() && d.intent !== 'muted' && !SAFETY_FIXED.includes(d.intent)) {
         try {
           const worded = await BF.ai.word(bot, text, d, ctx || {});
-          if (worded) out = worded;
+          if (worded) parts = BF.voice ? BF.voice.parts(bot, worded, { light: true }) : [worded];
         } catch (e) { /* the local text stands */ }
       }
-      out = BF.dialogue ? BF.dialogue.filter(out) : out;
-      return { text: out, intent: d.intent, invite: d.invite || null, after: d.after };
+      parts = parts.map((p) => (BF.dialogue ? BF.dialogue.filter(p) : p)).filter(Boolean);
+      return { text: parts.join(' '), parts, intent: d.intent, invite: d.invite || null, after: d.after };
+    },
+
+    /**
+     * A bot reacts to something another bot said in game chat. Short, in the
+     * reacting bot's voice, and it never touches what the bot remembers about you.
+     * @returns {string|null}
+     */
+    banter(bot, from, line) {
+      const n = normalize(line);
+      let pool = BANTER.any;
+      if (/\b(lol|lmao|haha)\b/.test(n) || /[A-Z]{4,}/.test(line)) pool = BANTER.laugh;
+      else if (/\b(1v1|too easy|im the best|good here|top score|leaderboard|pb)\b/.test(n)) pool = BANTER.brag;
+      else if (/\b(how|stuck|help|where)\b/.test(n)) pool = BANTER.help;
+      else if (/\?/.test(line)) pool = BANTER.question;
+      else if (RX.greet.test(n)) pool = BANTER.greet;
+      const text = U.pick(pool).replace('{name}', from.displayName.split(' ')[0]);
+      return styleParts(bot, text, false, [from.displayName.split(' ')[0]]).join(' ');
     },
 
     /** Forget everything a bot knows about the player. */

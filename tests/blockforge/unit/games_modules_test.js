@@ -14,9 +14,9 @@ function withGames() {
   return sb;
 }
 
-test('test_all_20_games_have_a_registered_gameplay_module', () => {
+test('test_all_70_games_have_a_registered_gameplay_module', () => {
   const { BF } = withGames();
-  assert.equal(BF.GAME_REGISTRY.length, 20);
+  assert.equal(BF.GAME_REGISTRY.length, 70);
   const types = BF.GameModules.types();
   for (const g of BF.GAME_REGISTRY) assert.ok(types.includes(g.gameType), g.id + ' -> ' + g.gameType);
 });

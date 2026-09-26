@@ -29,12 +29,15 @@
   };
   /** Most passes one creation can sell. */
   const MAX_PASSES = 25;
+  /** Highest price a creator can set on a pass. */
+  const MAX_PASS_PRICE = 100000000;
 
   const creator = (BF.creator = {
     TEMPLATES,
     VISIT_PAYOUT,
     PASS_EFFECTS,
     MAX_PASSES,
+    MAX_PASS_PRICE,
     THUMB_COLORS: ['#ff7a2e', '#46a8ff', '#4ad17f', '#b67cff', '#ff4f9a', '#ffc940', '#39f3ff', '#e03e5a'],
     THUMB_PATTERNS: ['grid', 'stripes', 'dots', 'stars', 'none'],
 
@@ -204,7 +207,7 @@
       const price = Math.round(Number(p.price));
       if (!ug) return { ok: false, error: 'Game not found.' };
       if (name.length < 3 || name.length > 30) return { ok: false, error: 'Pass names need 3-30 characters.' };
-      if (!(price >= 10 && price <= 100000)) return { ok: false, error: 'Price must be between 10 and 100,000 ForgeCoins.' };
+      if (!(price >= 10 && price <= MAX_PASS_PRICE)) return { ok: false, error: 'Price must be between 10 and ' + U.fmt(MAX_PASS_PRICE) + ' ForgeCoins.' };
       if ((ug.passes || []).length >= MAX_PASSES) return { ok: false, error: 'A game can have up to ' + MAX_PASSES + ' passes.' };
       const pass = { id: U.uid('ugp'), name, price, desc: String(p.desc || PASS_EFFECTS[p.effect] || '').trim(), effect: PASS_EFFECTS[p.effect] ? p.effect : 'vip' };
       BF.store.update('created', () => { ug.passes = (ug.passes || []).concat(pass); ug.updatedAt = BF.clock.now(); });
@@ -239,6 +242,15 @@
       return { ok: true };
     },
 
+    /**
+     * Chance that one visitor buys a pass at this price. Cheap passes sell
+     * often; expensive ones rarely (a 1,000,000 pass sells to roughly one visitor
+     * in a few hundred thousand), so price is a real trade-off.
+     */
+    passDemand(price, q) {
+      return 0.02 * (q == null ? 0.7 : q) * Math.pow(100 / Math.max(100, price), 0.85);
+    },
+
     /** How appealing a creation is to players (0.4 - 1.1): description, thumbnail, passes, likes, a Studio-built level. */
     quality(ug) {
       const votes = (ug.likes || 0) + (ug.dislikes || 0);
@@ -265,16 +277,25 @@
       let earned = visits * VISIT_PAYOUT;
       ug.earn = ug.earn || { visits: 0, passes: 0 };
       ug.earn.visits += visits * VISIT_PAYOUT;
+      let soldNow = 0, soldValue = 0, big = null;
       for (const p of ug.passes || []) {
-        const chance = 0.012 * q * Math.max(0.3, 1 - p.price / 3000);
-        const sold = visits > 30 ? Math.round(visits * chance * (0.6 + Math.random() * 0.8)) : Array.from({ length: visits }).filter(() => Math.random() < chance).length;
+        const chance = creator.passDemand(p.price, q);
+        const expected = visits * chance;
+        const sold = expected > 3 ? Math.round(expected * (0.6 + Math.random() * 0.8)) : Math.floor(expected) + (Math.random() < expected % 1 ? 1 : 0);
         if (!sold) continue;
         const share = Math.floor(p.price * 0.7) * sold;
         earned += share;
         ug.earn.passes += share;
         ug.sales = (ug.sales || 0) + sold;
-        const buyer = U.pick(BF.bots.list);
-        BF.notify.push({ type: 'update', title: 'Pass sold in ' + ug.name, body: (sold > 1 ? sold + ' players' : buyer.displayName) + ' bought ' + p.name + '. +' + U.fmt(share) + ' ForgeCoins pending.', icon: 'ticket', route: '#/create/' + ug.id, silent: sold > 1 });
+        soldNow += sold;
+        soldValue += share;
+        if (!big || p.price > big.p.price) big = { p, sold };
+      }
+      // one notification per batch of sales (and a loud one for big-ticket passes)
+      if (soldNow && BF.notify) {
+        const buyer = BF.creatorEconomy ? BF.creatorEconomy.richBuyer(big.p.price) : U.pick(BF.bots.list);
+        const whale = big.p.price >= 50000;
+        BF.notify.push({ type: 'update', title: whale ? buyer.displayName + ' bought ' + big.p.name + '!' : soldNow === 1 ? 'Pass sold in ' + ug.name : soldNow + ' passes sold in ' + ug.name, body: (whale ? 'A big spender paid ' + U.fmt(big.p.price) + ' ForgeCoins. ' : soldNow === 1 ? buyer.displayName + ' bought ' + big.p.name + '. ' : '') + '+' + U.fmt(soldValue) + ' ForgeCoins pending.', icon: 'ticket', route: '#/create/' + ug.id, silent: !whale && soldNow > 1 });
       }
       ug.pending = (ug.pending || 0) + earned;
       ug.revenue = (ug.revenue || 0) + earned;

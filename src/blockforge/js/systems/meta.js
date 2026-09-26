@@ -27,6 +27,36 @@
       BF.bus.emit('notify:new', Object.assign({ silent: !!n.silent }, item));
       return item;
     },
+    /** Notification types that still pop up in "Important only" mode. */
+    IMPORTANT: { friend: true, invite: true, bot: true },
+
+    /**
+     * Should this notification show as a pop-up? Pure check of the player's
+     * pop-up settings (mode, do-not-disturb, in-game quiet).
+     * @param {{type:string, action?:object}} n
+     * @param {boolean} inGame a game session is running
+     */
+    allowsPopup(n, inGame) {
+      const s = BF.store.state;
+      if (!s) return false;
+      const ns = s.settings.notifications;
+      if (ns.dnd || ns.popupMode === 'off' || ns.popups === false) return false;
+      if (ns.popupMode === 'important' && !BF.notify.IMPORTANT[n.type]) return false;
+      if (inGame && !ns.inGame && n.type !== 'invite' && !(n.type === 'friend' && n.action)) return false;
+      return true;
+    },
+    /** Achievement, badge and level-up banners. */
+    allowsBanner() {
+      const s = BF.store.state;
+      return !!s && !s.settings.notifications.dnd && s.settings.notifications.banners !== false;
+    },
+    /** Toggle do-not-disturb. Returns the new state. */
+    toggleDnd(on) {
+      let v = false;
+      BF.store.update('settings', (s) => { const ns = s.settings.notifications; ns.dnd = on == null ? !ns.dnd : !!on; v = ns.dnd; });
+      return v;
+    },
+
     unread() {
       const s = BF.store.state;
       return s ? s.notifications.filter((x) => !x.read).length : 0;

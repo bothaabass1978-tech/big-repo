@@ -351,6 +351,20 @@
     return svg(rect(0, 0, 320, 180, 'url(#bg)') + pat + art, lin('bg', [[0, U.shade(c, -0.35)], [1, U.shade(c, -0.7)]], 1, 1));
   }
 
+  /**
+   * Placeholder art for games without hand-drawn SVG (the 3D render replaces
+   * it): the engine's template art in a colour from the game id. The id goes
+   * into the SVG so every game's placeholder is unique (renders swap <img>s by
+   * their placeholder URL).
+   */
+  const TYPE_TEMPLATE = { runner: 'racing', party: 'arena', tag: 'arena', fishing: 'simulator', farm: 'simulator', restaurant: 'simulator', flight: 'obby', golf: 'obby', spooky: 'towerdefense', quiz: 'obby' };
+  function typeArt(game) {
+    const colors = ['#ff7a2e', '#46a8ff', '#4ad17f', '#b67cff', '#ff4f9a', '#ffc940', '#39f3ff', '#e03e5a'];
+    const c = colors[U.hash(game.id || game.name || 'x') % colors.length];
+    const out = templateArt(TYPE_TEMPLATE[game.gameType] || game.template || 'arena', c, ['grid', 'stripes', 'dots', 'stars'][U.hash(game.id || '') % 4]);
+    return out.replace('</svg>', '<desc>' + String(game.id || game.name).replace(/[<>&]/g, '') + '</desc></svg>');
+  }
+
   const cache = new Map();
 
   BF.thumbs = {
@@ -371,8 +385,8 @@
       const key = game.thumbnail ? JSON.stringify(game.thumbnail) + (game.template || '') : game.id;
       if (cache.has(key)) { if (BF.thumb3d && game.name) BF.thumb3d.request(game, cache.get(key)); return cache.get(key); }
       const src = game.thumbnail && game.thumbnail.type === 'preset'
-        ? templateArt(game.template || 'arena', game.thumbnail.color, game.thumbnail.pattern)
-        : BF.thumbs.svg(game.id);
+        ? templateArt(game.template || 'arena', game.thumbnail.color, game.thumbnail.pattern).replace('</svg>', '<desc>' + String(game.id || '').replace(/[<>&]/g, '') + '</desc></svg>')
+        : ART[game.id] ? BF.thumbs.svg(game.id) : typeArt(game);
       const url = U.svgData(src);
       cache.set(key, url);
       if (BF.thumb3d && game.name) BF.thumb3d.request(game, url);

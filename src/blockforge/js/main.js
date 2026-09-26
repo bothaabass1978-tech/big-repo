@@ -50,12 +50,30 @@
     if (globalHooks) return;
     globalHooks = true;
 
+    // background pop-ups: filtered by the player's settings and throttled so a burst
+    // (followers, sales, updates) becomes one "N more" toast instead of a wall of them
+    const POP = { gapMs: 6000 };
+    let lastPop = 0, held = 0, heldTimer = null;
+    const flushHeld = () => {
+      heldTimer = null;
+      if (!held) return;
+      const n = held;
+      held = 0;
+      lastPop = Date.now();
+      BF.ui.toast({ title: U.plural(n, 'more notification'), text: 'Open the bell to see them, or turn pop-ups down in Settings.', kind: 'info', icon: 'bell', action: { label: 'Open', onClick: () => BF.router.go('#/notifications') } });
+    };
     BF.bus.on('notify:new', (n) => {
       const s = BF.store.state;
       if (!s || n.silent) return;
+      const inGame = !!(BF.runtime && BF.runtime.active);
+      if (!BF.notify.allowsPopup(n, inGame)) return;
       if (s.settings.notifications.sound) BF.sfx.play('notify');
-      if (!s.settings.notifications.popups) return;
-      if (BF.runtime && BF.runtime.active && n.type !== 'friend' && n.type !== 'invite') return;
+      if (n.type !== 'invite' && Date.now() - lastPop < POP.gapMs) {
+        held++;
+        if (!heldTimer) heldTimer = setTimeout(flushHeld, POP.gapMs);
+        return;
+      }
+      lastPop = Date.now();
       BF.ui.toast({
         title: n.title,
         text: n.body,
@@ -66,14 +84,16 @@
     });
 
     BF.bus.on('achievement:unlocked', ({ def }) => {
+      if (!BF.notify.allowsBanner()) return;
       BF.sfx.play(def.secret ? 'secret' : 'achievement');
       BF.ui.banner({ kind: '', kicker: 'Achievement unlocked', title: def.name, desc: def.desc + (def.reward.coins ? ' · +' + U.fmt(def.reward.coins) + ' ForgeCoins' : ''), icon: def.icon });
     });
     BF.bus.on('badge:earned', ({ def }) => {
+      if (!BF.notify.allowsBanner()) return;
       BF.ui.banner({ kind: '', kicker: 'Badge earned', title: def.name, desc: def.desc, icon: def.icon || 'medal', duration: 3600 });
     });
     BF.bus.on('levelup', ({ level, reward, silent }) => {
-      if (silent) return;
+      if (silent || !BF.notify.allowsBanner()) return;
       BF.sfx.play('levelup');
       BF.ui.banner({ kind: 'level', kicker: 'Level up', title: 'You reached level ' + level + '!', desc: '+' + U.fmt(reward) + ' ForgeCoins level reward', icon: 'star' });
     });

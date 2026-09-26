@@ -238,15 +238,27 @@
       const history = conv ? conv.msgs.slice(-9, -1).map((m) => ({ from: m.from === 'me' ? 'me' : 'bot', text: m.text })) : [];
       const started = Date.now();
       const typingOn = setTimeout(() => { typing.add(withId); BF.bus.emit('messages:typing', { with: withId, typing: true }); }, 450 + Math.random() * 600);
+      const setTyping = (on) => { if (on) typing.add(withId); else typing.delete(withId); BF.bus.emit('messages:typing', { with: withId, typing: on }); };
+      const alive = () => BF.store.state && BF.store.accountId === account && !BF.friends.isBlocked(withId);
       const finish = (r) => {
-        const wait = r ? Math.max(0, Math.min(4200, 900 + r.text.length * 32) - (Date.now() - started)) : 0;
+        const parts = r ? (r.parts && r.parts.length ? r.parts : [r.text]).filter(Boolean) : [];
+        const first = parts[0] || '';
+        const wait = r ? Math.max(0, Math.min(4200, 900 + first.length * 32) - (Date.now() - started)) : 0;
         setTimeout(() => {
           clearTimeout(typingOn);
-          typing.delete(withId);
-          BF.bus.emit('messages:typing', { with: withId, typing: false });
-          if (!r || !r.text || !BF.store.state || BF.store.accountId !== account || BF.friends.isBlocked(withId)) return;
-          messages.receive(withId, r.text, { quietIfOpen: true, invite: r.invite || undefined });
-          if (r.after) { try { r.after(); } catch (e) { /* action is best-effort */ } }
+          setTyping(false);
+          if (!parts.length || !alive()) return;
+          messages.receive(withId, first, { quietIfOpen: true, invite: parts.length === 1 ? r.invite || undefined : undefined });
+          // people send several short messages: type, send, type again
+          let at = 0;
+          parts.slice(1).forEach((p, i) => {
+            const last = i === parts.length - 2;
+            const gap = 350 + Math.min(2600, p.length * 45) + Math.random() * 500;
+            setTimeout(() => { if (alive()) setTyping(true); }, at + 150);
+            at += gap;
+            setTimeout(() => { setTyping(false); if (alive()) messages.receive(withId, p, { quietIfOpen: true, invite: last ? r.invite || undefined : undefined }); }, at);
+          });
+          if (r.after) setTimeout(() => { try { r.after(); } catch (e) { /* action is best-effort */ } }, at);
         }, wait);
       };
       BF.chat.reply(bot, text, { channel: 'dm', history }).then(finish, () => finish(null));

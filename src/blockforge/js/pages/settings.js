@@ -67,7 +67,13 @@
   function notificationsTab(s) {
     const n = s.settings.notifications;
     const labels = { friend: 'Friend requests', achievement: 'Achievements and badges', invite: 'Game invites', purchase: 'Purchases', daily: 'Daily rewards', quest: 'Quest completion', bot: 'Messages from players', update: 'Game updates and creator sales', level: 'Level ups', system: 'System announcements' };
-    return '<div class="settings-card"><h3>Delivery</h3>' + toggle('notifications.popups', n.popups, 'Pop-up toasts', 'Show a small popup when something happens.') + toggle('notifications.sound', n.sound, 'Notification sound') + '</div>' +
+    return '<div class="settings-card"><h3>Pop-ups</h3>' +
+      toggle('notifications.dnd', n.dnd, 'Do not disturb', 'No pop-ups or banners at all. Everything still arrives in the bell.') +
+      seg('notifications.popupMode', n.popupMode || 'all', [['all', 'All'], ['important', 'Important only'], ['off', 'Off']], 'Pop-up toasts', 'Important only keeps friend requests, invites and messages.') +
+      toggle('notifications.banners', n.banners !== false, 'Achievement and level-up banners') +
+      toggle('notifications.inGame', n.inGame, 'Pop-ups while playing', 'Off keeps games quiet except for invites and friend requests.') +
+      toggle('notifications.sound', n.sound, 'Notification sound') +
+      '<p class="sr-hint" style="margin-top:8px">Bursts of pop-ups are bundled into one "more notifications" toast.</p></div>' +
       '<div class="settings-card"><h3>Notify me about</h3>' + Object.keys(labels).map((k) => toggle('notifications.types.' + k, n.types[k], labels[k])).join('') + '</div>';
   }
 

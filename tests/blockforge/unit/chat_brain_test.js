@@ -34,11 +34,12 @@ test('test_chat_likes_are_remembered_and_recalled', () => {
   assert.match(d.text, /pancakes/);
 });
 
-test('test_chat_bot_admits_it_is_a_bot', () => {
+test('test_chat_identity_question_gets_an_in_character_answer', () => {
   const { BF } = bootDefault();
   const d = BF.chat.think(friendBot(BF), 'are you a bot?', { channel: 'dm' });
   assert.equal(d.intent, 'identity');
-  assert.match(d.text, /bot/i);
+  assert.ok(d.text.length > 2);
+  assert.doesNotMatch(d.text, /BlockForge bot/i, 'no canned bot confession in the local voice');
 });
 
 test('test_chat_personal_info_gets_a_safety_reply_without_echo', () => {
@@ -145,5 +146,5 @@ test('test_chat_safety_replies_keep_their_local_wording_even_with_claude', async
   assert.ok(!/CLAUDE WORDING|555/.test(safe.text));
   const normal = await BF.chat.reply(friendBot(BF), 'what games do you like?', { channel: 'dm' });
   assert.equal(asked, 1);
-  assert.equal(normal.text, 'CLAUDE WORDING');
+  assert.equal(normal.text.toLowerCase(), 'claude wording', 'Claude wording is kept (only the voice case applies)');
 });

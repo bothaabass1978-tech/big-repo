@@ -162,7 +162,7 @@
         level: bot.level + (s.lvl || 0),
         wins: bot.base.wins + (s.wins || 0),
         gamesPlayed: bot.base.gamesPlayed + (s.played || 0),
-        coins: bot.base.coins + (s.coins || 0),
+        coins: bot.base.coins + (s.coins || 0) + (BF.creatorEconomy ? BF.creatorEconomy.wealthOf(bot.id) : 0),
         achievements: bot.base.achievements,
         followers: bot.base.followers,
         following: bot.base.following,
@@ -195,13 +195,9 @@
 
   const FILTER = /\b(idiot|stupid|dumb|loser|shut ?up|trash)\b/gi;
 
+  /** A line in the bot's own typing voice (systems/voice.js). */
   function style(bot, text) {
-    const p = bot.personality;
-    if (p === 'chaotic' && Math.random() < 0.35) text = text.toUpperCase();
-    if (p === 'chaotic' && Math.random() < 0.25) text += U.pick([' lol', '!!!', ' xD', ' :P']);
-    if (p === 'beginner') text = text.toLowerCase().replace(/[.!]+$/, '');
-    if (p === 'friendly' && Math.random() < 0.2 && !/[:)!]$/.test(text)) text += ' :)';
-    return text;
+    return BF.voice ? BF.voice.say(bot, text) : text;
   }
 
   function fill(text, ctx) {

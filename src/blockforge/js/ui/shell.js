@@ -67,12 +67,14 @@
       shell.updateBadges();
       shell.updateAvatar();
       shell.updateSidebarFoot();
+      shell.updateDnd();
       bindSearch();
       BF.store.on(['notifications', 'messages', 'social', 'quests', 'daily'], () => { shell.updateBadges(); shell.updateSidebarFoot(); });
       BF.store.on(['avatar', 'player'], shell.updateAvatar);
       BF.bus.on('wallet:changed', (e) => shell.animateBalance(e.delta));
       BF.bus.on('world:tick', () => { shell.updateLive(); shell.updateOnline(); });
       BF.bus.on('store:saved', shell.updateSaveStatus);
+      BF.bus.on('store:change', (keys) => { if (keys.has('settings')) shell.updateDnd(); });
     },
 
     setActive(name) {
@@ -120,6 +122,13 @@
         '<div class="sidebar-card online-card"><span class="live-dot"></span><span id="online-count">' + U.fmt(BF.world.totalOnline()) + '</span> forgers online</div>' +
         '<div class="sidebar-card save-card" id="save-status"></div>';
       shell.updateSaveStatus();
+    },
+
+    /** Mark the bell while do-not-disturb is on. */
+    updateDnd() {
+      const b = document.getElementById('notif-btn');
+      const on = !!(BF.store.state && BF.store.state.settings.notifications.dnd);
+      if (b) { b.classList.toggle('dnd', on); b.dataset.tip = on ? 'Notifications (do not disturb)' : 'Notifications'; }
     },
 
     updateOnline() {
@@ -212,12 +221,14 @@
     /** Notification dropdown. */
     openNotifications(anchor) {
       const list = BF.store.state.notifications.slice(0, 8);
-      const items = [{ html: '<div style="display:flex;align-items:center;justify-content:space-between"><b>Notifications</b><button class="btn btn-xs btn-ghost" id="nd-readall">Mark all read</button></div>' }];
+      const dnd = !!BF.store.state.settings.notifications.dnd;
+      const items = [{ html: '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><b>Notifications</b><span style="display:flex;gap:6px"><button class="btn btn-xs ' + (dnd ? 'btn-primary' : 'btn-ghost') + '" id="nd-dnd" aria-pressed="' + dnd + '" data-tip="' + (dnd ? 'Pop-ups are off' : 'Silence pop-ups and banners') + '">' + BF.icon('moon', 12) + (dnd ? 'Quiet on' : 'Quiet') + '</button><button class="btn btn-xs btn-ghost" id="nd-readall">Mark all read</button></span></div>' }];
       if (!list.length) items.push({ html: '<div class="faint" style="padding:14px 4px;text-align:center">You are all caught up.</div>' });
       const m = BF.ui.menu(anchor, items.concat(list.map((n) => ({
         html: '<button class="notif-mini' + (n.read ? '' : ' unread') + '" data-nid="' + n.id + '"><span class="nm-icon">' + BF.ui.achIcon(n.icon, 16) + '</span><span class="nm-body"><span class="nm-title">' + esc(n.title) + '</span><span class="nm-text">' + esc(n.body) + '</span><span class="nm-time">' + U.timeAgo(n.ts, BF.clock.now()) + '</span></span></button>',
       }))).concat([{ sep: true }, { label: 'View all notifications', icon: 'bell', href: '#/notifications' }]), { align: 'right', width: 360, focus: false });
       m.el.addEventListener('click', (e) => {
+        if (e.target.closest('#nd-dnd')) { const on = BF.notify.toggleDnd(); m.close(); shell.updateDnd(); BF.ui.toast({ title: on ? 'Do not disturb is on' : 'Pop-ups are back on', text: on ? 'Notifications still collect in the bell.' : '', kind: 'info', icon: on ? 'moon' : 'bell' }); return; }
         if (e.target.closest('#nd-readall')) { BF.notify.markAllRead(); m.close(); BF.ui.toast({ title: 'All notifications marked as read', kind: 'success' }); return; }
         const b = e.target.closest('[data-nid]');
         if (!b) return;

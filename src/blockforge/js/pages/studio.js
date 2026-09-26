@@ -198,7 +198,8 @@
 
   // ---------------------------------------------------------------------- ads
 
-  const AD = { tier: 'boosted', placements: ['home', 'discover', 'search'], budget: 500, headline: '' };
+  const AD = { tier: 'boosted', placements: ['home', 'discover', 'search'], budget: 500, headline: '', pace: 'fast' };
+  const PACE_ORDER = ['steady', 'fast', 'blitz', 'burst'];
   let adOff = null;
 
   function campaignRow(c) {
@@ -207,13 +208,19 @@
     const status = { active: '<span class="pill success"><span class="live-dot"></span>Running</span>', paused: '<span class="pill">Paused</span>', ended: '<span class="pill info">Finished</span>', stopped: '<span class="pill">Stopped</span>' }[c.status];
     const live = c.status === 'active' || c.status === 'paused';
     const hist = c.hist.slice(-20);
-    return '<article class="campaign panel" data-campaign="' + c.id + '"><div class="cp-top"><div><b>“' + esc(c.headline) + '”</b><div class="faint" style="font-size:12px">' + tier.label + ' · ' + c.placements.map((p) => BF.ads.PLACEMENTS[p].label.split(' · ')[0]).join(', ') + ' · started ' + U.timeAgo(c.createdAt, BF.clock.now()) + '</div></div>' + status + '</div>' +
+    const pace = BF.ads.PACES[c.pace];
+    const faster = PACE_ORDER[PACE_ORDER.indexOf(c.pace) + 1];
+    return '<article class="campaign panel" data-campaign="' + c.id + '"><div class="cp-top"><div><b>“' + esc(c.headline) + '”</b><div class="faint" style="font-size:12px">' + tier.label + (pace ? ' · ' + pace.label + ' pace' : '') + ' · ' + c.placements.map((p) => BF.ads.PLACEMENTS[p].label.split(' · ')[0]).join(', ') + ' · started ' + U.timeAgo(c.createdAt, BF.clock.now()) + '</div></div>' + status + '</div>' +
       '<div class="cp-budget"><div class="bar"><i style="width:' + Math.min(100, (c.spent / c.budget) * 100).toFixed(1) + '%"></i></div><span class="num faint">' + U.fmt(Math.round(c.spent)) + ' / ' + U.fmt(c.budget) + ' spent' + (c.refunded ? ' · ' + U.fmt(c.refunded) + ' refunded' : '') + '</span></div>' +
       '<div class="cp-stats"><div><span class="faint">Impressions</span><b class="num">' + U.fmt(c.impressions) + '</b></div><div><span class="faint">Clicks</span><b class="num">' + U.fmt(c.clicks) + '</b></div><div><span class="faint">CTR</span><b class="num">' + ctr.toFixed(2) + '%</b></div><div><span class="faint">Visits</span><b class="num">' + U.fmt(c.visits) + '</b></div><div><span class="faint">Cost / visit</span><b class="num">' + (c.visits ? (c.spent / c.visits).toFixed(2) : '—') + '</b></div></div>' +
       (hist.length > 1 ? BF.ui.barChart(hist.map((b) => b.v), { h: 60, color: 'var(--accent)', labels: ['', 'visits per minute'], aria: 'Visits per minute' }) : '') +
       (live ? '<div class="cp-actions">' + (c.status === 'active' ? '<button class="btn btn-sm btn-ghost" data-ad-pause="' + c.id + '">' + BF.icon('pause', 13) + 'Pause</button>' : '<button class="btn btn-sm btn-outline" data-ad-resume="' + c.id + '">' + BF.icon('play', 12) + 'Resume</button>') +
-        '<button class="btn btn-sm btn-ghost" data-ad-topup="' + c.id + '">' + BF.icon('plus', 13) + 'Add 250</button><button class="btn btn-sm btn-ghost" data-ad-stop="' + c.id + '">' + BF.icon('x', 13) + 'Stop and refund</button></div>' : '') + '</article>';
+        (faster ? '<button class="btn btn-sm btn-outline" data-ad-pace="' + c.id + '" data-pace="' + faster + '">' + BF.icon('bolt', 13) + 'Spend faster (' + BF.ads.PACES[faster].label + ')</button>' : '') +
+        '<button class="btn btn-sm btn-ghost" data-ad-topup="' + c.id + '">' + BF.icon('plus', 13) + 'Add ' + U.compact(topUpAmount(c)) + '</button><button class="btn btn-sm btn-ghost" data-ad-stop="' + c.id + '">' + BF.icon('x', 13) + 'Stop and refund</button></div>' : '') + '</article>';
   }
+
+  /** Top-ups scale with the campaign: 10% of its budget, at least 250. */
+  function topUpAmount(c) { return Math.max(250, Math.round(c.budget * 0.1 / 50) * 50); }
 
   function totalsHtml(tot) {
     return '<div><span class="faint">Running</span><b class="num">' + tot.running + '</b></div><div><span class="faint">Spent</span><b class="num">' + U.fmt(Math.round(tot.spent)) + '</b></div><div><span class="faint">Impressions</span><b class="num">' + U.fmt(tot.impressions) + '</b></div><div><span class="faint">Ad visits</span><b class="num">' + U.fmt(tot.visits) + '</b></div>';
@@ -236,7 +243,8 @@
         '<div class="field"><label for="ad-headline">Headline</label><input class="input" id="ad-headline" maxlength="60" value="' + esc(AD.headline) + '"><span class="hint">Shown on the sponsored card. 16-48 characters click best.</span><span class="error" id="ad-err-headline"></span></div>' +
         '<div class="field"><span class="label">Tier</span><div class="tier-pick">' + Object.entries(BF.ads.TIERS).map(([k, t]) => '<button type="button" class="tp' + (AD.tier === k ? ' on' : '') + '" data-tier="' + k + '"><b>' + t.label + '</b><span class="faint">' + t.cpm + ' ForgeCoins per 1,000 views</span><span class="faint">' + esc(t.desc) + '</span></button>').join('') + '</div></div>' +
         '<div class="field"><span class="label">Placements</span><div class="place-pick">' + Object.entries(BF.ads.PLACEMENTS).map(([k, p]) => '<label class="check-row"><input type="checkbox" data-place="' + k + '"' + (AD.placements.includes(k) ? ' checked' : '') + '> ' + esc(p.label) + '</label>').join('') + '</div><span class="error" id="ad-err-placements"></span></div>' +
-        '<div class="field"><label for="ad-budget">Budget (ForgeCoins, paid now)</label><div class="budget-row"><input class="input" id="ad-budget" type="number" min="' + BF.ads.LIMITS.minBudget + '" step="10" value="' + AD.budget + '">' + [100, 500, 2000, 10000].map((b) => '<button type="button" class="btn btn-xs btn-ghost" data-budget="' + b + '">' + U.compact(b) + '</button>').join('') + '</div><span class="hint">You have ' + coinsLabel(BF.economy.balance()) + '. Unspent budget is refunded when you stop a campaign.</span><span class="error" id="ad-err-budget"></span></div>' +
+        '<div class="field"><span class="label">Spend speed</span><div class="seg pace-pick" role="group" aria-label="Spend speed">' + PACE_ORDER.map((k) => '<button type="button" class="' + (AD.pace === k ? 'on' : '') + '" data-pace-pick="' + k + '" data-tip="' + esc(BF.ads.PACES[k].desc) + '">' + BF.ads.PACES[k].label + '</button>').join('') + '</div><span class="hint">Burst spends the whole budget in about 30 seconds; Steady spreads it over an hour.</span></div>' +
+        '<div class="field"><label for="ad-budget">Budget (ForgeCoins, paid now)</label><div class="budget-row"><input class="input" id="ad-budget" type="number" min="' + BF.ads.LIMITS.minBudget + '" step="10" value="' + AD.budget + '">' + [500, 5000, 50000, 500000].map((b) => '<button type="button" class="btn btn-xs btn-ghost" data-budget="' + b + '">' + U.compact(b) + '</button>').join('') + '<button type="button" class="btn btn-xs btn-ghost" data-budget="max">All</button></div><span class="hint">You have ' + coinsLabel(BF.economy.balance()) + '. Unspent budget is refunded when you stop a campaign.</span><span class="error" id="ad-err-budget"></span></div>' +
         '<div id="ad-est">' + estimateHtml(ug) + '</div><span class="error" id="ad-err-gameId"></span>' +
         '<button class="btn btn-primary btn-block" type="submit"' + (can ? '' : ' disabled') + '>' + BF.icon('megaphone', 15) + 'Launch campaign</button></form>';
       return '<div class="about-grid ads-grid"><div><div class="ad-totals panel" id="ad-totals">' + totalsHtml(tot) + '</div>' +
@@ -249,13 +257,14 @@
       const est = () => { const el = root.querySelector('#ad-est'); if (el) el.innerHTML = estimateHtml(ug); };
       form.querySelector('#ad-headline').addEventListener('input', (e) => { AD.headline = e.target.value; est(); });
       form.querySelector('#ad-budget').addEventListener('input', (e) => { AD.budget = Number(e.target.value) || 0; est(); });
-      form.querySelectorAll('[data-budget]').forEach((b) => b.addEventListener('click', () => { AD.budget = Number(b.dataset.budget); form.querySelector('#ad-budget').value = AD.budget; est(); }));
+      form.querySelectorAll('[data-budget]').forEach((b) => b.addEventListener('click', () => { AD.budget = b.dataset.budget === 'max' ? Math.min(BF.ads.LIMITS.maxBudget, BF.economy.balance()) : Number(b.dataset.budget); form.querySelector('#ad-budget').value = AD.budget; est(); }));
+      form.querySelectorAll('[data-pace-pick]').forEach((b) => b.addEventListener('click', () => { AD.pace = b.dataset.pacePick; form.querySelectorAll('[data-pace-pick]').forEach((x) => x.classList.toggle('on', x === b)); est(); }));
       form.querySelectorAll('[data-tier]').forEach((b) => b.addEventListener('click', () => { AD.tier = b.dataset.tier; form.querySelectorAll('[data-tier]').forEach((x) => x.classList.toggle('on', x === b)); est(); }));
       form.querySelectorAll('[data-place]').forEach((b) => b.addEventListener('change', () => { AD.placements = Array.from(form.querySelectorAll('[data-place]:checked')).map((x) => x.dataset.place); est(); }));
       form.addEventListener('submit', async (e) => {
         e.preventDefault();
         form.querySelectorAll('.error').forEach((x) => { x.textContent = ''; });
-        const o = { gameId: ug.id, headline: AD.headline, tier: AD.tier, placements: AD.placements, budget: AD.budget };
+        const o = { gameId: ug.id, headline: AD.headline, tier: AD.tier, placements: AD.placements, budget: AD.budget, pace: AD.pace };
         const errs = BF.ads.validate(o);
         if (Object.keys(errs).length) { for (const [k, v] of Object.entries(errs)) { const el = form.querySelector('#ad-err-' + k); if (el) el.textContent = v; } BF.sfx.play('error'); return; }
         const ok = await BF.ui.confirm({ title: 'Launch this campaign?', message: U.fmt(Math.floor(AD.budget)) + ' ForgeCoins are taken from your wallet now. Stop the campaign any time to get the unspent part back.', confirmLabel: 'Launch for ' + U.fmt(Math.floor(AD.budget)), icon: 'megaphone' });
@@ -267,11 +276,12 @@
         BF.router.refresh();
       });
       root.addEventListener('click', (e) => {
-        const p = e.target.closest('[data-ad-pause]'), rs = e.target.closest('[data-ad-resume]'), st = e.target.closest('[data-ad-stop]'), tu = e.target.closest('[data-ad-topup]');
+        const p = e.target.closest('[data-ad-pause]'), rs = e.target.closest('[data-ad-resume]'), st = e.target.closest('[data-ad-stop]'), tu = e.target.closest('[data-ad-topup]'), pc = e.target.closest('[data-ad-pace]');
+        if (pc) { BF.ads.setPace(pc.dataset.adPace, pc.dataset.pace); BF.ui.toast({ title: 'Spending faster', text: 'The rest of the budget now spends at ' + BF.ads.PACES[pc.dataset.pace].label + ' pace.', kind: 'success', icon: 'bolt' }); BF.router.refresh(); return; }
         if (p) BF.ads.pause(p.dataset.adPause);
         if (rs) { const r = BF.ads.resume(rs.dataset.adResume); if (!r.ok && r.error) BF.ui.toast({ title: r.error, kind: 'error' }); }
         if (st) { const r = BF.ads.stop(st.dataset.adStop); if (r.ok) BF.ui.toast({ title: 'Campaign stopped', text: r.refund ? U.fmt(r.refund) + ' ForgeCoins refunded.' : '', kind: 'coin' }); }
-        if (tu) { const r = BF.ads.topUp(tu.dataset.adTopup, 250); if (!r.ok) BF.ui.toast({ title: r.error, kind: 'error' }); }
+        if (tu) { const c0 = BF.ads.get(tu.dataset.adTopup); const r = BF.ads.topUp(tu.dataset.adTopup, c0 ? topUpAmount(c0) : 250); if (!r.ok) BF.ui.toast({ title: r.error, kind: 'error' }); }
         if (p || rs || st || tu) BF.router.refresh();
       });
       // live campaign numbers without re-rendering the form

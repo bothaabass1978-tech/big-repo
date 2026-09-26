@@ -22,6 +22,10 @@
   const CROWD = { peak: 1600000, exp: 2.2, sessionMin: 8 };
   /** Built-in visit counts are stored in data at 1/VISIT_SCALE of the platform's size. */
   const VISIT_SCALE = 60;
+  /** Live visit counters start counting from here, so they grow every minute and never go backwards. */
+  const VISIT_EPOCH = Date.UTC(2026, 8, 24);
+  /** Average share of peak through the day (the day curve's mean). */
+  const DAY_MEAN = 0.62;
   function boostOf(gameId) {
     const b = world.boosts.get(gameId);
     if (!b) return 1;
@@ -61,7 +65,7 @@
       const dislikes = baseDislikes + (vote === 'dislike' ? 1 : 0);
       return {
         playing: BF.world.playerCount(id),
-        visits: g.baseVisits * VISIT_SCALE + extraVisits * 40,
+        visits: g.baseVisits * VISIT_SCALE + extraVisits * 40 + BF.world.liveVisits(id),
         favorites: g.baseFavorites * 12 + (fav ? 1 : 0),
         likes,
         dislikes,
@@ -320,6 +324,18 @@
       return world.trackedCount(gameId) + world.crowd(gameId);
     },
 
+    /** Typical visits per minute for a built-in game (its crowd over a day, one visit per session). */
+    visitRate(gameId) {
+      const g = catalog.get(gameId);
+      if (!g || !g.builtIn) return 0;
+      return (CROWD.peak * Math.pow(g.popularity || 0.3, CROWD.exp) * DAY_MEAN) / CROWD.sessionMin;
+    },
+    /** Visits since the live counter started: grows every minute, same on every reload. */
+    liveVisits(gameId, now) {
+      const t = now == null ? (BF.clock ? BF.clock.now() : Date.now()) : now;
+      return Math.max(0, Math.floor(world.visitRate(gameId) * ((t - VISIT_EPOCH) / 60000)));
+    },
+
     /** How many servers a game is running (the tracked ones plus the crowd's). */
     serverTotal(gameId) {
       const g = catalog.get(gameId);
@@ -571,8 +587,14 @@
     'mystery-mansion:bestTime': [240000, 1800000], 'mystery-mansion:beetles': [0, 5],
   };
 
+  /** Ranges for stats shared by many games (the arcade engines). */
+  const STAT_RANGES = {
+    bestDistance: [300, 9000], bestScore: [300, 12000], bestPoints: [8, 60], roundsWon: [1, 400], tags: [1, 1500], bestSurvival: [20, 150],
+    bestHaul: [100, 6000], fishCaught: [5, 4000], legendaries: [0, 30], bestSeason: [200, 4000], harvests: [10, 5000], bestShift: [150, 2400],
+    served: [10, 6000], ringsHit: [10, 5000], bestRound: [14, 40], aces: [0, 60], bestEscape: [60000, 400000], found: [1, 900], correct: [5, 3000], wins: [1, 900],
+  };
   function botStat(bot, gameId, def) {
-    const range = RANGES[gameId + ':' + def.stat] || [1, 500];
+    const range = RANGES[gameId + ':' + def.stat] || STAT_RANGES[def.stat] || [1, 500];
     const r = U.rng(bot.id + ':' + gameId + ':' + def.stat)();
     const skill = U.clamp(bot.skill * 0.75 + r * 0.35, 0, 1);
     const curve = Math.pow(skill, def.order === 'asc' ? 1 : 2.4);
@@ -584,7 +606,7 @@
   BF.leaderboards = {
     GLOBAL: [
       { key: 'level', label: 'Level', icon: 'star' },
-      { key: 'coins', label: 'ForgeCoins', icon: 'coin' },
+      { key: 'coins', label: 'Richest', icon: 'coin' },
       { key: 'wins', label: 'Wins', icon: 'trophy' },
       { key: 'games', label: 'Games Played', icon: 'gamepad' },
       { key: 'achievements', label: 'Achievements', icon: 'medal' },

@@ -22,6 +22,10 @@
       privacy: { messages: 'everyone', friendRequests: 'everyone', showOnline: true, invites: true, inventoryPublic: true },
       notifications: {
         popups: true,
+        popupMode: 'all', // all | important | off
+        banners: true, // achievement, badge and level-up banners
+        inGame: false, // background pop-ups while a game is running
+        dnd: false, // do not disturb: no pop-ups or banners at all
         sound: true,
         types: { friend: true, achievement: true, invite: true, purchase: true, daily: true, quest: true, bot: true, update: true, level: true, system: true },
       },
@@ -233,6 +237,7 @@
     ['transactions', 'recent', 'notifications', 'created'].forEach((k) => { if (!Array.isArray(state[k])) state[k] = []; });
     ['inventory', 'passes', 'progress', 'messages', 'achievements', 'badges', 'bots', 'chatmem'].forEach((k) => { if (!state[k] || typeof state[k] !== 'object') state[k] = {}; });
     deepDefaults(state, skeleton);
+    if (state.settings.notifications.popups === false && state.settings.notifications.popupMode === 'all') state.settings.notifications.popupMode = 'off';
     if (!Array.isArray(state.player.stats.distinctGames)) state.player.stats.distinctGames = [];
     if (!state.ads || typeof state.ads !== 'object' || !Array.isArray(state.ads.campaigns)) state.ads = { campaigns: [] };
     if (!state.limiteds || typeof state.limiteds !== 'object') state.limiteds = {};

@@ -84,11 +84,14 @@
 
   function botProfile(bot, tab) {
     const st = BF.bots.stats(bot);
+    const roles = BF.creatorEconomy ? BF.creatorEconomy.rolesOf(bot.id) : [];
+    const ownGames = BF.botGames ? BF.botGames.byCreator(bot.id) : [];
+    const studioGames = roles.reduce((a, r) => a.concat(BF.GAME_REGISTRY.filter((g) => g.builtIn && g.creator === r.studio)), []);
     const status = BF.world.botStatus(bot.id);
     const F = BF.friends;
     const tabs = BF.ui.tabs([
       { id: 'about', label: 'About', href: '#/user/' + bot.id },
-      { id: 'creations', label: 'Creations', href: '#/user/' + bot.id + '/creations' },
+      { id: 'creations', label: 'Creations', href: '#/user/' + bot.id + '/creations', count: studioGames.length + ownGames.length || undefined },
       { id: 'inventory', label: 'Inventory', href: '#/user/' + bot.id + '/inventory' },
       { id: 'badges', label: 'Badges', href: '#/user/' + bot.id + '/badges' },
       { id: 'statistics', label: 'Statistics', href: '#/user/' + bot.id + '/statistics' },
@@ -100,7 +103,11 @@
     const gameBadges = [];
     BF.GAME_REGISTRY.forEach((g) => g.badges.forEach((b) => { if (r() < 0.12 + st.level / 300) gameBadges.push(Object.assign({ gameName: g.name }, b)); }));
     let body;
-    if (tab === 'creations') {
+    if (tab === 'creations' && (studioGames.length || ownGames.length)) {
+      body = (roles.length ? '<div class="role-list">' + roles.map((r) => '<a class="pill ' + (r.role === 'owner' ? 'gold' : 'accent') + '" href="#/creator/' + encodeURIComponent(r.studio) + '">' + BF.icon('anvil', 12) + (r.role === 'owner' ? 'Founder of ' : 'Developer at ') + esc(r.studio) + '</a>').join('') + '</div>' : '') +
+        (ownGames.length ? '<section class="section">' + BF.ui.sectionHead('Games by ' + esc(bot.displayName), 'brush') + '<div class="grid-cards">' + ownGames.map((g) => BF.ui.gameCard(g)).join('') + '</div></section>' : '') +
+        (studioGames.length ? '<section class="section">' + BF.ui.sectionHead('Studio games', 'anvil') + '<div class="grid-cards">' + studioGames.map((g) => BF.ui.gameCard(g)).join('') + '</div></section>' : '');
+    } else if (tab === 'creations') {
       body = bot.base.created ? '<div class="panel notice">' + BF.icon('anvil', 18) + '<div><b>' + esc(bot.displayName) + ' has ' + U.plural(bot.base.created, 'private project') + '.</b><p class="faint">Unpublished creations are only visible to their creator.</p></div></div>' : BF.ui.empty({ icon: 'anvil', title: esc(bot.displayName) + ' has no public creations' });
     } else if (tab === 'inventory') {
       body = '<p class="faint" style="margin-bottom:12px">Items ' + esc(bot.displayName) + ' is wearing right now.</p><div class="grid-cards items">' + wearing.map((i) => BF.ui.itemCard(i)).join('') + '</div>';
@@ -109,7 +116,7 @@
     } else if (tab === 'statistics') {
       body = '<div class="panel"><dl class="kv">' + [['Level', st.level], ['Games played', U.fmt(st.gamesPlayed)], ['Wins', U.fmt(st.wins)], ['ForgeCoins', U.fmt(st.coins)], ['Achievements', st.achievements + ' / ' + BF.ACHIEVEMENTS.length], ['Friends', st.friends], ['Followers', U.fmt(st.followers)], ['Following', st.following], ['Play style', pers.label], ['Skill rating', Math.round(bot.skill * 100) + ' / 100']].map((x) => '<div><dt>' + x[0] + '</dt><dd class="num">' + x[1] + '</dd></div>').join('') + '</dl></div>';
     } else {
-      body = '<div class="about-grid"><div><div class="panel"><h3 class="panel-title">' + BF.icon('user', 17) + 'About</h3><p class="bio">' + esc(bot.bio) + '</p><div class="pers-chip" style="--pc:' + pers.color + '">' + BF.icon(pers.icon, 15) + '<b>' + pers.label + '</b><span class="faint">' + esc(pers.blurb) + '</span></div></div>' +
+      body = '<div class="about-grid"><div><div class="panel"><h3 class="panel-title">' + BF.icon('user', 17) + 'About</h3>' + (roles.length ? '<div class="role-list">' + roles.map((r) => '<a class="pill ' + (r.role === 'owner' ? 'gold' : 'accent') + '" href="#/creator/' + encodeURIComponent(r.studio) + '">' + BF.icon('anvil', 12) + (r.role === 'owner' ? 'Founder of ' : 'Developer at ') + esc(r.studio) + '</a>').join('') + '</div>' : '') + '<p class="bio">' + esc(bot.bio) + '</p><div class="pers-chip" style="--pc:' + pers.color + '">' + BF.icon(pers.icon, 15) + '<b>' + pers.label + '</b><span class="faint">' + esc(pers.blurb) + '</span></div></div>' +
         '<div class="panel" style="margin-top:14px"><h3 class="panel-title">' + BF.icon('heart', 17) + 'Favorite games</h3><div class="mini-games">' + favGames.map((g) => '<a class="mini-game" href="#/game/' + g.id + '"><img src="' + BF.thumbs.url(g) + '" alt=""><span>' + esc(g.name) + '</span></a>').join('') + '</div></div></div>' +
         '<div><div class="panel"><h3 class="panel-title">' + BF.icon('shirt', 17) + 'Currently wearing</h3><div class="wearing-grid">' + wearing.map((i) => '<button class="wear-chip" data-act="item-detail" data-item="' + i.id + '"><span class="rarity-dot rar-' + i.rarity + '"></span>' + esc(i.name) + '</button>').join('') + '</div></div>' +
         '<div class="panel" style="margin-top:14px"><h3 class="panel-title">' + BF.icon('medal', 17) + 'Badges</h3><div class="badge-grid small">' + (gameBadges.slice(0, 6).map((b) => badgeTile(b)).join('') || '<p class="faint">No badges yet.</p>') + '</div></div></div></div>';
@@ -128,7 +135,7 @@
     actions += '<button class="icon-btn" data-act="user-menu" data-bot="' + bot.id + '" aria-label="More">' + BF.icon('dots', 18) + '</button>';
     return '<section class="profile-hero"><div class="ph-avatar">' + heroAvatar(bot.avatar, bot.id) + '</div><div class="ph-main"><div class="ph-names"><h1 class="page-title">' + esc(bot.displayName) + '</h1><span class="faint">@' + esc(bot.username) + '</span><span class="lvl-badge">' + BF.icon('star', 13) + 'Level ' + st.level + '</span>' + (F.followsYou(bot.id) ? '<span class="pill">Follows you</span>' : '') + '</div>' +
       '<div class="ph-status"><span class="status-dot ' + status.state + '" data-live="dot:' + bot.id + '"></span><span data-live="status:' + bot.id + '">' + BF.ui.statusText(status) + '</span></div>' +
-      '<div class="ph-stats"><div><b class="num">' + st.friends + '</b><span>Friends</span></div><div><b class="num">' + U.compact(st.followers) + '</b><span>Followers</span></div><div><b class="num">' + st.following + '</b><span>Following</span></div><div><b class="num">' + U.compact(st.coins) + '</b><span>ForgeCoins</span></div><div><b class="num">' + st.achievements + '</b><span>Achievements</span></div></div>' +
+      '<div class="ph-stats"><div><b class="num">' + st.friends + '</b><span>Friends</span></div><div><b class="num">' + U.compact(st.followers) + '</b><span>Followers</span></div><div><b class="num">' + st.following + '</b><span>Following</span></div><div><b class="num">' + U.compact(st.coins) + '</b><span>' + (roles.length || ownGames.length ? 'Net worth' : 'ForgeCoins') + '</span></div><div><b class="num">' + st.achievements + '</b><span>Achievements</span></div></div>' +
       '<div class="ph-meta faint">' + BF.icon('calendar', 14) + ' Joined ' + U.fmtDate(bot.joinDate) + ' · ' + U.plural(st.gamesPlayed, 'game') + ' played</div><div class="ph-actions">' + actions + '</div></div></section>' + tabs + body;
   }
 
