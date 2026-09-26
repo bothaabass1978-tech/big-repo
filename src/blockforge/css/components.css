@@ -661,3 +661,11 @@ kbd { display: inline-grid; place-items: center; min-width: 22px; height: 22px; 
 .avatar-chip.sm .avatar-3d.crop-shot { width: 36px; height: 36px; margin-top: 3px; }
 .avatar-chip.lg .avatar-3d.crop-shot { width: 72px; height: 72px; margin-top: 5px; }
 .avatar-btn .avatar-3d.crop-shot { width: 42px; height: 42px; margin-top: 3px; }
+
+/* Exotic and Divine: the rarest tiers shimmer */
+.rar-exotic { --rc: var(--r-exotic); }
+.rar-divine { --rc: var(--r-divine); }
+.icard.rar-exotic, .icard.rar-divine { border-color: color-mix(in srgb, var(--rc) 45%, var(--line)); box-shadow: 0 0 0 1px color-mix(in srgb, var(--rc) 25%, transparent), 0 6px 22px color-mix(in srgb, var(--rc) 18%, transparent); }
+.icard.rar-exotic .icard-thumb::after, .icard.rar-divine .icard-thumb::after { content: ''; position: absolute; inset: 0; background: linear-gradient(115deg, transparent 25%, rgba(255, 255, 255, 0.22) 45%, transparent 65%); background-size: 250% 100%; animation: sheen 2.4s linear infinite; pointer-events: none; }
+.rarity-tag.rar-exotic { background: linear-gradient(90deg, rgba(57, 243, 255, 0.22), rgba(182, 124, 255, 0.22)); }
+.rarity-tag.rar-divine { background: linear-gradient(90deg, rgba(255, 224, 102, 0.3), rgba(255, 255, 255, 0.15), rgba(255, 224, 102, 0.3)); }

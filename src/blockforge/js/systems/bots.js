@@ -87,12 +87,22 @@
         gamesPlayed: Math.floor(level * (12 + r() * 20)),
         coins: Math.floor(200 + level * level * (3 + r() * 9) + r() * 2000),
         achievements: Math.min(BF.ACHIEVEMENTS.length - 1, Math.floor(level / 4 + r() * 6)),
-        followers: Math.floor(Math.pow(r(), 3) * 900 + level * 2),
+        // a platform this size has stars: about 1 in 60 players has tens of thousands to millions of followers
+        followers: Math.floor(Math.pow(r(), 3) * 900 + level * 2) * starPower(id, level),
         following: Math.floor(r() * 120 + 5),
         friends: Math.floor(5 + r() * 60),
         created: r() < 0.12 ? 1 + Math.floor(r() * 3) : 0,
       },
     };
+  }
+
+  /** Follower multiplier from a stable hash of the id (keeps the seeded population unchanged). */
+  function starPower(id, level) {
+    const h = U.hash(id + ':star') % 1000;
+    if (h < 3) return 800 + (h * 397) % 2400;
+    if (h < 16) return 60 + (h * 131) % 300;
+    if (h < 60) return 8 + (h * 17) % 30;
+    return 1 + Math.floor(level / 40);
   }
 
   const bots = (BF.bots = {

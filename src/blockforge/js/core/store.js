@@ -96,6 +96,8 @@
       daily: { lastClaimDay: null, streak: 0, bestStreak: 0, totalClaims: 0 },
       created: [],
       ads: { campaigns: [] },
+      limiteds: {},
+      updates: { seen: [], last: 0 },
       settings: defaultSettings(),
       secrets: { forgecore: { unlocked: false, at: 0, uses: 0, total: 0, wordSolved: false } },
       bots: {},
@@ -233,6 +235,8 @@
     deepDefaults(state, skeleton);
     if (!Array.isArray(state.player.stats.distinctGames)) state.player.stats.distinctGames = [];
     if (!state.ads || typeof state.ads !== 'object' || !Array.isArray(state.ads.campaigns)) state.ads = { campaigns: [] };
+    if (!state.limiteds || typeof state.limiteds !== 'object') state.limiteds = {};
+    if (!state.updates || typeof state.updates !== 'object' || !Array.isArray(state.updates.seen)) state.updates = { seen: [], last: 0 };
     state.version = BF.SAVE_VERSION;
     return state;
   }
@@ -259,6 +263,7 @@
       BF.clock.offsetDays = store.state.debug.dayOffset || 0;
       store.state.meta.sessions = (store.state.meta.sessions || 0) + 1;
       store.save('load');
+      BF.bus.emit('store:loaded', { accountId: store.accountId });
       return store.state;
     },
 
@@ -375,6 +380,7 @@
       store.state = st;
       BF.clock.offsetDays = st.debug.dayOffset || 0;
       store.save('import');
+      BF.bus.emit('store:loaded', { accountId: store.accountId });
       BF.accounts.touchProfile(acc.id, st.player);
       return { ok: true };
     },
@@ -385,6 +391,7 @@
       store.state = BF.createInitialState(acc, { sample: !!acc.sample });
       BF.clock.offsetDays = 0;
       store.save('reset');
+      BF.bus.emit('store:loaded', { accountId: store.accountId });
     },
   });
 

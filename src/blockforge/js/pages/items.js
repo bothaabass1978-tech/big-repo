@@ -54,18 +54,28 @@
       (list.length ? '<div class="grid-cards items">' + list.map((i) => BF.ui.itemCard(i)).join('') + '</div>' : BF.ui.empty({ icon: 'bag', title: 'No items match', text: 'Try a different rarity or search.' }));
   }
 
+  /** A limited drop: art, price or RAP, and a stock bar. */
+  function ltdCard(i) {
+    const L = BF.limiteds, left = L.left(i), mine = L.serials(i).length;
+    return '<button class="ltd-card rar-' + i.rarity + '" data-act="item-detail" data-item="' + i.id + '"><div class="ltd-art">' + BF.ui.itemPreview(i, { size: 120 }) + BF.ui.rarityTag(i.rarity) + '</div><b>' + esc(i.name) + '</b>' +
+      '<div class="ltd-price">' + (left ? BF.ui.coins(i.price) : '<span class="faint">RAP</span> ' + BF.ui.coins(L.rap(i))) + '</div>' +
+      BF.ui.bar(i.limitedStock - left, i.limitedStock, 'thin') + '<span class="faint ltd-left">' + (left ? U.fmt(left) + ' / ' + U.fmt(i.limitedStock) + ' left' : 'Sold out · resale only') + (mine ? ' · you own ' + mine : '') + '</span></button>';
+  }
+
   function featuredTab() {
     const hero = BF.ITEMS.hat_firehalo;
     const limited = BF.ITEMS.col_founders_anvil;
     const bundles = BF.ITEM_LIST.filter((i) => i.cat === 'bundle');
-    const topRare = BF.ITEM_LIST.filter((i) => !i.notForSale && ['legendary', 'mythic'].includes(i.rarity) && i.cat !== 'bundle' && i.cat !== 'collectible' && i.price > 0);
+    const topRare = BF.ITEM_LIST.filter((i) => !i.notForSale && !i.limitedStock && ['legendary', 'mythic'].includes(i.rarity) && i.cat !== 'bundle' && i.cat !== 'collectible' && i.price > 0);
+    const drops = BF.limiteds ? BF.limiteds.list() : [];
     const cheap = BF.ITEM_LIST.filter((i) => i.price > 0 && i.price <= 150 && i.cat !== 'tool' && !i.notForSale).sort((a, b) => a.price - b.price);
-    const newest = BF.ITEM_LIST.filter((i) => i.price > 0 && !i.notForSale && i.cat !== 'tool' && i.cat !== 'collectible').slice(-10).reverse();
+    const newest = BF.ITEM_LIST.filter((i) => i.price > 0 && !i.notForSale && !i.limitedStock && i.cat !== 'tool' && i.cat !== 'collectible').slice(-10).reverse();
     const heroOwned = BF.inventory.owns(hero.id);
     return '<section class="shop-hero rar-mythic"><div class="sh-art">' + BF.ui.itemPreview(hero, { size: 220, onAvatar: true }) + '</div><div class="sh-info"><span class="eyebrow" style="color:var(--r-mythic)">Mythic spotlight</span><h2 class="sh-title">' + esc(hero.name) + '</h2><p class="muted">' + esc(hero.desc) + '</p>' +
       '<div class="sh-buy">' + (heroOwned ? BF.ui.ownedTag() + '<button class="btn btn-primary" data-act="equip" data-item="' + hero.id + '">Equip</button>' : BF.ui.coins(hero.price, { cls: 'lg', size: 22 }) + '<button class="btn btn-primary btn-lg" data-act="buy-item" data-item="' + hero.id + '">' + BF.icon('bag', 17) + 'Buy</button>') + '<button class="btn btn-ghost" data-act="item-detail" data-item="' + hero.id + '">Preview</button></div>' +
       '<p class="faint" style="font-size:12px">Preview shows the item on your current avatar.</p></div>' +
       '<div class="sh-limited" data-act="item-detail" data-item="' + limited.id + '" tabindex="0"><span class="pill gold">' + BF.icon('clock', 11) + 'Limited · 1 per account</span><div class="shl-art">' + BF.ui.itemPreview(limited) + '</div><b>' + esc(limited.name) + '</b>' + (BF.inventory.owns(limited.id) ? BF.ui.ownedTag() : BF.ui.coins(limited.price)) + '</div></section>' +
+      (drops.length ? '<section class="section">' + BF.ui.sectionHead('Limited Drops', 'gem') + '<p class="faint" style="margin:-4px 0 12px;font-size:13px">A fixed number of copies, each with a serial number. When they sell out they are only on the resale market.</p><div class="ltd-grid">' + drops.map(ltdCard).join('') + '</div></section>' : '') +
       '<section class="section">' + BF.ui.sectionHead('Bundles', 'gift', { href: '#/shop/bundles', label: 'All bundles' }) + '<div class="row-scroll items">' + bundles.map((i) => BF.ui.itemCard(i)).join('') + '</div></section>' +
       '<section class="section">' + BF.ui.sectionHead('Legendary & Mythic', 'crown') + '<div class="row-scroll items">' + sortItems(topRare, 'rarity').map((i) => BF.ui.itemCard(i)).join('') + '</div></section>' +
       '<section class="section">' + BF.ui.sectionHead('Great deals under 150', 'wallet') + '<div class="row-scroll items">' + cheap.map((i) => BF.ui.itemCard(i)).join('') + '</div></section>' +

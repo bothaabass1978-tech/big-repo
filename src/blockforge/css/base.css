@@ -37,6 +37,8 @@
   --r-epic: #b67cff;
   --r-legendary: #ffb52e;
   --r-mythic: #ff4f9a;
+  --r-exotic: #39f3ff;
+  --r-divine: #ffe066;
   --overlay: rgba(4, 6, 10, 0.66);
   --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.35);
   --shadow-2: 0 10px 28px rgba(0, 0, 0, 0.38);
@@ -94,6 +96,8 @@
   --r-epic: #8b4fe0;
   --r-legendary: #d68a00;
   --r-mythic: #e0307e;
+  --r-exotic: #0aa8c4;
+  --r-divine: #c79a00;
   --overlay: rgba(18, 24, 33, 0.45);
   --shadow-1: 0 1px 2px rgba(20, 30, 50, 0.08);
   --shadow-2: 0 10px 28px rgba(20, 30, 50, 0.12);

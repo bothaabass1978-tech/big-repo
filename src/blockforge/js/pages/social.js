@@ -53,9 +53,23 @@
         body = rec.length ? '<div class="list panel tight">' + rec.map((x) => { const g = BF.catalog.get(x.r.gameId); return BF.ui.userRow(x.b, BF.ui.socialButtons(x.b.id) + '<button class="icon-btn sm" data-act="user-menu" data-bot="' + x.b.id + '" aria-label="More">' + BF.icon('dots', 16) + '</button>', { sub: 'met in ' + esc(g ? g.name : 'a game') + ' ' + U.timeAgo(x.r.ts, BF.clock.now()) }); }).join('') + '</div>'
           : BF.ui.empty({ icon: 'history', title: 'No one yet', text: 'Players from servers you join appear here.', action: { label: 'Play a game', href: '#/discover' } });
       } else if (tab === 'followers' || tab === 'following') {
-        const ids = so[tab];
-        body = ids.length ? '<div class="list panel tight">' + ids.map((id) => BF.bots.get(id)).filter(Boolean).map((b) => BF.ui.userRow(b, (tab === 'followers' ? (BF.friends.isFollowing(b.id) ? '<span class="pill">Mutual</span>' : '<button class="btn btn-xs btn-outline" data-act="follow" data-bot="' + b.id + '">Follow back</button>') : '<button class="btn btn-xs btn-ghost" data-act="unfollow" data-bot="' + b.id + '">Unfollow</button>') + BF.ui.socialButtons(b.id))).join('') + '</div>'
-          : BF.ui.empty({ icon: 'users', title: tab === 'followers' ? 'No followers yet' : 'Not following anyone', text: 'Follow players from their profile to see them here.' });
+        // newest first; long lists are capped so the page stays fast
+        const all = so[tab].slice().reverse();
+        const ids = all.slice(0, 150);
+        let head = '';
+        if (tab === 'followers' && BF.followers) {
+          const m = BF.followers.nextMilestone();
+          const perHour = Math.round(BF.followers.ratePerMin() * 60);
+          head = '<div class="panel follow-stats"><div><b class="num">' + U.fmt(so.followers.length) + '</b><span>followers</span></div><div><b class="num">~' + U.fmt(perHour) + '</b><span>new per hour</span></div>' +
+            (m ? '<div class="fs-mile"><span>Next milestone: <b>' + U.fmt(m.at) + '</b> · bonus ' + BF.ui.coins(m.reward) + '</span><div class="bar"><i style="width:' + Math.round(m.progress * 100) + '%"></i></div></div>' : '<div class="fs-mile"><span>Every milestone reached!</span></div>') +
+            '<p class="faint">Level up, win, earn badges, chat and publish popular games to gain followers faster. Players of your games may follow you too.</p></div>';
+        } else if (tab === 'following') {
+          const sugg = BF.bots.list.filter((b) => !BF.friends.isFollowing(b.id) && !BF.friends.isBlocked(b.id)).map((b) => ({ b, f: BF.bots.stats(b).followers })).sort((x, y) => y.f - x.f).slice(0, 6);
+          head = '<h3 class="section-title" style="margin-bottom:10px">Popular players to follow</h3><div class="list panel tight" style="margin-bottom:18px">' + sugg.map((x) => BF.ui.userRow(x.b, '<button class="btn btn-xs btn-outline" data-act="follow" data-bot="' + x.b.id + '">' + BF.icon('plus', 12) + 'Follow</button>', { sub: U.compact(x.f) + ' followers · ' + esc(BF.PERSONALITIES[x.b.personality].label) })).join('') + '</div><h3 class="section-title" style="margin-bottom:10px">You follow</h3>';
+        }
+        body = head + (ids.length ? '<div class="list panel tight">' + ids.map((id) => BF.bots.get(id)).filter(Boolean).map((b) => BF.ui.userRow(b, (tab === 'followers' ? (BF.friends.isFollowing(b.id) ? '<span class="pill">Mutual</span>' : '<button class="btn btn-xs btn-outline" data-act="follow" data-bot="' + b.id + '">Follow back</button>') : '<button class="btn btn-xs btn-ghost" data-act="unfollow" data-bot="' + b.id + '">Unfollow</button>') + BF.ui.socialButtons(b.id))).join('') + '</div>'
+          + (all.length > ids.length ? '<p class="faint" style="margin-top:10px">and ' + U.fmt(all.length - ids.length) + ' more</p>' : '')
+          : BF.ui.empty({ icon: 'users', title: tab === 'followers' ? 'No followers yet' : 'Not following anyone', text: 'Follow players from their profile to see them here.' }));
       } else if (tab === 'blocked') {
         body = so.blocked.length ? '<div class="list panel tight">' + so.blocked.map((id) => BF.bots.get(id)).filter(Boolean).map((b) => BF.ui.userRow(b, '<button class="btn btn-xs btn-outline" data-act="unblock" data-bot="' + b.id + '">Unblock</button>')).join('') + '</div>'
           : BF.ui.empty({ icon: 'block', title: 'Nobody is blocked', text: 'Blocked players cannot message you or send requests.' });

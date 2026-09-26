@@ -149,6 +149,7 @@
     if (check.reason === 'owned') return BF.ui.toast({ title: 'You already own ' + item.name, kind: 'info' });
     if (check.reason === 'notForSale') return BF.ui.toast({ title: item.name + ' is found in game, not sold.', kind: 'info' });
     if (check.reason === 'limit') return BF.ui.toast({ title: 'Limit reached', text: 'This limited item is one per account.', kind: 'info' });
+    if (check.reason === 'soldout') return A['item-detail']({ item: item.id });
     const bal = BF.economy.balance();
     const short = check.price - bal;
     BF.ui.modal({
@@ -166,19 +167,19 @@
           label: 'Buy for ' + U.fmt(check.price), kind: 'primary', icon: 'bag', onClick: (h) => {
             const res = BF.inventory.buy(item.id);
             if (!purchaseResult(res, item, h)) return false;
-            showPurchased(h, item);
+            showPurchased(h, item, res.serial);
             return false;
           },
         }],
     });
   };
 
-  function showPurchased(handle, item) {
+  function showPurchased(handle, item, serial) {
     const body = handle.el.querySelector('.modal-body');
     const foot = handle.el.querySelector('.modal-foot');
     handle.el.querySelector('.modal-title').textContent = 'Purchase successful!';
     const slot = BF.ITEM_CATS[item.cat].slot;
-    body.innerHTML = '<div class="bought"><div class="bought-art rar-' + item.rarity + '">' + BF.ui.itemPreview(item, { size: 150, animate: true }) + '</div><div class="bought-check">' + BF.icon('check', 22) + '</div><p><b>' + esc(item.name) + '</b> was added to your inventory.</p></div>';
+    body.innerHTML = '<div class="bought"><div class="bought-art rar-' + item.rarity + '">' + BF.ui.itemPreview(item, { size: 150, animate: true }) + '</div><div class="bought-check">' + BF.icon('check', 22) + '</div><p><b>' + esc(item.name) + '</b>' + (serial ? ' <span class="pill gold">#' + serial + ' of ' + U.fmt(item.limitedStock) + '</span>' : '') + ' was added to your inventory.</p></div>';
     BF.ui.burst(body.querySelector('.bought-art'));
     BF.ui.coinFly(body.querySelector('.bought-art'), 4);
     foot.innerHTML = '';
@@ -234,7 +235,16 @@
       const inv = BF.store.state.inventory[item.id];
       const game = item.gameId ? BF.catalog.get(item.gameId) : null;
       let buttons = '';
-      if (!item.notForSale && (!owned || item.cat === 'collectible')) buttons += '<button class="btn btn-primary" data-act="buy-item" data-item="' + item.id + '">' + BF.icon('bag', 15) + 'Buy for ' + U.fmt(price) + '</button>';
+      const L = item.limitedStock && BF.limiteds ? BF.limiteds : null;
+      let limitedHtml = '';
+      if (L) {
+        const left = L.left(item), mine = L.serials(item);
+        limitedHtml = '<div class="ltd-box"><div class="ltd-head"><span class="pill gold">' + BF.icon('gem', 11) + 'Limited</span><b class="num">' + (left ? U.fmt(left) + ' of ' + U.fmt(item.limitedStock) + ' left' : 'Sold out') + '</b><span class="faint">RAP ' + U.fmt(L.rap(item)) + '</span></div>' + BF.ui.bar(item.limitedStock - left, item.limitedStock, left ? 'thin' : 'thin success') +
+          (mine.length ? '<div class="ltd-serials">Your serial' + (mine.length > 1 ? 's' : '') + ': ' + mine.map((n) => '<span class="pill">#' + n + '</span>').join(' ') + '</div>' : '') +
+          (!left ? '<div class="ltd-offers"><div class="faint" style="font-size:12px;margin:8px 0 4px">Resellers</div>' + L.offers(item).map((o, i) => '<div class="ltd-offer">' + BF.ui.avatarChip(o.bot.avatar, { size: 'sm' }) + '<span>@' + esc(o.bot.username) + ' <span class="faint">#' + o.serial + '</span></span>' + BF.ui.coins(o.price) + '<button class="btn btn-xs btn-primary" data-act="buy-resale" data-item="' + item.id + '" data-offer="' + i + '">Buy</button></div>').join('') + '</div>' : '') + '</div>';
+        if (left) buttons += '<button class="btn btn-primary" data-act="buy-item" data-item="' + item.id + '">' + BF.icon('bag', 15) + 'Buy #' + U.fmt(item.limitedStock - left + 1) + ' for ' + U.fmt(price) + '</button>';
+        if (mine.length && owned) buttons += '<button class="btn btn-ghost" data-act="sell-limited" data-item="' + item.id + '">Sell to market for ' + U.fmt(Math.floor(L.rap(item) * L.T.resaleFee)) + '</button>';
+      } else if (!item.notForSale && (!owned || item.cat === 'collectible')) buttons += '<button class="btn btn-primary" data-act="buy-item" data-item="' + item.id + '">' + BF.icon('bag', 15) + 'Buy for ' + U.fmt(price) + '</button>';
       if (owned && slot) buttons += equipped ? '<button class="btn btn-outline" data-act="unequip" data-item="' + item.id + '">Unequip</button>' : '<button class="btn btn-primary" data-act="equip" data-item="' + item.id + '">' + BF.icon('shirt', 15) + 'Equip</button>';
       if (owned && item.cat === 'emote') buttons += '<button class="btn btn-outline" data-act="preview-emote" data-item="' + item.id + '">' + BF.icon('play', 13) + 'Play emote</button>';
       if (owned && inv) buttons += '<button class="btn btn-ghost" data-act="fav-item" data-item="' + item.id + '">' + BF.icon('heart', 15) + (inv.fav ? 'Unfavorite' : 'Favorite') + '</button>';
@@ -243,7 +253,7 @@
         (slot && item.cat !== 'emote' ? '<button class="btn btn-xs btn-outline id-try" data-tryon>' + BF.icon('user', 13) + (tryOn ? 'Show on mannequin' : 'Try on your avatar') + '</button>' : '') + '</div>' +
         '<div class="id-info"><div class="id-tags">' + BF.ui.rarityTag(item.rarity) + '<span class="pill">' + esc(BF.ITEM_CATS[item.cat].label) + '</span>' + (owned ? BF.ui.ownedTag(item.cat === 'collectible' && inv ? 'Owned x' + inv.qty : 'Owned') : '') + (equipped ? '<span class="pill success">Equipped</span>' : '') + (item.limited ? '<span class="pill gold">Limited</span>' : '') + '</div>' +
         '<h2 class="id-name">' + esc(item.name) + '</h2><div class="faint">by ' + esc(item.creator) + (game ? ' · <a href="#/game/' + game.id + '" class="link">' + esc(game.name) + '</a>' : '') + '</div>' +
-        '<p class="id-desc">' + esc(item.desc) + '</p>' +
+        '<p class="id-desc">' + esc(item.desc) + '</p>' + limitedHtml +
         (item.cat === 'bundle' ? '<div class="id-contents">' + item.contents.map((id) => { const c = BF.ITEMS[id]; return '<div class="idc rar-' + c.rarity + '">' + BF.ui.itemPreview(c, { size: 56 }) + '<span>' + esc(c.name) + '</span>' + (BF.inventory.owns(id) ? BF.icon('check', 14) : '') + '</div>'; }).join('') + '</div>' : '') +
         '<dl class="id-stats"><div><dt>Price</dt><dd>' + (item.notForSale ? 'Not sold' : BF.ui.coins(price)) + '</dd></div><div><dt>Collection value</dt><dd>' + BF.ui.coins(BF.inventory.itemValue(item)) + '</dd></div>' + (inv ? '<div><dt>Acquired</dt><dd>' + U.fmtDate(inv.at) + '</dd></div>' : '') + '</dl>' +
         '<div class="id-actions">' + buttons + '</div></div></div>';
@@ -252,9 +262,31 @@
     const body = h.el.querySelector('.modal-body');
     const rerender = () => { if (!h.closed) body.innerHTML = renderBody(); };
     body.addEventListener('click', (e) => { if (e.target.closest('[data-tryon]')) { tryOn = !tryOn; rerender(); } });
-    const off = BF.store.on(['inventory', 'avatar', 'wallet'], rerender);
+    const off = BF.store.on(['inventory', 'avatar', 'wallet', 'limiteds'], rerender);
     const origClose = h.close;
     h.close = (r) => { off(); origClose(r); };
+  };
+
+  A['buy-resale'] = async (p) => {
+    const item = BF.ITEMS[p.item];
+    const offer = item && BF.limiteds.offers(item)[Number(p.offer)];
+    if (!offer) return BF.ui.toast({ title: 'That listing is gone', kind: 'info' });
+    const ok = await BF.ui.confirm({ title: 'Buy ' + item.name + ' #' + offer.serial + '?', message: 'From @' + offer.bot.username + ' for ' + U.fmt(offer.price) + ' ForgeCoins (you have ' + U.fmt(BF.economy.balance()) + ').', confirmLabel: 'Buy for ' + U.fmt(offer.price) });
+    if (!ok) return;
+    const r = BF.limiteds.buyResale(item, offer);
+    if (!r.ok) return BF.ui.toast({ title: r.reason === 'insufficient' ? 'Not enough ForgeCoins.' : 'Purchase failed', text: r.need ? 'You need ' + U.fmt(r.need) + ' more.' : '', kind: 'error' });
+    BF.sfx.play('purchase');
+    BF.ui.toast({ title: 'You own ' + item.name + ' #' + r.serial, kind: 'success', icon: 'gem' });
+  };
+
+  A['sell-limited'] = async (p) => {
+    const item = BF.ITEMS[p.item];
+    if (!item) return;
+    const value = Math.floor(BF.limiteds.rap(item) * BF.limiteds.T.resaleFee);
+    const ok = await BF.ui.confirm({ title: 'Sell ' + item.name + '?', message: 'The market pays ' + U.fmt(value) + ' ForgeCoins (70% of its recent average price). Limited stock never comes back, so you may pay more to get one again.', confirmLabel: 'Sell for ' + U.fmt(value), danger: true });
+    if (!ok) return;
+    const r = BF.limiteds.sellToMarket(item);
+    if (r.ok) BF.ui.toast({ title: 'Sold ' + item.name + ' #' + r.serial, text: '+' + U.fmt(r.value) + ' ForgeCoins', kind: 'success' });
   };
 
   A['preview-emote'] = (p) => {
@@ -276,17 +308,18 @@
     if (BF.passes.owns(pass.id)) return BF.ui.toast({ title: 'You already own ' + pass.name, kind: 'info' });
     const game = BF.catalog.get(pass.gameId);
     const bal = BF.economy.balance();
-    const short = pass.price - bal;
+    const price = BF.passes.price(pass);
+    const short = price - bal;
     BF.ui.modal({
       title: short > 0 ? 'Not enough ForgeCoins.' : 'Buy game pass',
       icon: short > 0 ? 'coin' : 'ticket',
       iconKind: short > 0 ? 'gold' : '',
       body: '<div class="pass-confirm"><img src="' + BF.thumbs.url(game) + '" alt=""><div><div class="bp-name">' + esc(pass.name) + '</div><div class="faint" style="font-size:12.5px">' + esc(game.name) + '</div><p class="muted" style="margin-top:6px;font-size:13px">' + esc(pass.desc) + '</p></div></div>' +
-        '<div class="buy-math"><div><span>Price</span>' + BF.ui.coins(pass.price) + '</div><div><span>Your balance</span>' + BF.ui.coins(bal) + '</div><div class="bm-total"><span>After purchase</span>' + (short > 0 ? '<span class="delta-neg num">Short by ' + U.fmt(short) + '</span>' : BF.ui.coins(bal - pass.price)) + '</div></div>',
+        '<div class="buy-math"><div><span>Price' + (price < pass.price ? ' <s class="faint num">' + U.fmt(pass.price) + '</s>' : '') + '</span>' + BF.ui.coins(price) + '</div><div><span>Your balance</span>' + BF.ui.coins(bal) + '</div><div class="bm-total"><span>After purchase</span>' + (short > 0 ? '<span class="delta-neg num">Short by ' + U.fmt(short) + '</span>' : BF.ui.coins(bal - price)) + '</div></div>',
       actions: short > 0
         ? [{ label: 'Close', kind: 'ghost' }, { label: 'Ways to earn', kind: 'gold', onClick: () => BF.router.go('#/wallet') }]
         : [{ label: 'Cancel', kind: 'ghost' }, {
-          label: 'Buy for ' + U.fmt(pass.price), kind: 'primary', icon: 'ticket', onClick: (h) => {
+          label: 'Buy for ' + U.fmt(price), kind: 'primary', icon: 'ticket', onClick: (h) => {
             const r = BF.passes.buy(pass.id);
             if (!r.ok) { purchaseResult(r, { name: pass.name }, h); return false; }
             BF.sfx.play('purchase');

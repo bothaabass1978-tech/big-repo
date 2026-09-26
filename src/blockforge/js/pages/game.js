@@ -7,6 +7,35 @@
 
   const U = BF.util;
   const esc = U.esc;
+
+  /**
+   * Banner for a developer update: its event while one runs in this game, or
+   * any recent update when `opts.latest` (home page). Empty string when none.
+   */
+  BF.ui.updateBanner = function (g, opts) {
+    if (!BF.updates) return '';
+    opts = opts || {};
+    let rec, def, game = g, until = 0;
+    if (opts.latest) {
+      const l = BF.updates.latest();
+      if (!l || BF.clock.now() - l.rec.at > 7 * 86400000) return '';
+      rec = l.rec; def = l.def; game = l.game;
+      const a = BF.updates.active(game.id);
+      until = a && a.rec.id === rec.id ? a.until : 0;
+    } else {
+      const a = BF.updates.active(g.id);
+      if (!a) return '';
+      rec = a.rec; def = a.def; until = a.until;
+    }
+    const chips = [];
+    if (until && def.event && def.event.xp > 1) chips.push('<span class="pill gold">' + BF.icon('star', 11) + def.event.xp + 'x XP</span>');
+    if (until && def.sale) chips.push('<a class="pill success" href="#/game/' + game.id + '/store">' + BF.icon('ticket', 11) + def.sale + '% off passes</a>');
+    for (const id of def.items || []) { const it = BF.ITEMS[id]; if (it) chips.push('<button class="pill accent" data-act="item-detail" data-item="' + it.id + '">' + BF.icon('gem', 11) + 'New limited: ' + esc(it.name) + '</button>'); }
+    return '<section class="update-banner"><div class="ub-icon">' + BF.icon('refresh', 22) + '</div><div class="ub-main"><div class="eyebrow">' + (opts.latest ? 'What\'s new · ' + esc(game.name) : 'Update event') + ' · v' + esc(rec.v) + '</div>' +
+      '<h3 class="ub-title">' + esc(def.title) + '</h3><p class="ub-notes">' + esc(def.notes) + '</p>' +
+      '<div class="ub-chips">' + chips.join('') + (until ? '<span class="faint num">Ends in ' + U.fmtDuration((until - BF.clock.now()) / 1000) + '</span>' : '<span class="faint">Released ' + U.timeAgo(rec.at, BF.clock.now()) + '</span>') + '</div></div>' +
+      (opts.latest ? '<button class="btn btn-play" data-act="play" data-game="' + game.id + '">' + BF.icon('play', 14) + 'Play</button>' : '') + '</section>';
+  };
   let liveOff = null;
   let lbStat = {};
 
@@ -37,6 +66,26 @@
         '<div class="sr-friends">' + (fr.length ? '<span class="pill success" data-tip="' + esc(fr.map((b) => b.displayName).join(', ')) + '">' + BF.icon('users', 12) + fr.length + ' friend' + (fr.length > 1 ? 's' : '') + '</span>' : '') + '</div>' +
         '<div class="sr-act">' + (mine ? '<span class="pill accent">You are here</span>' : full ? '<button class="btn btn-sm" disabled>Full</button>' : '<button class="btn btn-sm btn-play" data-act="join-server" data-game="' + gameId + '" data-server="' + srv.id + '">Join</button>') + '</div></div>';
     }).join('');
+    // the crowd's public servers: a sample of busy ones, joined through matchmaking
+    const crowd = BF.world.crowd(gameId);
+    if (crowd > 0 && !opts.noCrowd) {
+      const g = BF.catalog.get(gameId);
+      const max = (g && g.maxPlayers) || 12;
+      const r = U.rng('pub:' + gameId + ':' + Math.floor(Date.now() / 60000));
+      const regions = ['US-East', 'US-West', 'EU-West', 'EU-Central', 'Asia-East', 'Oceania', 'South America'];
+      let pub = '';
+      for (let i = 0; i < 6; i++) {
+        const count = Math.max(1, max - Math.floor(r() * Math.min(4, max / 3)));
+        const ping = 20 + Math.floor(r() * 140);
+        pub += '<div class="server-row public"><div class="sr-id"><span class="sr-name">Server #' + (100000 + Math.floor(r() * 899999)) + '</span><span class="faint">' + regions[Math.floor(r() * regions.length)] + ' · public</span></div>' +
+          '<div class="sr-avatars"><span class="faint" style="font-size:12px">' + BF.icon('users', 12) + ' ' + count + ' players</span></div>' +
+          '<div class="sr-count"><div class="num"><b>' + count + '</b>/' + max + ' players</div>' + BF.ui.bar(count, max, 'success thin') + '</div>' +
+          '<div class="sr-ping">' + pingBars(ping) + '<span class="num">' + ping + 'ms</span></div><div class="sr-friends"></div>' +
+          '<div class="sr-act">' + (count >= max ? '<button class="btn btn-sm" disabled>Full</button>' : '<button class="btn btn-sm btn-play" data-act="play" data-game="' + gameId + '">Join</button>') + '</div></div>';
+      }
+      rows = '<div class="server-summary">' + BF.icon('server', 14) + '<b class="num">' + U.fmt(BF.world.serverTotal(gameId)) + '</b> servers · <b class="num">' + U.fmt(BF.world.playerCount(gameId)) + '</b> playing now</div>' + rows + pub +
+        '<div class="server-summary faint">+ ' + U.fmt(Math.max(0, BF.world.serverTotal(gameId) - (BF.world.servers.get(gameId) || []).length - 6)) + ' more public servers</div>';
+    }
     const sl = !opts.noSecret && BF.secrets.sleeper(gameId);
     if (sl) {
       rows += '<div class="server-row sleeping" data-sleeper><div class="sr-id"><span class="sr-name">Server #' + sl.id + '</span><span class="faint">— · up ∞</span></div>' +
@@ -131,7 +180,7 @@
         { id: 'about', label: 'About', href: '#/game/' + g.id, icon: 'info' },
         { id: 'store', label: 'Store', href: '#/game/' + g.id + '/store', icon: 'ticket', count: (g.passes || []).length + (g.products || []).length },
         { id: 'badges', label: 'Badges', href: '#/game/' + g.id + '/badges', icon: 'medal', count: g.badges.length },
-        { id: 'servers', label: 'Servers', href: '#/game/' + g.id + '/servers', icon: 'server', count: BF.world.serversFor(g.id).length },
+        { id: 'servers', label: 'Servers', href: '#/game/' + g.id + '/servers', icon: 'server', count: BF.world.serverTotal(g.id) },
         { id: 'leaderboard', label: 'Leaderboard', href: '#/game/' + g.id + '/leaderboard', icon: 'podium' },
       ], tab);
       const body = tab === 'store' ? storeTab(g) : tab === 'badges' ? badgesTab(g) : tab === 'servers' ? serversTab(g) : tab === 'leaderboard' ? leaderboardTab(g) : aboutTab(g, st);
@@ -147,7 +196,7 @@
         (owner ? '<a class="btn btn-outline" href="#/create/' + g.id + '">' + BF.icon('anvil', 15) + 'Manage</a>' : '') + '</div>' +
         '<div class="gh-rating"><div class="ghr-bar"><i style="width:' + (st.approval * 100).toFixed(1) + '%"></i></div><span class="faint num">' + BF.icon('thumbUp', 12) + ' ' + U.compact(st.likes) + ' · ' + BF.icon('thumbDown', 12) + ' ' + U.compact(st.dislikes) + ' · ' + Math.round(st.approval * 100) + '% liked</span></div>' +
         '<div class="gh-stats"><div><span class="faint">Playing</span><b class="num"><span class="live-dot"></span> <span data-live="playing:' + g.id + '">' + U.fmt(st.playing) + '</span></b></div><div><span class="faint">Visits</span><b class="num">' + U.compact(st.visits) + '</b></div><div><span class="faint">Favorites</span><b class="num">' + U.compact(st.favorites) + '</b></div><div><span class="faint">Created</span><b>' + U.fmtDate(g.createdAt) + '</b></div><div><span class="faint">Updated</span><b>' + U.fmtDate(g.updatedAt) + '</b></div><div><span class="faint">Genre</span><b>' + esc(g.genre) + '</b></div></div>' +
-        '</div></section>' + tabs + '<div id="game-tab">' + body + '</div>';
+        '</div></section>' + BF.ui.updateBanner(g) + tabs + '<div id="game-tab">' + body + '</div>';
     },
     mount(root, params) {
       const g = BF.catalog.get(params.id);

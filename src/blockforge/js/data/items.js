@@ -13,8 +13,10 @@
     epic: { key: 'epic', label: 'Epic', color: '#b67cff', rank: 3, valueMult: 1.5 },
     legendary: { key: 'legendary', label: 'Legendary', color: '#ffb52e', rank: 4, valueMult: 2.0 },
     mythic: { key: 'mythic', label: 'Mythic', color: '#ff4f9a', rank: 5, valueMult: 3.0 },
+    exotic: { key: 'exotic', label: 'Exotic', color: '#39f3ff', rank: 6, valueMult: 4.0 },
+    divine: { key: 'divine', label: 'Divine', color: '#fff1a8', rank: 7, valueMult: 6.0 },
   };
-  BF.RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic'];
+  BF.RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic', 'exotic', 'divine'];
 
   /**
    * Item categories. `slot` = avatar slot it equips into; `group` = shop tab / inventory tab.
@@ -170,6 +172,28 @@
     ['col_brass_key', 'Ashcombe Brass Key', 'collectible', 'epic', 0, 'Old Harrow Games', 'Proof that you cracked the Ashcombe case.', { icon: 'key', c1: '#d8a64b' }, { notForSale: true, value: 800, gameId: 'mystery-mansion' }],
     ['col_chequered_plate', 'Chequered Plate', 'collectible', 'rare', 0, 'Nitro Nest', 'Awarded for a first-place finish in Skyline Racers.', { icon: 'flag', c1: '#f5f5f5' }, { notForSale: true, value: 300, gameId: 'skyline-racers' }],
     ['col_arena_trophy', 'Arena Trophy', 'collectible', 'epic', 0, 'IronAnvil Studios', 'Victor of a Block Battlegrounds match.', { icon: 'trophy', c1: '#ffc940' }, { notForSale: true, value: 700, gameId: 'block-battlegrounds' }],
+    // ---- Limited drops: a fixed global stock that other players buy up; each copy has a serial number.
+    // limitedStock = copies ever made, soldAtStart = share already gone when the drop is first seen,
+    // perHour = copies other players buy per hour while any remain, releasedDaysAgo staggers the drops.
+    ['hat_radiant_halo', 'Radiant Halo', 'hat', 'divine', 5000000, 'BlockForge', 'Fifty were ever forged. A ring of pure light that follows its owner everywhere.', { style: 'halo', c1: '#ffe066', c2: '#ffffff' }, { featured: true, limitedStock: 50, soldAtStart: 0.82, perHour: 1.2, releasedDaysAgo: 9 }],
+    ['hat_celestial_crown', 'Celestial Crown', 'hat', 'divine', 2500000, 'Starlit Arcade', 'Set with gems cut from a fallen star. Limited to 100 copies.', { style: 'crown', c1: '#fff1a8', c2: '#7fe7ff' }, { featured: true, limitedStock: 100, soldAtStart: 0.64, perHour: 1.6, releasedDaysAgo: 5 }],
+    ['head_nebula', 'Nebula Head', 'head', 'exotic', 1200000, 'NeonAtelier', 'A swirling nebula where a head should be. Limited to 150 copies.', { shape: 'void', c1: '#1a0b36', c2: '#ff4fd8' }, { limitedStock: 150, soldAtStart: 0.4, perHour: 2.4, releasedDaysAgo: 3 }],
+    ['back_phoenix', 'Phoenix Wings', 'back', 'exotic', 750000, 'Moonloom', 'Wings that burn without burning. Limited to 250 copies.', { style: 'wings', c1: '#ff7a2e', glow: true }, { limitedStock: 250, soldAtStart: 0.55, perHour: 4, releasedDaysAgo: 2 }],
+    ['sh_frost_dragon', 'Frost Dragon Pal', 'shoulder', 'exotic', 600000, 'Tinytails Co.', 'A baby dragon made of living ice. Limited to 300 copies.', { style: 'dragon', c1: '#bfe6ff', c2: '#46a8ff' }, { limitedStock: 300, soldAtStart: 0.3, perHour: 5, releasedDaysAgo: 1 }],
+    ['hat_frostfire_horns', 'Frostfire Horns', 'hat', 'exotic', 400000, 'IronAnvil Studios', 'One horn of ice, one of flame. Limited to 400 copies.', { style: 'horns', c1: '#bfe6ff', c2: '#ff7a2e' }, { limitedStock: 400, soldAtStart: 1, perHour: 6, releasedDaysAgo: 14 }],
+    ['back_gold_jetpack', 'Golden Jetpack', 'back', 'exotic', 350000, 'Gearhead Garage', 'Solid gold thrusters. Completely impractical. Limited to 500 copies.', { style: 'jetpack', c1: '#ffc940', c2: '#39f3ff' }, { limitedStock: 500, soldAtStart: 0.2, perHour: 7, releasedDaysAgo: 0.5 }],
+    ['back_starlight_cape', 'Starlight Cape', 'back', 'legendary', 150000, 'NeonAtelier', 'Woven from a clear night sky. Limited to 1,000 copies.', { style: 'cape', c1: '#1f2a6a' }, { limitedStock: 1000, soldAtStart: 0.35, perHour: 14, releasedDaysAgo: 4 }],
+    ['acc_prism_visor', 'Prism Visor', 'accessory', 'legendary', 90000, 'NeonAtelier', 'Splits every light into a rainbow. Limited to 2,000 copies.', { style: 'visor', c1: '#ff4fd8' }, { limitedStock: 2000, soldAtStart: 0.1, perHour: 26, releasedDaysAgo: 0.2 }],
+    // ---- Update drops: hidden until a developer update (data/updates.js) releases them
+    ['hat_champion_crown', 'Champion Crown', 'hat', 'exotic', 450000, 'IronAnvil Studios', 'Released with Champion Season in Block Battlegrounds. Limited to 600 copies.', { style: 'crown', c1: '#ffb454', c2: '#ff3d5a' }, { limitedStock: 600, soldAtStart: 0.04, perHour: 8, releasedDaysAgo: 0, releasedBy: 'upd_bb_champions', notForSale: true }],
+    ['sh_phantom_raven', 'Phantom Raven', 'shoulder', 'legendary', 180000, 'Old Harrow Games', 'A raven that is not quite there. Released with Moonlit Manor. Limited to 1,200 copies.', { style: 'bird', c1: '#5a5f7a', c2: '#b67cff' }, { limitedStock: 1200, soldAtStart: 0.05, perHour: 14, releasedDaysAgo: 0, releasedBy: 'upd_mm_moonlit', notForSale: true }],
+    ['back_nitro_thrusters', 'Nitro Thrusters', 'back', 'legendary', 120000, 'Nitro Nest', 'Twin neon boosters from the Night City Grand Prix. Limited to 1,500 copies.', { style: 'jetpack', c1: '#39f3ff', c2: '#ff4fd8' }, { limitedStock: 1500, soldAtStart: 0.06, perHour: 18, releasedDaysAgo: 0, releasedBy: 'upd_sr_nightcity', notForSale: true }],
+    ['back_royal_wings', 'Royal Pet Wings', 'back', 'legendary', 200000, 'Tinytails Co.', 'Gold-trimmed wings from the Royal Pet Parade. Limited to 1,000 copies.', { style: 'wings', c1: '#ffd66b' }, { limitedStock: 1000, soldAtStart: 0.05, perHour: 12, releasedDaysAgo: 0, releasedBy: 'upd_pw_parade', notForSale: true }],
+    ['sh_crystal_drone', 'Crystal Drone', 'shoulder', 'exotic', 520000, 'DeepCore Games', 'A drone grown from a deep-core crystal. Limited to 350 copies.', { style: 'drone', c1: '#ff4fd8', c2: '#7fe7ff' }, { limitedStock: 350, soldAtStart: 0.05, perHour: 5, releasedDaysAgo: 0, releasedBy: 'upd_mm_deepcore', notForSale: true }],
+    ['hat_glacier_viking', 'Glacier Viking Helm', 'hat', 'exotic', 300000, 'Bastion Works', 'Carved from the ice of the Winter Siege. Limited to 700 copies.', { style: 'viking', c1: '#bfe6ff', c2: '#e8ecf1' }, { limitedStock: 700, soldAtStart: 0.05, perHour: 9, releasedDaysAgo: 0, releasedBy: 'upd_cs_winter', notForSale: true }],
+    // ---- Ultra-rare finds: never sold, found only by finishing games (free, earned by playing)
+    ['col_star_fragment', 'Star Fragment', 'collectible', 'divine', 0, 'BlockForge', 'Found by finishing a game: about 1 in 20,000 sessions. Almost nobody has one.', { icon: 'gem', c1: '#fff1a8' }, { notForSale: true, value: 1000000, dropChance: 1 / 20000 }],
+    ['col_ember_egg', 'Ember Egg', 'collectible', 'exotic', 0, 'BlockForge', 'Warm to the touch. Found by finishing a game: about 1 in 4,000 sessions.', { icon: 'pearl', c1: '#ff7a2e' }, { notForSale: true, value: 250000, dropChance: 1 / 4000 }],
     // ---- Tools (sold in game stores, used by their game)
     ['tool_titan_pickaxe', 'Titan Pickaxe', 'tool', 'epic', 600, 'DeepCore Games', 'Mega Miners: mining power 12 and it never dulls.', { icon: 'pickaxe', c1: '#8fd3ff' }, { gameId: 'mega-miners', store: true }],
     ['tool_golden_shovel', 'Golden Shovel', 'tool', 'rare', 400, 'Salty Pixel Co.', 'Treasure Islands: dig twice as fast and find more coins.', { icon: 'shovel', c1: '#ffc940' }, { gameId: 'treasure-islands', store: true }],

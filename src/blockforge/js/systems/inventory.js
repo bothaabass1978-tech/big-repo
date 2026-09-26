@@ -64,6 +64,12 @@
     canBuy(item) {
       const price = inventory.priceFor(item);
       if (item.notForSale) return { ok: false, reason: 'notForSale', price };
+      // limited items: collectors may own several serials; once stock is gone only resale remains
+      if (item.limitedStock && BF.limiteds) {
+        if (BF.limiteds.soldOut(item)) return { ok: false, reason: 'soldout', price };
+        if (!BF.economy.canAfford(price)) return { ok: false, reason: 'insufficient', price };
+        return { ok: true, price };
+      }
       if (item.cat !== 'collectible' && inventory.isOwned(item)) return { ok: false, reason: 'owned', price };
       if (item.limited && inventory.qty(item.id) >= item.limited) return { ok: false, reason: 'limit', price };
       if (!BF.economy.canAfford(price)) return { ok: false, reason: 'insufficient', price };
@@ -79,6 +85,11 @@
       if (!item) return { ok: false, reason: 'missing' };
       const check = inventory.canBuy(item);
       if (!check.ok && check.reason !== 'insufficient') return check;
+      if (item.limitedStock && BF.limiteds) {
+        const r = BF.limiteds.buyNew(item);
+        if (r.ok) { BF.store.update('player', (s) => { s.player.stats.itemsBought += 1; }); BF.quests.track('buy_item', 1); BF.bus.emit('purchase', { item, price: r.price }); }
+        return r;
+      }
       const res = BF.economy.spend(check.price, 'Purchased ' + item.name, item.cat === 'tool' ? 'product' : 'purchase');
       if (!res.ok) return { ok: false, reason: 'insufficient', need: res.need, price: check.price };
       if (item.cat === 'bundle') item.contents.forEach((cid) => { if (!inventory.owns(cid)) inventory.add(cid, 1, 'bundle'); });
@@ -98,7 +109,7 @@
 
     canSell(item) {
       if (!inventory.owns(item.id)) return false;
-      if (item.cat === 'bundle' || item.starter) return false;
+      if (item.cat === 'bundle' || item.starter || item.limitedStock) return false;
       return inventory.sellValue(item) > 0;
     },
 
@@ -132,6 +143,8 @@
 
     /** Collection value of one item (rarity multiplier applied). */
     itemValue(item) {
+      // limiteds are worth what the resale market pays for them
+      if (item.limitedStock && BF.limiteds && BF.store.state) return BF.limiteds.rap(item);
       const base = item.value || item.price || 25;
       return Math.round(base * BF.RARITY[item.rarity].valueMult);
     },
@@ -205,13 +218,17 @@
       return (g.passes || []).some((p) => p.effect === effect && passes.owns(p.id));
     },
 
+    /** Current price of a pass, with any developer-update sale applied. */
+    price(p) { return BF.updates ? BF.updates.passPrice(p) : p.price; },
+
     /** Buy a game pass with ForgeCoins. */
     buy(passId) {
       const p = passes.get(passId);
       if (!p) return { ok: false, reason: 'missing' };
       if (passes.owns(passId)) return { ok: false, reason: 'owned' };
-      const res = BF.economy.spend(p.price, 'Purchased ' + p.name + ' (game pass)', 'pass');
-      if (!res.ok) return { ok: false, reason: 'insufficient', need: res.need, price: p.price };
+      const price = passes.price(p);
+      const res = BF.economy.spend(price, 'Purchased ' + p.name + ' (game pass)' + (price < p.price ? ' on sale' : ''), 'pass');
+      if (!res.ok) return { ok: false, reason: 'insufficient', need: res.need, price };
       BF.store.update(['passes', 'player'], (s) => {
         s.passes[passId] = { at: BF.clock.now(), gameId: p.gameId };
         s.player.stats.passesBought += 1;

@@ -18,6 +18,17 @@
     return s.created.filter((g) => includeUnpublished || (g.published && g.visibility !== 'private')).map(BF.creator.toListing);
   }
 
+  /** Crowd tuning (data): the most popular game's peak players, popularity curve, minutes per visit. */
+  const CROWD = { peak: 1600000, exp: 2.2, sessionMin: 8 };
+  /** Built-in visit counts are stored in data at 1/VISIT_SCALE of the platform's size. */
+  const VISIT_SCALE = 60;
+  function boostOf(gameId) {
+    const b = world.boosts.get(gameId);
+    if (!b) return 1;
+    if (Date.now() > b.until) { world.boosts.delete(gameId); return 1; }
+    return b.k;
+  }
+
   const catalog = (BF.catalog = {
     /** Every listed game. Pass true to include your unpublished creations. */
     all(includeUnpublished) {
@@ -44,13 +55,14 @@
         return { playing: BF.world.playerCount(id), visits: ug.visits || 0, favorites: (ug.favorites || 0) + (fav ? 1 : 0), likes, dislikes, approval: likes + dislikes ? likes / (likes + dislikes) : 0 };
       }
       const extraVisits = (s.catalog.visits[id] || 0) + (BF.world.visitDelta.get(id) || 0);
-      const baseDislikes = Math.round((g.baseLikes * (1 - g.approval)) / g.approval);
-      const likes = g.baseLikes + (vote === 'like' ? 1 : 0);
+      const baseLikes = g.baseLikes * 12;
+      const baseDislikes = Math.round((baseLikes * (1 - g.approval)) / g.approval);
+      const likes = baseLikes + (vote === 'like' ? 1 : 0);
       const dislikes = baseDislikes + (vote === 'dislike' ? 1 : 0);
       return {
         playing: BF.world.playerCount(id),
-        visits: g.baseVisits + extraVisits,
-        favorites: g.baseFavorites + (fav ? 1 : 0),
+        visits: g.baseVisits * VISIT_SCALE + extraVisits * 40,
+        favorites: g.baseFavorites * 12 + (fav ? 1 : 0),
         likes,
         dislikes,
         approval: likes / (likes + dislikes),
@@ -165,6 +177,8 @@
     session: null,
     lastSeen: new Map(),
     meets: new Map(),
+    drift: new Map(),
+    boosts: new Map(),
 
     /** Build the bot population and fill servers. */
     init() {
@@ -273,15 +287,56 @@
       return list.slice().sort((a, b) => (b.bots.length + (b.user ? 1 : 0)) - (a.bots.length + (a.user ? 1 : 0)) || a.ping - b.ping);
     },
 
-    playerCount(gameId) {
+    /** Players you can meet: the named bots actually placed in this game's servers. */
+    trackedCount(gameId) {
       return (world.servers.get(gameId) || []).reduce((a, s) => a + s.bots.length + (s.user ? 1 : 0), 0);
+    },
+
+    /**
+     * Everyone else playing: a crowd sized by popularity, following a day curve
+     * (quiet at dawn, busiest in the evening), with a slow random drift and any
+     * event boost from a developer update. Creator games draw a crowd from their
+     * recent visits (about 8 minutes per visit).
+     */
+    crowd(gameId) {
+      const g = catalog.get(gameId);
+      if (!g) return 0;
+      if (!g.builtIn) {
+        const ug = (BF.store.state && BF.store.state.created.find((x) => x.id === gameId)) || null;
+        if (!ug || !ug.published) return 0;
+        const h = (ug.hist || []).slice(-3);
+        const perMin = h.length ? h.reduce((a, b) => a + b.v, 0) / h.length : 0;
+        return Math.round(perMin * CROWD.sessionMin * boostOf(gameId));
+      }
+      const d = new Date(BF.clock ? BF.clock.now() : Date.now());
+      const hour = d.getHours() + d.getMinutes() / 60;
+      const day = 0.62 + 0.38 * Math.sin(((hour - 13) / 24) * Math.PI * 2);
+      const weekend = d.getDay() === 0 || d.getDay() === 6 ? 1.18 : 1;
+      const drift = world.drift.get(gameId) || 1;
+      return Math.round(CROWD.peak * Math.pow(g.popularity || 0.3, CROWD.exp) * day * weekend * drift * boostOf(gameId));
+    },
+
+    playerCount(gameId) {
+      return world.trackedCount(gameId) + world.crowd(gameId);
+    },
+
+    /** How many servers a game is running (the tracked ones plus the crowd's). */
+    serverTotal(gameId) {
+      const g = catalog.get(gameId);
+      const per = Math.max(2, Math.round(((g && g.maxPlayers) || 12) * 0.82));
+      return (world.servers.get(gameId) || []).length + Math.ceil(world.crowd(gameId) / per);
     },
 
     totalOnline() {
       let n = world.menuOnline.size + 1;
       for (const list of world.servers.values()) for (const s of list) n += s.bots.length;
-      return n;
+      for (const g of catalog.all()) n += world.crowd(g.id);
+      // players browsing menus, the shop and profiles rather than a game
+      return Math.round(n * 1.14);
     },
+
+    /** Temporarily multiply a game's crowd (events from developer updates). */
+    boost(gameId, k, ms) { world.boosts.set(gameId, { k, until: Date.now() + ms }); },
 
     /** Where a bot is right now. */
     botStatus(id) {
@@ -408,7 +463,12 @@
 
       for (const req of s.social.outgoing) if (Date.now() - req.at > 20000) BF.friends.resolveOutgoing(req.id);
 
+      // crowds drift slowly (a few percent a minute) so counts feel alive
+      for (const g of BF.GAME_REGISTRY) { const v = world.drift.get(g.id) || 1; world.drift.set(g.id, U.clamp(v + (Math.random() - 0.5) * 0.02 + (1 - v) * 0.02, 0.85, 1.15)); }
       if (BF.creator) BF.creator.simulate();
+      if (BF.followers) BF.followers.worldTick();
+      if (BF.limiteds) BF.limiteds.worldTick();
+      if (BF.updates) BF.updates.worldTick();
       BF.bus.emit('world:tick');
     },
 

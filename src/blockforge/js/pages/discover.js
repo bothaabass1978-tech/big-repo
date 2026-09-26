@@ -158,13 +158,19 @@
     },
   });
 
+  /** A pass's price, showing the original struck through during an update sale. */
+  function passPriceTag(p) {
+    const now = BF.passes.price(p);
+    return now < p.price ? '<span class="pc-sale"><s class="faint num">' + U.fmt(p.price) + '</s>' + BF.ui.coins(now) + '</span>' : BF.ui.coins(p.price);
+  }
+
   /** Game pass card (store tab + library). */
   function passCard(p, opts) {
     opts = opts || {};
     const owned = BF.passes.owns(p.id);
     const game = BF.catalog.get(p.gameId);
     return '<div class="pass-card' + (owned ? ' owned' : '') + '"><div class="pc-icon">' + BF.icon(p.icon || 'ticket', 26) + '</div><div class="pc-main"><div class="pc-name">' + esc(p.name) + '</div>' + (opts.hideGame ? '' : '<a class="faint pc-game" href="#/game/' + p.gameId + '">' + esc(game ? game.name : '') + '</a>') + '<p class="pc-desc">' + esc(p.desc) + '</p></div>' +
-      '<div class="pc-foot">' + (owned ? BF.ui.ownedTag('Owned') + (opts.hideGame ? '' : '<button class="btn btn-xs btn-play" data-act="play" data-game="' + p.gameId + '">Play</button>') : BF.ui.coins(p.price) + '<button class="btn btn-sm btn-primary" data-act="buy-pass" data-pass="' + p.id + '">Buy</button>') + '</div></div>';
+      '<div class="pc-foot">' + (owned ? BF.ui.ownedTag('Owned') + (opts.hideGame ? '' : '<button class="btn btn-xs btn-play" data-act="play" data-game="' + p.gameId + '">Play</button>') : passPriceTag(p) + '<button class="btn btn-sm btn-primary" data-act="buy-pass" data-pass="' + p.id + '">Buy</button>') + '</div></div>';
   }
   BF.ui.passCard = passCard;
 

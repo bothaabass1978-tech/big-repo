@@ -221,7 +221,7 @@
         if (visits > 0 && BF.world && BF.world.menuOnline && BF.bots) {
           const cap = (ug.maxPlayers || 12) * 3;
           const idle = Array.from(BF.world.menuOnline);
-          for (let n = Math.min(3, Math.ceil(visits / 8)); n > 0 && idle.length && BF.world.playerCount(ug.id) < cap; n--) {
+          for (let n = Math.min(3, Math.ceil(visits / 8)); n > 0 && idle.length && BF.world.trackedCount(ug.id) < cap; n--) {
             const bot = BF.bots.get(idle.splice(Math.floor(Math.random() * idle.length), 1)[0]);
             if (bot) BF.world.place(bot, ug.id);
           }

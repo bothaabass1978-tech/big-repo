@@ -21,7 +21,7 @@
         '<div class="login-brand-inner"><div class="login-logo">' + BF.logo(54) + '</div>' +
         '<h1 class="login-headline">Build it. Play it.<br>Forge your own worlds.</h1>' +
         '<p class="login-copy">Twenty original games, live servers full of players, an avatar shop with over a hundred items, and a creator studio of your own. Everything runs on this device.</p>' +
-        '<ul class="login-facts"><li>' + BF.icon('gamepad', 16) + '20 playable games</li><li>' + BF.icon('users', 16) + '420 simulated players</li><li>' + BF.coinIcon(16) + 'Fictional ForgeCoins</li></ul></div></section>' +
+        '<ul class="login-facts"><li>' + BF.icon('gamepad', 16) + '20 playable games</li><li>' + BF.icon('users', 16) + 'Millions of simulated players</li><li>' + BF.coinIcon(16) + 'Fictional ForgeCoins</li></ul></div></section>' +
         '<section class="login-panel"><div class="login-card">' +
         '<h2 class="login-title">Sign in</h2><p class="muted" style="margin-bottom:16px">Choose a local account on this device.</p>' +
         '<div class="acct-list">' + (accounts.length ? accounts.map((a) => '<button class="acct" data-acct="' + a.id + '"><span class="avatar-chip lg">' + BF.avatar.render(a.avatar || { skin: BF.STARTER_SKIN, equipped: BF.STARTER_EQUIP }, { crop: 'bust', still: true, size: 80 }) + '</span><span class="acct-main"><span class="acct-name">' + esc(a.displayName) + '</span><span class="acct-sub">@' + esc(a.username) + ' · Level ' + (a.level || 1) + (a.lastLogin ? ' · last played ' + U.timeAgo(a.lastLogin) : '') + '</span></span><span class="btn btn-primary btn-sm">Continue' + BF.icon('arrowRight', 14) + '</span></button>').join('') : '<p class="faint">No accounts yet.</p>') + '</div>' +
@@ -89,7 +89,7 @@
         '<div class="hh-level"><span class="lvl-badge">' + BF.icon('star', 13) + 'Level ' + p.level + '</span><div class="hh-xp">' + BF.ui.bar(p.xp, need, 'xp') + '<span class="faint num">' + U.fmt(p.xp) + ' / ' + U.fmt(need) + ' XP</span></div></div>' +
         '<div class="hh-stats"><a href="#/wallet" class="hh-stat"><span class="faint">ForgeCoins</span>' + BF.ui.coins(s.wallet.balance, { size: 17 }) + '</a><a href="#/friends" class="hh-stat"><span class="faint">Friends</span><b class="num">' + s.social.friends.length + '</b></a><a href="#/achievements" class="hh-stat"><span class="faint">Achievements</span><b class="num">' + unlocked.length + '/' + achs.length + '</b></a><a href="#/quests" class="hh-stat"><span class="faint">Quests ready</span><b class="num">' + claimable + '</b></a></div></div>' +
         '<div class="hh-daily' + (daily.canClaim ? ' ready' : '') + '"><div class="eyebrow">Daily reward</div><div class="hh-daily-amt">' + BF.coinIcon(30) + '<span class="num">' + U.fmt(daily.canClaim ? daily.nextAmount : BF.DAILY_REWARDS[(daily.currentIndex + 1) % 7]) + '</span></div><div class="faint" style="font-size:12.5px">' + (daily.canClaim ? 'Day ' + daily.nextDay + ' of your streak is ready' : 'Claimed today · ' + daily.streak + '-day streak') + '</div>' +
-        '<button class="btn ' + (daily.canClaim ? 'btn-gold' : 'btn-outline') + ' btn-sm" data-act="open-daily">' + BF.icon('gift', 15) + (daily.canClaim ? 'Claim reward' : 'View streak') + '</button></div></section>';
+        '<button class="btn ' + (daily.canClaim ? 'btn-gold' : 'btn-outline') + ' btn-sm" data-act="open-daily">' + BF.icon('gift', 15) + (daily.canClaim ? 'Claim reward' : 'View streak') + '</button></div></section>' + BF.ui.updateBanner(null, { latest: true });
 
       if (recent.length) {
         h += '<section class="section">' + BF.ui.sectionHead('Continue Playing', 'play', { href: '#/games/recent', label: 'See all' }) + '<div class="row-scroll">' + recent.slice(0, 8).map((x) => {
@@ -113,6 +113,13 @@
           const g = BF.catalog.get(x.st.gameId);
           return '<div class="fp-card" data-ctx="user" data-bot="' + x.b.id + '"><a href="#/user/' + x.b.id + '">' + BF.ui.avatarChip(x.b.avatar, { status: 'ingame', size: 'lg' }) + '</a><div class="fp-main"><a class="row-title" href="#/user/' + x.b.id + '">' + esc(x.b.displayName) + '</a><div class="row-sub">Playing <a href="#/game/' + g.id + '" class="link">' + esc(g.name) + '</a></div></div><button class="btn btn-sm btn-play" data-act="join-friend" data-bot="' + x.b.id + '">Join</button></div>';
         }).join('') + '</div>' : BF.ui.empty({ icon: 'users', title: 'None of your friends are in a game', text: 'When friends join a server they show up here so you can hop in with them.', action: { label: 'Find friends', href: '#/friends/find' } })) + '</section>';
+
+      // people you follow (who are not already friends) currently in a game
+      const followIn = BF.followers ? BF.followers.activity(20).filter((x) => !BF.friends.isFriend(x.bot.id)).slice(0, 8) : [];
+      if (followIn.length) h += '<section class="section">' + BF.ui.sectionHead('People You Follow', 'star', { href: '#/friends/following', label: 'Following' }) + '<div class="friends-playing">' + followIn.map((x) => {
+        const g = BF.catalog.get(x.status.gameId);
+        return '<div class="fp-card" data-ctx="user" data-bot="' + x.bot.id + '"><a href="#/user/' + x.bot.id + '">' + BF.ui.avatarChip(x.bot.avatar, { status: 'ingame', size: 'lg' }) + '</a><div class="fp-main"><a class="row-title" href="#/user/' + x.bot.id + '">' + esc(x.bot.displayName) + '</a><div class="row-sub">' + U.compact(BF.bots.stats(x.bot).followers) + ' followers · <a href="#/game/' + (g ? g.id : '') + '" class="link">' + esc(g ? g.name : 'a game') + '</a></div></div><button class="btn btn-sm btn-play" data-act="join-friend" data-bot="' + x.bot.id + '">Join</button></div>';
+      }).join('') + '</div></section>';
 
       const ads = BF.ui.sponsoredCards('home', 4);
       if (ads) h += '<section class="section sponsored-row">' + BF.ui.sectionHead('Sponsored', 'megaphone', { href: '#/create', label: 'Advertise your game' }) + '<div class="row-scroll">' + ads + '</div></section>';
