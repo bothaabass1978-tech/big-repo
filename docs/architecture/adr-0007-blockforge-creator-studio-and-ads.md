@@ -122,6 +122,15 @@ what a game earns.
 - **Rejection Reason**: A prepaid budget with refunds is predictable and can
   never overdraw the wallet.
 
+## Amendment 2026-09-26: Custom template and 25 passes
+
+- A sixth template, **Custom**, builds a game from scratch in the Studio
+  (30 × 18 grid, 14 tiles, a rules form). See ADR-0009.
+- The pass cap rises from 6 to 25 (`BF.creator.MAX_PASSES`), with new pass
+  effects: Sparkle Trail and Supporter.
+- Visitors to a creator's games may follow the creator, and the crowd on a
+  creator game follows its recent visits. See ADR-0008.
+
 ## Consequences
 
 ### Positive

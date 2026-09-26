@@ -199,7 +199,7 @@ async function signIn(page) {
     }
     return out;
   });
-  check('creator made and published a game from every template', made.length === 5, made.join(','));
+  check('creator made and published a game from every template', made.length === (await page.evaluate(() => Object.keys(BF.creator.TEMPLATES).length)), made.join(','));
   for (const id of made) {
     const before = page.errors.length;
     await page.evaluate((gid) => BF.play(gid), id);
@@ -233,13 +233,12 @@ async function signIn(page) {
   // Ads: launch a campaign from the Ads tab, let it run, see it in the Sponsored row
   await page.evaluate((id) => { location.hash = '#/create/' + id + '/ads'; }, obbyId);
   await page.waitForTimeout(600);
-  const balBefore = await page.evaluate(() => BF.economy.balance());
   await page.click('#ad-form button[type=submit]');
   await page.waitForTimeout(350);
   await page.click('.modal .btn-primary').catch(() => {});
   await page.waitForTimeout(500);
-  const ad = await page.evaluate((id) => { const c = BF.ads.active(id)[0]; if (!c) return null; for (let i = 0; i < 20; i++) BF.ads.simulate(4); BF.store.touch(['ads', 'created']); return { budget: c.budget, spent: c.spent, visits: c.visits, bal: BF.economy.balance() }; }, obbyId);
-  check('launching an ad campaign charges its budget and buys visits', !!ad && ad.bal === balBefore - ad.budget && ad.spent > 0 && ad.visits > 0, JSON.stringify(ad));
+  const ad = await page.evaluate((id) => { const c = BF.ads.active(id)[0]; if (!c) return null; for (let i = 0; i < 20; i++) BF.ads.simulate(4); BF.store.touch(['ads', 'created']); return { budget: c.budget, spent: c.spent, visits: c.visits, charged: -(BF.economy.history('ads')[0] || { amount: 0 }).amount }; }, obbyId);
+  check('launching an ad campaign charges its budget and buys visits', !!ad && ad.charged === ad.budget && ad.spent > 0 && ad.visits > 0, JSON.stringify(ad));
   await page.waitForTimeout(400);
   await shot(page, '07-ads');
   await page.evaluate(() => { location.hash = '#/home'; });
@@ -279,6 +278,68 @@ async function signIn(page) {
   const afterReload = await page.evaluate(() => ({ bal: BF.economy.balance(), autosave: BF.store.state.settings.data.autosave }));
   check('autosave off: a reload does not save unsaved changes', afterReload.bal === savedBal && afterReload.autosave === false, JSON.stringify(afterReload) + ' expected ' + savedBal);
   await page.evaluate(() => { BF.store.update('settings', (s) => { s.settings.data.autosave = true; }); BF.store.save('manual'); });
+
+  // ------------------------------------------------------------ live platform
+  // 3D thumbnails replace the SVG placeholders once rendered
+  await page.evaluate(() => { location.hash = '#/discover'; });
+  await page.waitForTimeout(2500);
+  const thumb3d = await page.evaluate(() => Array.from(document.querySelectorAll('img')).some((i) => /^data:image\/jpeg/.test(i.src)));
+  check('3D game thumbnails replace the placeholders', thumb3d);
+  // a limited item: serial number and falling stock
+  const ltd = await page.evaluate(() => {
+    const item = BF.limiteds.list().find((i) => !BF.limiteds.soldOut(i) && i.price <= 200000);
+    BF.economy.earn(item.price, 'e2e: limited', 'debug');
+    const left = BF.limiteds.left(item);
+    const r = BF.inventory.buy(item.id);
+    return { ok: r.ok, serial: r.serial, drop: left - BF.limiteds.left(item) };
+  });
+  check('buying a limited item gives a serial and uses up stock', ltd.ok && ltd.serial > 0 && ltd.drop === 1, JSON.stringify(ltd));
+  // a developer update arrives only when due, then shows on Home with its sale
+  const upd = await page.evaluate(() => {
+    const s = BF.store.state.updates;
+    const early = BF.updates.check(s.last ? s.last + 3600000 : Date.now());
+    s.last = BF.clock.now() - 8 * 86400000;
+    const rec = BF.updates.check();
+    const g = BF.catalog.get(rec.gameId);
+    return { early: !!early, rec: !!rec, sale: BF.passes.price(g.passes[0]) < g.passes[0].price || !BF.updates.defAt(s.seen.length - 1).sale };
+  });
+  await page.evaluate(() => { location.hash = '#/home'; });
+  await page.waitForTimeout(700);
+  const banner = await page.evaluate(() => !!document.querySelector('.update-banner'));
+  check('developer updates are spaced out and appear on Home', !upd.early && upd.rec && upd.sale && banner, JSON.stringify(upd) + ' banner ' + banner);
+  await shot(page, '04b-update-home');
+  // the followers page
+  await page.evaluate(() => { location.hash = '#/friends/followers'; });
+  await page.waitForTimeout(600);
+  check('followers page shows the follow stats', await page.evaluate(() => !!document.querySelector('.follow-stats')));
+  // a custom game built from scratch, played in 3D, with a chat order
+  const cg = await page.evaluate(() => {
+    const r = BF.creator.create({ name: 'E2E Custom World', description: 'Made from scratch.', genre: 'Adventure', maxPlayers: 8, template: 'custom', visibility: 'public', difficulty: 'normal' });
+    return r.ok ? r.game.id : null;
+  });
+  await page.evaluate((id) => { location.hash = '#/create/' + id + '/studio'; }, cg);
+  await page.waitForTimeout(700);
+  const rulesForm = await page.evaluate(() => !!document.querySelector('#studio-rules'));
+  await page.evaluate(() => { BF.store.state.settings.gameplay.botAI = 'local'; });
+  await page.evaluate((id) => BF.play(id), cg);
+  await page.waitForTimeout(3000);
+  await page.evaluate(() => { const b = document.querySelector('[data-gact=start]'); if (b) b.click(); });
+  await page.waitForTimeout(800);
+  await page.waitForFunction(() => { const s = BF.runtime.session(); return s && s.all.length > 0; }, null, { timeout: 15000 }).catch(() => {});
+  const cgs = await page.evaluate(() => { const s = BF.runtime.session(); return { three: !!(s && s.use3d), bots: s ? s.all.length : 0, name: s && s.all[0] ? s.all[0].displayName.split(' ')[0] : '' }; });
+  let ordered = false;
+  if (cgs.bots) {
+    await page.keyboard.press('Enter');
+    await page.keyboard.type(cgs.name + ' follow me');
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(3500);
+    ordered = await page.evaluate(() => { const s = BF.runtime.session(); return !!s && (s.orders.size > 0 || Array.from(document.querySelectorAll('#gr-chat-log .gr-msg')).some((e) => /follow|behind|lead|busy|later|thing|coming/i.test(e.textContent))); });
+  }
+  check('a custom game has a rules form and plays in 3D', rulesForm && cgs.three, JSON.stringify(cgs));
+  check('a bot answers an order typed in chat', ordered, JSON.stringify(cgs));
+  await shot(page, '04c-custom-game');
+  await page.evaluate(() => BF.runtime.leave());
+  await page.waitForTimeout(600);
 
   // ------------------------------------------------------------ mobile
   const phone = await newPage(browser, { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });

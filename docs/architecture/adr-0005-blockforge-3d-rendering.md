@@ -188,6 +188,24 @@ Added after player feedback that models clipped through each other.
 |------------|-------------|--------------------------|
 | Product brief (BlockForge) | "make all the games and avatars 3d" | 3D views for all 20 modules, 3D avatar rigs everywhere |
 
+## Amendment 2026-09-26: 3D thumbnails and the mansion rebuild
+
+- **Game thumbnails** are now rendered in 3D by `engine/thumbs3d.js`
+  (`BF.thumb3d`). There is one staged scene per game id (custom games use their
+  template's scene), with the title drawn on the canvas at no more than 72% of
+  the width so it stays clear of the Play button. Renders are 640 × 360 JPEGs
+  cached in memory and in localStorage (`bf.thumb3d.<key>`, versioned).
+  `BF.thumbs.url()` returns the cached render when there is one, otherwise it
+  returns the SVG and queues a render; once the render is ready, visible
+  `<img>` elements are swapped in place. `g3d.World` accepts
+  `opts.renderer` so the thumbnail renderer can reuse one offscreen WebGL
+  context.
+- **Mystery Mansion rooms** are rebuilt from a set-dressing kit (panelled
+  walls, framed paintings, sconces, rugs, windows, real doors, furniture). All
+  puzzle positions (furnace dials, anvil, display case) are unchanged, so
+  ADR-0004's secret still works.
+- `World.boxes` instances accept per-instance `rx` and `rz` rotation.
+
 ## Performance Implications
 
 - **CPU**: about 3 ms of JS per frame in the busiest games.

@@ -32,15 +32,17 @@ online and fall back to system fonts when you are not.
 | Area | Highlights |
 |---|---|
 | **Home / Discover / Games** | Continue playing, friends' activity, recommendations, 14 genre categories, sorting, favourites, likes and dislikes, live player counts |
-| **Game pages** | Description, how to play, server browser (join a specific server), game store with 41 game passes and 9 products, 54 game badges, per-game leaderboards |
-| **Avatar Shop** | 116 items in 17 categories across 6 rarities (common → mythic), bundles, a limited one-per-account collectible, "Purchase successful!" and "Not enough ForgeCoins." flows |
+| **Game pages** | Description, how to play, server browser (join a specific server), game store with 101 game passes (at least 5 per game) and 9 products, 54 game badges, per-game leaderboards |
+| **Avatar Shop** | 133 items in 17 categories across 8 rarities (common → mythic, then exotic and divine), bundles, **Limited Drops** with fixed stock, serial numbers and a resale market (up to 5,000,000 ForgeCoins), two ultra-rare free finds (1 in 4,000 and 1 in 20,000 finished games), "Purchase successful!" and "Not enough ForgeCoins." flows |
 | **Inventory / Avatar** | Wear, favourite and sell items (40% back), a 14-slot avatar editor with skin tones, randomize and reset |
 | **Wallet** | Live balance in the header (click it to open the Wallet) and a full ledger with categories and filters |
 | **Progress** | Daily rewards 50 → 75 → 100 → 150 → 200 → 300 → 500 over a 7-day streak; 32 quests (5 daily and 4 weekly slots); 35 achievements; 6 platform badges; levels with ForgeCoin level-up rewards |
 | **3D** | Every game and every avatar renders in 3D (three.js, vendored). The avatar editor and profiles have a live, drag-to-spin viewer. Settings → Gameplay → Graphics: Auto, High, Low or Classic 2D |
-| **Social** | 2,000 fictional bots (60 handcrafted) with ten personalities: competitive, friendly, explorer, collector, chaotic, beginner, builder, speedrunner, roleplayer and helper. Friends, requests, follows, blocking, messages, game invites, and fuller servers that bots join and leave |
+| **Social** | 2,000 fictional bots (60 handcrafted) with ten personalities: competitive, friendly, explorer, collector, chaotic, beginner, builder, speedrunner, roleplayer and helper. Friends, requests, **followers** (people follow you as you level up, win and publish games, with milestone rewards), blocking, messages, game invites. The platform runs at real scale: about 16 million online, top games over a million players across tens of thousands of servers |
 | **Bot chat** | Bots understand and answer whatever you type, in DMs and in game chat: questions, maths, jokes and riddles, game facts with live player counts, opinions, invites ("wanna play Sky Obby?" and they meet you there) and friend requests. They remember your name and what you like, and they keep chat safe (no personal info, "free coins" scams called out). In the claude.ai viewer, bots can word their replies with Claude (Settings → Bot replies) |
-| **Create** | Build games from 5 templates (Arena, Racing, Obby, Simulator, Tower Defense). Hand-build Obby, Tower Defense and Arena levels in the **Studio** tile editor, add passes, publish, run **ad campaigns** (Standard / Boosted / Premium, Home, Discover and Search placements, prepaid budget with refunds), and follow earnings from visits and pass sales on per-minute charts with **Collect all** |
+| **Bot orders** | Tell bots what to do in game chat and they do it: "Poppy follow me", "everyone dance", "stay here", "help me", "fight me", "build a tower", "pass me the ball". Each game supports the orders that make sense there; friendly bots and friends say yes more often |
+| **Updates** | The studios behind the games ship an update now and then, never often: the first a day after you start, then one every 4 to 7 days. Each brings patch notes in the game's update log and a three-day event (bonus XP, a bigger crowd, a pass sale) and some bring a new limited item |
+| **Create** | Build games from 6 templates (Arena, Racing, Obby, Simulator, Tower Defense, and **Custom** from scratch). Hand-build Obby, Tower Defense, Arena and Custom levels in the **Studio** tile editor. Custom games have 14 tiles (walls, coins, gems, lava, spikes, enemies, keys and doors, pads, checkpoints, a goal) and their own rules (goal, timer, lives, speeds, theme, bots). Add up to 25 passes, publish, run **ad campaigns** (Standard / Boosted / Premium, Home, Discover and Search placements, prepaid budget with refunds), and follow earnings from visits and pass sales on per-minute charts with **Collect all** |
 | **Search** | Games, items and players, with autocomplete (press `/`) |
 | **Settings** | Account, privacy, notifications, appearance (theme, accent, density, reduced motion, font size), gameplay (volume, touch controls, FPS counter, graphics, bot chat, bot replies), and data (autosave, save now, export or import JSON, reset). Developer tools are hidden: tap the build number 5 times |
 
@@ -106,12 +108,13 @@ node --test 'tests/blockforge/unit/*_test.js'
 
 # end-to-end smoke test in Chromium: all routes, shop, all 20 games in 3D and
 # Classic 2D, bot chat, creator templates, Studio, ads and earnings, save
-# round-trip, autosave-off reload and a phone viewport
+# round-trip, autosave-off reload, 3D thumbnails, limited items, developer
+# updates, followers, a custom game with a chat order, and a phone viewport
 npm i -D playwright   # once, if Playwright is not installed globally
 node tests/blockforge/e2e/platform_smoke_e2e_test.js --shots /tmp/blockforge-shots
 ```
 
-Current status: 81 unit tests and 77 end-to-end checks, all passing.
+Current status: 96 unit tests and 84 end-to-end checks, all passing.
 
 ## Code layout
 
@@ -122,15 +125,16 @@ src/blockforge/
 ├── css/                base · components · pages · game
 └── js/
     ├── core/           util, event bus + clock, storage adapter, synthesized sfx, icons, store + accounts
-    ├── data/           items, games (passes, badges, products), quests/achievements, bots, thumbnails
+    ├── data/           items, games (passes, badges, products), quests/achievements, bots, thumbnails, developer updates
     ├── systems/        economy, meta (quests, badges, achievements, notifications), inventory,
     │                   avatar, social, world (servers, catalog, leaderboards, search), creator,
-    │                   studio (level layouts), ads (campaigns), secrets, chat (bot conversation), ai (Claude wording)
+    │                   studio (level layouts), ads (campaigns), secrets, chat (bot conversation), ai (Claude wording),
+    │                   followers, limiteds (stock, serials, resale), updates (developer updates), orders (bot orders)
     ├── ui/             components, router, shell, actions, terminal
     ├── pages/          one file per area (home, discover, game, items, social, create, studio, profile, settings, progress)
-    ├── engine/         input, gfx (particles, camera), g3d (3D world kit), avatar3d (rigs + thumbnails),
+    ├── engine/         input, gfx (particles, camera), g3d (3D world kit), avatar3d (rigs + thumbnails), thumbs3d (3D game thumbnails),
     │                   props3d (merged pets, cars, zombies, ships), phys, runtime (game sessions)
-    ├── games/          the 20 game modules (2D simulation + 3D view)
+    ├── games/          the 20 game modules plus the Custom template (2D simulation + 3D view)
     └── main.js         boot
 ```
 
@@ -143,6 +147,8 @@ Design decisions are recorded in `docs/architecture/`:
 - [ADR-0005 3D rendering for games and avatars](../../docs/architecture/adr-0005-blockforge-3d-rendering.md)
 - [ADR-0006 Bot conversation engine and optional Claude wording](../../docs/architecture/adr-0006-blockforge-bot-conversation-engine.md)
 - [ADR-0007 Creator Studio, advertising and earnings](../../docs/architecture/adr-0007-blockforge-creator-studio-and-ads.md)
+- [ADR-0008 Live platform: followers, scale, limited items and developer updates](../../docs/architecture/adr-0008-blockforge-live-platform.md)
+- [ADR-0009 Bot orders and custom games](../../docs/architecture/adr-0009-blockforge-bot-orders-and-custom-games.md)
 
 To **add a game**, register a module with `BF.GameModules.register(type, {...})`
 in a new `js/games/*.js` file (see ADR-0003). Add `three: true` with a

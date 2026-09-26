@@ -15,11 +15,11 @@ const ROOT = path.resolve(__dirname, '../../../src/blockforge');
 /** Scripts needed for headless system tests, in index.html order. */
 const SYSTEM_SCRIPTS = [
   'js/core/util.js', 'js/core/bus.js', 'js/core/storage.js', 'js/core/sfx.js', 'js/core/icons.js',
-  'js/data/items.js', 'js/data/games.js', 'js/data/progression.js', 'js/data/bots.js', 'js/data/thumbs.js',
+  'js/data/items.js', 'js/data/games.js', 'js/data/progression.js', 'js/data/bots.js', 'js/data/thumbs.js', 'js/data/updates.js',
   'js/core/store.js',
   'js/systems/bots.js', 'js/systems/avatar.js', 'js/systems/economy.js', 'js/systems/meta.js',
-  'js/systems/inventory.js', 'js/systems/social.js', 'js/systems/world.js', 'js/systems/creator.js', 'js/systems/studio.js', 'js/systems/ads.js', 'js/systems/secrets.js',
-  'js/systems/chat.js', 'js/systems/ai.js',
+  'js/systems/inventory.js', 'js/systems/limiteds.js', 'js/systems/updates.js', 'js/systems/social.js', 'js/systems/followers.js', 'js/systems/world.js', 'js/systems/creator.js', 'js/systems/studio.js', 'js/systems/ads.js', 'js/systems/secrets.js',
+  'js/systems/chat.js', 'js/systems/ai.js', 'js/systems/orders.js',
 ];
 
 function memoryStorage(seed) {
