@@ -361,15 +361,21 @@
     /** data: URL for an <img>, cached. Accepts a game object or id. */
     url(game) {
       if (!game) return '';
-      if (typeof game === 'string') game = { id: game };
+      if (typeof game === 'string') game = (BF.catalog && BF.catalog.get(game)) || { id: game };
       if (game.thumbnail && game.thumbnail.type === 'image') return game.thumbnail.data;
+      // a rendered 3D key-art thumbnail when one is ready; otherwise the SVG art now and the render later
+      if (BF.thumb3d && game.name) {
+        const r = BF.thumb3d.get(game);
+        if (r) return r;
+      }
       const key = game.thumbnail ? JSON.stringify(game.thumbnail) + (game.template || '') : game.id;
-      if (cache.has(key)) return cache.get(key);
+      if (cache.has(key)) { if (BF.thumb3d && game.name) BF.thumb3d.request(game, cache.get(key)); return cache.get(key); }
       const src = game.thumbnail && game.thumbnail.type === 'preset'
         ? templateArt(game.template || 'arena', game.thumbnail.color, game.thumbnail.pattern)
         : BF.thumbs.svg(game.id);
       const url = U.svgData(src);
       cache.set(key, url);
+      if (BF.thumb3d && game.name) BF.thumb3d.request(game, url);
       return url;
     },
     template: templateArt,

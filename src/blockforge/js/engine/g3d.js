@@ -248,7 +248,8 @@
   function World(opts) {
     opts = opts || {};
     this.q = quality();
-    this.renderer = renderer();
+    // a World can draw into its own renderer (thumbnails) instead of the shared game one
+    this.renderer = opts.renderer || renderer();
     this.canvas = this.renderer.domElement;
     this.W = opts.W || 960;
     this.H = opts.H || 540;

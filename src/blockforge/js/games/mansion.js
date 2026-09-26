@@ -42,6 +42,7 @@
   const BOOK_ORDER = [0, 1, 2, 3]; // crimson, sea (blue), eldest (1871 brown), tree (green)
 
   BF.GameModules.register('mansion', {
+    orders: ['follow', 'come', 'stay', 'leave', 'help'],
     three: true,
     maxBots: 3,
     feedTop: 0.13,
@@ -60,6 +61,8 @@
       const floats = V ? V.floaters2d(0, (x, y) => toWall(x, y)) : new BF.Floaters();
       const d = ctx.data;
       d.beetles = d.beetles || [];
+      // Pocket Watch pass: three extra minutes before midnight
+      const limit = T.limit + (ctx.hasPass('pocketwatch') ? 180 : 0);
       const lantern = ctx.hasPass('lantern');
       const hints = ctx.hasPass('hints');
       const secrets = BF.secrets;
@@ -301,7 +304,8 @@
         });
       }
 
-      function hint() {
+      function hint() { say(nextHint(), 'Hint journal'); }
+      function nextHint() {
         const steps = [
           [!hasClue('letter'), 'The portrait in the foyer hangs a little crooked.'],
           [!st.flags.power, 'The fuse box in the kitchen controls the cellar lights. Each switch flips its neighbours too.'],
@@ -312,7 +316,7 @@
           [d.beetles.length >= 5 && !st.flags.drawerOpen && st.flags.safeOpen, 'All five beetles are home. Try the signet ring on the display case in the study.'],
           [true, 'Go to the parlor and name the culprit. The letter, the scarf and the ticket all point one way.'],
         ];
-        say(steps.find((s) => s[0])[1], 'Hint journal');
+        return steps.find((x) => x[0])[1];
       }
 
       // ------------------------------------------------------------------ UI
@@ -508,7 +512,112 @@
         const P = (x, y, w, h, d, color, o) => V.box(x + w / 2, FLOOR - y - h, (o && o.z != null ? o.z : 0) + d / 2, w, h, d, color, Object.assign({ parent: roomG }, o));
         const wallTex = (key, base, stripe) => BF.g3d.canvasTex('mm-wall:' + key, 128, 128, (g2, w, h) => { g2.fillStyle = base; g2.fillRect(0, 0, w, h); g2.fillStyle = stripe; for (let x = 0; x < w; x += 32) g2.fillRect(x, 0, 14, h); g2.fillStyle = 'rgba(255,255,255,.05)'; for (let y = 8; y < h; y += 32) for (let x = 8; x < w; x += 32) { g2.beginPath(); g2.arc(x + 12, y + 8, 4, 0, Math.PI * 2); g2.fill(); } }, { repeat: [960 / 128 * 1.5, 360 / 128 * 1.5] });
         const floorTex = (key, base) => BF.g3d.canvasTex('mm-floor:' + key, 128, 128, (g2, w, h) => { g2.fillStyle = base; g2.fillRect(0, 0, w, h); g2.fillStyle = 'rgba(0,0,0,.2)'; for (let y = 0; y < h; y += 16) g2.fillRect(0, y, w, 2); for (let y = 0; y < h; y += 16) g2.fillRect(((y * 37) % 90) + 20, y, 2, 16); }, { repeat: [12, 6] });
-        const doorAt = (x, y, w, h, color) => { P(x - 6, y - 6, w + 12, h + 6, 6, '#2a1a10'); P(x, y, w, h, 8, color || '#3a2418'); P(x + w - 18, y + h * 0.55, 6, 6, 12, '#b8860b', { metal: 0.6 }); };
+        // ------------------------------------------------ set dressing kit
+        // Wall-mounted pieces use P() (screen rectangle on the back wall, depth outward).
+        // Floor pieces use atS() so they stand where the 2D art had them.
+        const atS = (sx, z) => 480 + (sx - 480) * (CAM_D - z) / CAM_D;
+        const light = (x, y, z, color, power, dist) => { const l = new THREE.PointLight(color, power, dist || 700, 1); l.position.set(x, y, z); roomG.add(l); return l; };
+        const tex = (key, w, h, fn, opts) => BF.g3d.canvasTex('mm-' + key, w, h, fn, opts);
+        const painting = (kind) => tex('paint:' + kind, 128, 160, (g2, w, h) => {
+          const sky = g2.createLinearGradient(0, 0, 0, h);
+          if (kind === 'ashcombe' || kind === 'lady') {
+            sky.addColorStop(0, kind === 'lady' ? '#3a2a4a' : '#2a3a2a'); sky.addColorStop(1, '#0e120e');
+            g2.fillStyle = sky; g2.fillRect(0, 0, w, h);
+            const lady = kind === 'lady';
+            g2.fillStyle = lady ? '#6a2a5a' : '#15151c'; g2.beginPath(); g2.moveTo(14, h); g2.quadraticCurveTo(20, 100, 64, 96); g2.quadraticCurveTo(108, 100, 114, h); g2.fill();
+            g2.fillStyle = lady ? '#f4ecd0' : '#e8e2d0'; g2.beginPath(); g2.moveTo(52, 98); g2.lineTo(64, 122); g2.lineTo(76, 98); g2.fill();
+            g2.fillStyle = '#e0ac69'; g2.fillRect(44, 44, 40, 50);
+            if (lady) { g2.fillStyle = '#5a2a1a'; g2.fillRect(38, 34, 52, 16); g2.fillRect(36, 40, 10, 50); g2.fillRect(82, 40, 10, 50); }
+            else { g2.fillStyle = '#b9b3a6'; g2.fillRect(40, 48, 8, 34); g2.fillRect(80, 48, 8, 34); g2.fillRect(46, 40, 36, 6); g2.fillStyle = '#1b1b22'; g2.fillRect(40, 18, 48, 24); g2.fillRect(34, 38, 60, 5); }
+            g2.fillStyle = '#1b1b22'; g2.fillRect(52, 60, 7, 4); g2.fillRect(69, 60, 7, 4);
+            g2.fillStyle = lady ? '#a0304a' : '#6b3a2a'; g2.fillRect(56, 80, 16, 3);
+            if (!lady) { g2.fillStyle = '#c9a227'; g2.beginPath(); g2.arc(64, 130, 6, 0, Math.PI * 2); g2.fill(); }
+          } else if (kind === 'sea') {
+            sky.addColorStop(0, '#1d2a4a'); sky.addColorStop(0.55, '#e8a060'); sky.addColorStop(0.56, '#2a4a6a'); sky.addColorStop(1, '#10203a');
+            g2.fillStyle = sky; g2.fillRect(0, 0, w, h);
+            g2.fillStyle = '#ffd08a'; g2.beginPath(); g2.arc(88, 84, 12, 0, Math.PI * 2); g2.fill();
+            g2.fillStyle = '#2a1a10'; g2.fillRect(30, 96, 44, 10); g2.fillRect(50, 50, 3, 46);
+            g2.fillStyle = '#f4ecd0'; g2.beginPath(); g2.moveTo(53, 52); g2.lineTo(74, 88); g2.lineTo(53, 88); g2.fill(); g2.beginPath(); g2.moveTo(50, 58); g2.lineTo(32, 88); g2.lineTo(50, 88); g2.fill();
+            g2.strokeStyle = 'rgba(255,255,255,.25)'; for (let y = 104; y < h; y += 9) { g2.beginPath(); g2.moveTo(0, y); g2.lineTo(w, y + 3); g2.stroke(); }
+          } else {
+            sky.addColorStop(0, '#0f1a33'); sky.addColorStop(1, '#3a4a6a');
+            g2.fillStyle = sky; g2.fillRect(0, 0, w, h);
+            g2.fillStyle = '#f4f1ea'; g2.beginPath(); g2.arc(92, 36, 12, 0, Math.PI * 2); g2.fill();
+            g2.fillStyle = '#2f5a3a'; g2.beginPath(); g2.moveTo(0, 120); g2.quadraticCurveTo(50, 80, 128, 110); g2.lineTo(128, h); g2.lineTo(0, h); g2.fill();
+            g2.fillStyle = '#1b1b22'; g2.fillRect(46, 82, 36, 26); g2.beginPath(); g2.moveTo(42, 84); g2.lineTo(64, 66); g2.lineTo(86, 84); g2.fill();
+            g2.fillStyle = '#ffd66b'; g2.fillRect(52, 90, 5, 6); g2.fillRect(70, 90, 5, 6);
+          }
+          g2.strokeStyle = 'rgba(0,0,0,.35)'; g2.lineWidth = 6; g2.strokeRect(0, 0, w, h);
+        });
+        const rugTex = (c1, c2) => tex('rug:' + c1 + c2, 256, 128, (g2, w, h) => {
+          g2.fillStyle = c1; g2.fillRect(0, 0, w, h);
+          g2.strokeStyle = c2; g2.lineWidth = 6; g2.strokeRect(10, 10, w - 20, h - 20); g2.lineWidth = 2; g2.strokeRect(20, 20, w - 40, h - 40);
+          g2.fillStyle = c2; g2.beginPath(); g2.moveTo(w / 2, 30); g2.lineTo(w / 2 + 60, h / 2); g2.lineTo(w / 2, h - 30); g2.lineTo(w / 2 - 60, h / 2); g2.fill();
+          g2.fillStyle = c1; g2.beginPath(); g2.moveTo(w / 2, 46); g2.lineTo(w / 2 + 38, h / 2); g2.lineTo(w / 2, h - 46); g2.lineTo(w / 2 - 38, h / 2); g2.fill();
+          g2.fillStyle = c2; for (let x = 30; x < w - 20; x += 22) { g2.fillRect(x, 26, 6, 6); g2.fillRect(x, h - 32, 6, 6); }
+          g2.fillStyle = 'rgba(255,255,255,.08)'; for (let i = 0; i < 400; i++) g2.fillRect((i * 37) % w, (i * 53) % h, 1, 1);
+        });
+        const brickTex = (base) => tex('brick:' + base, 128, 128, (g2, w, h) => {
+          g2.fillStyle = U.shade(base, -0.35); g2.fillRect(0, 0, w, h);
+          for (let r = 0; r < 8; r++) for (let c = -1; c < 4; c++) { g2.fillStyle = U.shade(base, ((r * 7 + c * 3) % 5) * 0.03 - 0.05); g2.fillRect(c * 32 + (r % 2 ? 16 : 0) + 2, r * 16 + 2, 28, 12); }
+        }, { repeat: [8, 3] });
+        const tileTex = (a, b) => tex('tile:' + a + b, 64, 64, (g2, w, h) => {
+          for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) { g2.fillStyle = (x + y) % 2 ? a : b; g2.fillRect(x * 16, y * 16, 16, 16); }
+          g2.strokeStyle = 'rgba(0,0,0,.15)'; for (let i = 0; i <= 4; i++) { g2.strokeRect(0, i * 16, w, 0.5); g2.strokeRect(i * 16, 0, 0.5, h); }
+        }, { repeat: [10, 2] });
+        const woodC = '#5a3a22', darkWood = '#3a2414', brass = '#c9a227';
+        const panelWall = (base) => {
+          // wainscot with raised panels, a chair rail and crown moulding
+          P(-240, 250, 1440, 110, 3, U.shade(base, -0.45));
+          for (let x = -220; x < 1180; x += 90) { P(x, 264, 72, 80, 5, U.shade(base, -0.38)); P(x + 6, 270, 60, 68, 6, U.shade(base, -0.42)); }
+          P(-240, 244, 1440, 8, 8, U.shade(base, -0.2));
+          P(-240, 0, 1440, 12, 10, U.shade(base, -0.3)); P(-240, 12, 1440, 5, 6, U.shade(base, 0.1));
+        };
+        const frame = (x, y, w, h, kind) => { P(x - 10, y - 10, w + 20, h + 20, 6, brass, { metal: 0.6, rough: 0.35 }); P(x - 4, y - 4, w + 8, h + 8, 7, U.shade(brass, -0.3), { metal: 0.5 }); const c = P(x, y, w, h, 8, '#ffffff', { map: painting(kind) }); return c; };
+        const sconce = (x, y) => { P(x - 6, y, 12, 26, 6, brass, { metal: 0.6 }); P(x - 10, y + 16, 20, 5, 16, brass, { metal: 0.6 }); const f = V.shape('cone', x, FLOOR - y - 8, 13, 5, 12, 5, '#ffd66b', { parent: roomG, glow: 1.6, shadow: false }); glowParts.push(f); f.userData.candle = true; P(x - 3, y + 2, 6, 14, 14, '#f4ecd0'); };
+        const lamp = (sx, z, shade) => {
+          const x = atS(sx, z);
+          V.shape('cyl', x, 3, z, 34, 6, 34, darkWood, { parent: roomG }); V.shape('cylLo', x, 60, z, 4, 114, 4, brass, { parent: roomG, metal: 0.6 });
+          const s = V.shape('cone', x, 128, z, 40, 30, 40, shade || '#f4d7a0', { parent: roomG, glow: 0.7 }); s.rotation.x = 0;
+          light(x, 120, z + 10, '#ffcf8a', 90, 520);
+        };
+        const armchair = (sx, z, color, rot) => {
+          const g = V.group(roomG); g.position.set(atS(sx, z), 0, z); g.rotation.y = rot || 0;
+          V.box(0, 0, 0, 56, 26, 50, U.shade(color, -0.3), { parent: g }); V.box(0, 26, 4, 50, 10, 44, color, { parent: g });
+          V.box(0, 26, -22, 56, 48, 10, color, { parent: g }); V.box(0, 72, -22, 60, 8, 12, U.shade(color, 0.1), { parent: g });
+          for (const sd of [-1, 1]) { V.box(sd * 26, 26, 0, 8, 22, 50, U.shade(color, -0.1), { parent: g }); V.box(sd * 26, 0, 20, 6, 6, 6, darkWood, { parent: g }); }
+          return g;
+        };
+        const table = (sx, z, w, d, h, color) => {
+          const x = atS(sx, z);
+          V.box(x, h - 5, z, w, 5, d, color, { parent: roomG });
+          for (const [ox, oz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) V.box(x + ox * (w / 2 - 5), 0, z + oz * (d / 2 - 5), 5, h - 5, 5, U.shade(color, -0.2), { parent: roomG });
+          return x;
+        };
+        const plant = (sx, z, s) => {
+          const x = atS(sx, z); s = s || 1;
+          V.shape('cyl', x, 12 * s, z, 22 * s, 24 * s, 22 * s, '#8a4a2a', { parent: roomG });
+          for (let i = 0; i < 6; i++) { const a = i * 1.05; const l = V.shape('sphere', x + Math.cos(a) * 9 * s, 34 * s + (i % 2) * 8 * s, z + Math.sin(a) * 9 * s, 20 * s, 16 * s, 20 * s, i % 2 ? '#2f8f47' : '#3aa656', { parent: roomG }); l.castShadow = true; }
+        };
+        const windowAt = (x, y, w, h) => {
+          P(x - 12, y - 12, w + 24, h + 24, 6, '#e8e2d0'); P(x, y, w, h, 7, '#0e1a33', { basic: true });
+          const moon = V.shape('sphere', x + w * 0.7, FLOOR - y - h * 0.3, 8, 26, 26, 4, '#f4f1ea', { parent: roomG, basic: true }); moon.castShadow = false;
+          P(x + w / 2 - 3, y, 6, h, 10, '#e8e2d0'); P(x, y + h / 2 - 3, w, 6, 10, '#e8e2d0');
+          P(x - 16, y + h + 4, w + 32, 8, 18, '#e8e2d0');
+          for (const sd of [0, 1]) P(sd ? x + w - 10 : x - 34, y - 20, 44, h + 50, 14, '#7a1e2e');
+          P(x - 40, y - 26, w + 80, 8, 16, brass, { metal: 0.5 });
+        };
+        // a proper panelled door with casing, knob and hinges
+        const doorAt = (x, y, w, h, color, open) => {
+          P(x - 10, y - 10, w + 20, h + 10, 6, '#e8e2d0'); P(x - 14, y - 16, w + 28, 8, 9, '#e8e2d0');
+          if (open) { P(x, y, w, h, 9, '#07060a', { basic: true }); return; }
+          const c = color || '#4a2c1a';
+          P(x, y, w, h, 8, c);
+          for (const [py, ph] of [[0.08, 0.36], [0.52, 0.4]]) for (const px of [0.12, 0.54]) P(x + w * px, y + h * py, w * 0.34, h * ph, 10, U.shade(c, 0.08));
+          V.shape('sphere', x + w - 16, FLOOR - y - h * 0.52, 12, 9, 9, 9, brass, { parent: roomG, metal: 0.7, rough: 0.3 });
+          for (const hy of [0.15, 0.8]) P(x + 2, y + h * hy, 5, 12, 10, brass, { metal: 0.6 });
+        };
+        const rug = (c1, c2, x0, z0, x1, z1) => { const r = V.ground(x0, z0, x1, z1, '#ffffff', { parent: roomG, y: 0.6, map: rugTex(c1, c2) }); r.receiveShadow = true; return r; };
 
         function build() {
           const R = st.room, room = ROOMS[R];
@@ -521,62 +630,120 @@
           V.preset(outdoor ? 'night' : R === 'cellar' ? 'cave' : 'indoor', { fogNear: 2400, fogFar: 5000 });
           V.shadowSize(600);
           V.focus(480, 100);
-          // back wall, floor, baseboard
           if (outdoor) {
-            V.box(480, -1, -400, 3000, 1400, 2, '#1a2a4a', { parent: roomG, basic: true });
+            V.box(480, -1, -400, 3000, 1400, 2, '#101a33', { parent: roomG, basic: true });
             const moon = V.shape('sphere', 840, FLOOR - 70, -300, 60, 60, 60, '#f4f1ea', { parent: roomG, basic: true });
             moon.position.set(480 + (840 - 480) * (CAM_D + 300) / CAM_D, 90 + (FLOOR - 70 - 90) * (CAM_D + 300) / CAM_D, -300);
+            const r = U.rng('mm-stars'), stars = [];
+            for (let i = 0; i < 70; i++) stars.push({ x: -300 + r() * 1600, y: 200 + r() * 700, z: -390, w: 3, h: 3, d: 1, color: '#ffffff' });
+            V.boxes(stars, { parent: roomG, basic: true, shadow: false });
             const hedge = [];
             for (let x = -200; x < 1200; x += 60) hedge.push({ x, y: 0, z: -40, w: 70, h: 70 + ((x * 7) % 30), d: 60, color: '#1f4a2a' });
             V.boxes(hedge, { parent: roomG, geo: 'sphereLo' });
+            // the manor's back wall on the right, with the kitchen door in it
+            P(740, 60, 460, 300, 30, '#4a3a3a', { map: brickTex('#6a4a3a') });
+            P(730, 44, 480, 18, 40, '#2a2226');
+          } else if (R === 'cellar') {
+            V.box(480, 0, -10, 1600, FLOOR + 400, 20, '#ffffff', { parent: roomG, map: brickTex('#5a4a44') });
           } else {
             V.box(480, 0, -10, 1600, FLOOR + 400, 20, '#ffffff', { parent: roomG, map: wallTex(R, room.wall, U.shade(room.wall, 0.06)) });
-            V.box(480, 0, 1, 1600, 50, 4, U.shade(room.wall, -0.3), { parent: roomG });
-            V.box(480, 50, 3, 1600, 4, 4, U.shade(room.wall, 0.2), { parent: roomG, shadow: false });
+            panelWall(room.wall);
           }
-          V.ground(-600, 0, 1560, 700, '#ffffff', { parent: roomG, map: outdoor ? BF.g3d.gridTex('#2a4a2a', 'rgba(0,0,0,0)', 1, { repeat: [16, 8], noise: true }) : floorTex(R, room.floor) });
-          if (!outdoor && R !== 'cellar') { const rug = V.ground(300, 160, 660, 330, U.shade(room.wall, 0.15), { parent: roomG, y: 0.5 }); rug.receiveShadow = true; }
-          // doors
-          for (const sp of room.spots) if (sp.door && !(R === 'foyer' && (sp.id === 'toUpper' || sp.id === 'toCellar')) && !(R === 'upper' && sp.id === 'toFoyer') && !(R === 'cellar' && sp.id === 'toFoyer')) doorAt(sp.x, sp.y, sp.w, sp.h);
+          V.ground(-600, 0, 1560, 700, '#ffffff', { parent: roomG, map: outdoor ? BF.g3d.gridTex('#2a4a2a', 'rgba(0,0,0,0)', 1, { repeat: [16, 8], noise: true }) : R === 'kitchen' ? tileTex('#d7dde6', '#39414f') : floorTex(R, room.floor) });
+          // doors (the foyer stairs, upper-hall stair gap and cellar stairs are built with their rooms)
+          for (const sp of room.spots) if (sp.door && !(R === 'foyer' && (sp.id === 'toUpper' || sp.id === 'toCellar')) && !(R === 'upper' && sp.id === 'toFoyer') && !(R === 'cellar' && sp.id === 'toFoyer')) doorAt(sp.x, sp.y, sp.w, sp.h, R === 'kitchen' && sp.id === 'toGarden' ? '#5a4030' : null);
+          if (!outdoor) light(480, 300, 320, R === 'cellar' ? '#ffb070' : '#ffe0b0', R === 'cellar' ? (powered() ? 70 : 0) : 60, 900);
+
           if (R === 'foyer') {
-            P(395, 75, 160, 190, 8, '#b8860b', { metal: 0.5, rough: 0.35, rot: st.flags.portraitMoved ? 0.06 : 0 });
-            P(405, 85, 140, 170, 10, '#3a2a1e');
-            P(440, 185, 70, 60, 12, '#1f2a44'); V.shape('sphere', 475, FLOOR - 150, 12, 56, 64, 12, '#e0ac69', { parent: roomG }); P(452, 118, 46, 16, 14, '#6b6b6b');
-            P(130, 110, 70, 250, 40, '#5a3a2a'); V.shape('cyl', 165, FLOOR - 160, 41, 44, 2, 44, '#f4f1ea', { parent: roomG }).rotation.x = Math.PI / 2;
-            P(163, 142, 3, 18, 44, '#1b1b22'); P(165, 160, 8, 3, 44, '#1b1b22');
-            P(140, 230, 50, 110, 42, '#3a2418');
-            V.shape('cyl', 263, FLOOR - 325, 25, 46, 70, 46, '#2a2f3a', { parent: roomG });
-            for (const [x, c] of [[252, '#8b5a2b'], [272, '#c0392b']]) { const u = V.shape('cyl', x, FLOOR - 270, 25, 4, 60, 4, c, { parent: roomG }); u.rotation.z = x < 262 ? 0.15 : -0.2; }
-            for (let i = 0; i < 8; i++) P(660 + i * 20, 180 - i * 16, 160 - i * 20, 14, 70 - i * 6, '#6a4a2a');
-            P(660, 196, 160, 164, 20, '#5a3a22');
-            P(700, 260, 90, 100, 24, '#2a1e18'); V.shape('sphere', 775, FLOOR - 312, 25, 8, 8, 6, '#b8860b', { parent: roomG, metal: 0.6 });
-            for (let i = 0; i < 4; i++) V.shape('sphere', 598 + (i % 2) * 22, FLOOR - (180 + Math.floor(i / 2) * 22), 6, 10, 10, 10, '#b8860b', { parent: roomG, metal: 0.6 });
-            V.shape('cyl', 480, FLOOR - 10, 120, 8, 20, 8, '#b8860b', { parent: roomG });
+            rug('#7a1e2e', '#c9a227', 150, 170, 810, 330);
+            // portrait of Lord Ashcombe (the frame hangs crooked once moved)
+            const g = V.group(roomG); g.position.set(475, FLOOR - 170, 0); g.rotation.z = st.flags.portraitMoved ? 0.07 : 0;
+            V.box(0, -100, 0, 170, 200, 6, brass, { parent: g, metal: 0.6, rough: 0.35 }); V.box(0, -94, 2, 158, 188, 6, U.shade(brass, -0.3), { parent: g, metal: 0.5 });
+            V.box(0, -88, 4, 146, 176, 6, '#ffffff', { parent: g, map: painting('ashcombe') });
+            if (st.flags.portraitMoved) P(430, 250, 40, 22, 2, '#f4ecd0');
+            // grandfather clock with a hood, face at 11:07 and a still pendulum
+            P(126, 150, 78, 210, 42, darkWood); P(122, 104, 86, 52, 46, woodC); P(118, 96, 94, 10, 50, U.shade(woodC, 0.1));
+            for (const fx of [128, 196]) V.shape('sphere', fx, FLOOR - 92, 25, 8, 12, 8, brass, { parent: roomG, metal: 0.6 });
+            V.shape('cyl', 165, FLOOR - 130, 47, 46, 2, 46, '#f4f1ea', { parent: roomG }).rotation.x = Math.PI / 2;
+            // clock hands stopped at 11:07
+            for (const [ang, len, w] of [[(11 + 7 / 60) / 12, 11, 3], [7 / 60, 17, 2]]) { const hub = V.group(roomG); hub.position.set(165, FLOOR - 130, 49); hub.rotation.z = -ang * Math.PI * 2; V.box(0, 0, 0, w, len, 2, '#1b1b22', { parent: hub }); }
+            P(140, 190, 50, 130, 44, '#1a1008'); P(162, 200, 4, 80, 46, brass, { metal: 0.6 });
+            V.shape('cyl', 164, FLOOR - 290, 47, 20, 3, 20, brass, { parent: roomG, metal: 0.7 }).rotation.x = Math.PI / 2;
+            // umbrella stand
+            V.shape('cyl', 263, 34, 25, 44, 68, 44, '#2a2f3a', { parent: roomG, metal: 0.3 });
+            for (const y of [8, 58]) V.shape('cyl', 263, y, 25, 46, 4, 46, brass, { parent: roomG, metal: 0.6 });
+            for (const [x, c, tilt] of [[252, '#8b5a2b', 0.15], [270, '#c0392b', -0.2], [262, '#1f2a44', 0.05]]) { const u = V.shape('cyl', x, 92, 25, 5, 64, 5, c, { parent: roomG }); u.rotation.z = tilt; const hk = V.shape('torus', x - Math.sin(tilt) * 32, 124, 25, 12, 12, 16, c, { parent: roomG }); hk.rotation.y = Math.PI / 2; }
+            // key board
+            P(584, 164, 62, 62, 6, darkWood);
+            for (let i = 0; i < 4; i++) { const hx = 598 + (i % 2) * 30, hy = 180 + Math.floor(i / 2) * 22; P(hx - 2, hy - 2, 4, 4, 12, brass, { metal: 0.6 }); if (i !== 3) V.shape('sphere', hx, FLOOR - hy - 10, 14, 8, 12, 3, brass, { parent: roomG, metal: 0.6 }); }
+            // grand staircase with a runner and banister
+            for (let i = 0; i < 9; i++) { P(660 + i * 18, 180 - i * 15, 170 - i * 18, 16, 80 - i * 5, woodC); P(680 + i * 18, 180 - i * 15, 120 - i * 18 > 20 ? 50 : 0, 3, 81 - i * 5, '#7a1e2e'); }
+            P(660, 196, 170, 164, 22, '#4a3020');
+            doorAt(700, 260, 90, 100, '#2a1a10');
+            for (let i = 0; i < 9; i++) P(664 + i * 18, 136 - i * 15, 4, 44, 84 - i * 5, '#e8e2d0');
+            { const rail = V.box(0, 0, 0, 200, 6, 8, darkWood, { parent: roomG }); rail.position.set(750, FLOOR - 120 + 10, 76); rail.rotation.z = Math.atan2(15, 18); }
+            P(654, 120, 14, 76, 88, darkWood); V.shape('sphere', 661, FLOOR - 116, 94, 16, 16, 16, brass, { parent: roomG, metal: 0.6 });
+            table(330, 60, 70, 36, 64, woodC); plant(330, 60, 0.9);
+            sconce(340, 120); sconce(605, 110);
           } else if (R === 'upper') {
-            P(620, 110, 120, 250, 8, st.flags.studyOpen ? '#0b0a0e' : '#3a2418');
-            P(372, 62, 176, 186, 6, '#5a3a2a'); P(380, 70, 160, 170, 8, '#1a2a4a', { basic: true });
-            V.shape('sphere', 480, FLOOR - 130, 10, 44, 44, 4, '#f4f1ea', { parent: roomG, basic: true });
-            P(380, 150, 160, 6, 12, '#5a3a2a'); P(456, 70, 6, 170, 12, '#5a3a2a');
-            P(390, 290, 180, 10, 30, '#6a4a2a'); P(400, 300, 160, 60, 2, '#1b120c', { basic: true });
+            rug('#1f2a44', '#c9a227', 100, 200, 860, 330);
+            doorAt(620, 110, 120, 250, '#4a2c1a', st.flags.studyOpen);
+            windowAt(380, 70, 160, 170);
+            frame(800, 100, 110, 130, 'sea');
+            sconce(305, 130); sconce(575, 130);
+            // the stairwell: a gap in the floor edged by a balustrade
+            P(390, 300, 180, 60, 2, '#0b0908', { basic: true });
+            P(384, 292, 192, 8, 40, darkWood);
+            for (let i = 0; i < 9; i++) P(392 + i * 22, 300, 5, 26, 36, '#e8e2d0');
+            P(384, 296, 8, 64, 42, darkWood); P(568, 296, 8, 64, 42, darkWood);
+            table(850, 40, 80, 36, 70, woodC); { const x = atS(850, 40); V.shape('cyl', x, 80, 40, 14, 18, 14, '#f4ecd0', { parent: roomG }); const fl = V.shape('cone', x, 94, 40, 5, 10, 5, '#ffd66b', { parent: roomG, glow: 1.6, shadow: false }); glowParts.push(fl); fl.userData.candle = true; }
+            plant(300, 40, 1.1);
           } else if (R === 'library') {
-            P(300, 90, 360, 230, 40, '#4a3020');
+            rug('#2a4a2a', '#c9a227', 150, 170, 810, 330);
+            // bookcase: carcass, crown, shelves and uneven books
+            // hollow carcass: back board plus sides, so the books sit inside and stay visible
+            P(290, 70, 380, 290, 6, U.shade(darkWood, -0.2)); for (const x of [290, 660]) P(x, 70, 10, 290, 42, darkWood);
+            P(282, 62, 396, 14, 44, woodC); P(282, 346, 396, 14, 44, woodC);
             const books = [];
-            for (let row = 0; row < 3; row++) for (let i = 0; i < 16; i++) { if (st.flags.shelfOpen && row === 1 && i >= 7 && i <= 9) continue; books.push({ x: 312 + i * 21 + 8, y: FLOOR - (102 + row * 72) - 60, z: 30, w: 16, h: 58 + ((i * 7) % 5), d: 22, color: ['#8b3a3a', '#3a5a8b', '#6b8b3a', '#8b7a3a', '#5a3a6b'][(i * 3 + row) % 5] }); }
+            const r = U.rng('mm-books');
+            for (let row = 0; row < 3; row++) {
+              let x = 304;
+              for (let i = 0; x < 650; i++) {
+                const w = 12 + Math.floor(r() * 10), h = 50 + Math.floor(r() * 16);
+                if (!(st.flags.shelfOpen && row === 1 && x > 440 && x < 510)) books.push({ x: x + w / 2, y: FLOOR - (102 + row * 72) - h + 2, z: 18, w: w - 1, h, d: 24 + r() * 6, color: ['#8b3a3a', '#3a5a8b', '#6b8b3a', '#8b7a3a', '#5a3a6b', '#2a4a4a', '#7a4a2a'][Math.floor(r() * 7)] });
+                x += w;
+              }
+            }
             V.boxes(books, { parent: roomG });
-            for (let row = 1; row < 3; row++) P(300, 90 + row * 72 - 6, 360, 6, 44, '#3a2418');
+            for (let row = 0; row < 3; row++) P(290, 96 + row * 72 - 6, 380, 6, 40, woodC);
             if (st.flags.shelfOpen) P(450, 180, 60, 40, 44, '#0b0a0e', { basic: true });
-            P(100, 250, 90, 110, 30, '#5a3a2a'); const book = P(90, 240, 110, 12, 40, '#f4ecd0'); book.rotation.x = 0.3;
-            V.shape('sphere', 845, FLOOR - 290, 30, 80, 80, 80, '#2e86c1', { parent: roomG, rough: 0.5 });
-            P(840, 330, 10, 30, 30, '#5a3a2a'); P(820, 350, 50, 10, 40, '#5a3a2a');
-            P(700, 70, 70, 50, 20, '#6a4a2a');
-            for (let i = 0; i < 8; i++) P(680 + (i % 2) * 36, 110 + i * 30, 6, 6, 50, '#8b5a2b');
-            for (const x of [676, 718]) P(x, 100, 6, 260, 50, '#8b5a2b');
+            // reading stand with the open book and a candle
+            P(122, 262, 46, 98, 24, woodC); P(104, 350, 82, 10, 40, darkWood);
+            { const bk = P(92, 240, 106, 10, 44, '#f4ecd0'); bk.rotation.x = 0.35; P(144, 238, 2, 12, 48, '#8b3a3a'); }
+            // globe on a stand with a brass meridian
+            V.shape('sphere', 845, FLOOR - 285, 36, 74, 74, 74, '#2e86c1', { parent: roomG, rough: 0.5 });
+            for (const [lx, ly, s] of [[830, 270, 22], [860, 300, 16], [840, 305, 12]]) V.shape('sphere', lx, FLOOR - ly, 70, s, s * 0.8, 4, '#4a9a4a', { parent: roomG });
+            { const m = V.shape('torus', 845, FLOOR - 285, 36, 88, 88, 20, brass, { parent: roomG, metal: 0.7 }); m.rotation.y = Math.PI / 2; }
+            P(840, 322, 10, 30, 36, darkWood); P(816, 350, 58, 10, 44, darkWood);
+            // rolling ladder to the top shelf
+            P(694, 60, 84, 60, 26, woodC); for (let i = 0; i < 3; i++) P(700 + i * 24, 66, 18, 50, 30, ['#8b3a3a', '#3a5a8b', '#8b7a3a'][i]);
+            for (const x of [690, 740]) { const rail = P(x, 100, 7, 260, 52, '#8b5a2b'); rail.rotation.z = x === 690 ? 0.04 : 0.04; }
+            for (let i = 0; i < 8; i++) P(694, 118 + i * 30, 50, 5, 54, '#8b5a2b');
+            armchair(230, 170, '#2f5a3a', 0.4); lamp(160, 110);
+            sconce(245, 120);
           } else if (R === 'study') {
-            P(560, 90, 130, 140, 10, '#b8860b', { metal: 0.5, rough: 0.35 });
-            P(570, 100, 110, 120, 12, st.flags.safeOpen ? '#2a2f3a' : '#3a5a3a');
-            if (st.flags.safeOpen) P(585, 115, 80, 90, 14, '#1b1b22', { basic: true });
-            P(220, 250, 260, 110, 70, '#5a3a2a'); P(250, 236, 110, 14, 50, '#f4ecd0');
-            V.shape('cylLo', 430, FLOOR - 250, 30, 16, 24, 16, '#e8d3a8', { parent: roomG, glow: 0.8 });
+            rug('#5a1e2e', '#c9a227', 150, 190, 810, 330);
+            // painting that hides the safe
+            if (st.flags.safeOpen) { P(560, 90, 130, 140, 10, '#2a2f3a', { metal: 0.6 }); P(585, 115, 80, 90, 12, '#0b0b10', { basic: true }); const door = P(690, 90, 18, 140, 110, '#3a3f4a', { metal: 0.6 }); door.rotation.y = 0.1; }
+            else frame(566, 96, 118, 128, 'hills');
+            // desk: top, pedestals with drawers, green-shaded lamp, papers and quill
+            P(210, 236, 280, 14, 76, woodC);
+            for (const x of [220, 400]) { P(x, 250, 80, 110, 66, darkWood); for (let i = 0; i < 3; i++) { P(x + 6, 256 + i * 34, 68, 28, 68, woodC); P(x + 36, 266 + i * 34, 8, 6, 72, brass, { metal: 0.6 }); } }
+            P(250, 228, 110, 8, 56, '#f4ecd0'); P(270, 226, 60, 4, 60, '#e8e2d0');
+            V.shape('cylLo', 430, FLOOR - 236, 40, 16, 4, 16, brass, { parent: roomG, metal: 0.6 }); V.shape('cylLo', 430, FLOOR - 222, 40, 3, 26, 3, brass, { parent: roomG, metal: 0.6 });
+            { const sh = V.shape('cylLo', 430, FLOOR - 210, 40, 34, 10, 18, '#1f6a3a', { parent: roomG, glow: 0.4 }); sh.rotation.z = 0; }
+            light(430, FLOOR - 200, 70, '#fff0c8', 40, 360);
+            armchair(350, 120, '#5a1e2e', Math.PI);
             // beetle cabinet: a glass case on a wooden base with the signet drawer
             P(760, 270, 120, 50, 40, '#6a4a2a'); P(756, 266, 128, 6, 44, '#4e3420');
             P(764, 204, 112, 62, 4, '#5a1e2e');
@@ -593,47 +760,114 @@
             if (drawerOut) P(792, 284, 56, 22, 40, '#1a1008', { z: 0.5 });
             P(790, 282, 60, 24, 40, '#7a5634', { z: drawerOut + 2 });
             P(816, 290, 8, 8, 44, '#b8860b', { metal: 0.7, z: drawerOut });
+            // bookcase between the desk and the safe, and a fireplace-side plant
+            P(110, 110, 80, 250, 30, darkWood); for (let row = 0; row < 4; row++) { P(110, 110 + row * 60 + 54, 80, 6, 32, woodC); for (let i = 0; i < 5; i++) P(116 + i * 14, 110 + row * 60 + 12, 12, 42, 26, ['#8b3a3a', '#3a5a8b', '#6b8b3a', '#8b7a3a', '#5a3a6b'][(i + row) % 5]); }
+            sconce(530, 120); plant(720, 50, 1);
           } else if (R === 'kitchen') {
+            // tiled splashback, counters with cupboard doors, stove, sink and shelves
+            P(-240, 190, 1440, 60, 4, '#ffffff', { map: tileTex('#e8ecf1', '#bcd0dc') });
             P(110, 110, 110, 130, 30, '#6a707c', { metal: 0.4 });
+            P(118, 118, 94, 20, 32, '#39414f');
             for (let i = 0; i < 5; i++) V.shape('sphere', 130 + i * 18, FLOOR - 150, 32, 11, 11, 6, st.fuses[i] ? '#ffd66b' : '#2a2f3a', { parent: roomG, glow: st.fuses[i] ? 1.2 : 0 });
-            P(300, 290, 330, 70, 70, '#8b5a2b'); P(296, 286, 338, 6, 74, '#d7dde6');
-            V.shape('cyl', 440, FLOOR - 272, 40, 30, 20, 30, '#f4f1ea', { parent: roomG });
+            P(160, 20, 8, 92, 12, '#39414f', { metal: 0.4 });
+            // counters
+            P(290, 250, 350, 110, 60, '#e8e2d0'); P(284, 244, 362, 8, 66, '#39414f');
+            for (let i = 0; i < 4; i++) { P(298 + i * 86, 262, 78, 88, 62, '#d7cfbd'); P(330 + i * 86, 300, 14, 4, 66, brass, { metal: 0.6 }); }
+            // teacup and saucer on the counter
+            V.shape('cyl', 450, FLOOR - 246, 40, 40, 3, 28, '#f4f1ea', { parent: roomG });
+            V.shape('cyl', 450, FLOOR - 236, 40, 24, 18, 20, '#f4f1ea', { parent: roomG });
+            { const h = V.shape('torus', 464, FLOOR - 236, 40, 12, 12, 10, '#f4f1ea', { parent: roomG }); h.rotation.y = Math.PI / 2; }
+            // cast-iron range set into the counter, with burners, a pot and a kettle under a hood
+            P(530, 250, 100, 110, 64, '#2a2f3a', { metal: 0.4 }); P(546, 290, 68, 50, 66, '#1b1b22'); P(560, 282, 40, 4, 68, brass, { metal: 0.6 });
+            for (const bx of [552, 604]) V.shape('cyl', bx, FLOOR - 248, 36, 24, 3, 24, '#1b1b22', { parent: roomG });
+            V.shape('cyl', 552, FLOOR - 234, 36, 28, 24, 28, '#8a94a6', { parent: roomG, metal: 0.6 });
+            V.shape('sphere', 604, FLOOR - 236, 36, 26, 22, 26, '#c0392b', { parent: roomG, metal: 0.3 });
+            P(520, 130, 120, 40, 40, '#8a94a6', { metal: 0.5 }); P(566, 20, 28, 110, 30, '#8a94a6', { metal: 0.5 });
+            // hanging pans on a rail
+            P(300, 110, 200, 6, 14, brass, { metal: 0.6 });
+            for (let i = 0; i < 4; i++) { P(316 + i * 48, 116, 2, 20, 16, '#39414f'); V.shape('cyl', 317 + i * 48, FLOOR - 150, 16, 28 - i * 3, 5, 28 - i * 3, i % 2 ? '#b87333' : '#39414f', { parent: roomG, metal: 0.6 }).rotation.x = Math.PI / 2; }
+            // shelf of jars
+            P(640, 90, 100, 8, 26, woodC);
+            for (let i = 0; i < 4; i++) V.shape('cyl', 656 + i * 22, FLOOR - 76, 14, 16, 26, 16, ['#e8a060', '#d0e0a0', '#f4ecd0', '#a0c0e0'][i], { parent: roomG, opacity: 0.85 });
+            // the muddy boot print by the back door
             const print = V.shape('disc', 685, 0.8, 150, 60, 26, 1, '#3c2814', { parent: roomG, opacity: 0.8, shadow: false }); print.rotation.x = -Math.PI / 2; print.rotation.z = 0.2;
-            P(780, 150, 70, 60, 10, '#1a2a4a', { basic: true });
-            V.shape('cyl', 560, FLOOR - 240, 20, 50, 30, 50, '#39414f', { parent: roomG, metal: 0.5 });
+            P(782, 152, 66, 56, 12, '#0e1a33', { basic: true });
           } else if (R === 'garden') {
-            P(80, 120, 200, 230, 110, '#8fd3ff', { opacity: 0.25, depthWrite: false });
-            for (const [x, y, w, h] of [[80, 120, 4, 230], [276, 120, 4, 230], [80, 120, 200, 4], [178, 120, 4, 230]]) P(x, y, w, h, 112, '#d7dde6');
-            const lamp = V.shape('sphere', 180, FLOOR - 230, 55, 16, 16, 16, '#ffd66b', { parent: roomG, glow: 1.4 });
-            glowParts.push(lamp); lamp.userData.flicker = !st.flags.trueEnding;
-            for (let i = 0; i < 6; i++) { V.shape('sphere', 380 + i * 26, 22, 60, 42, 40, 42, '#2f8f47', { parent: roomG }); V.shape('sphere', 380 + i * 26, 40, 76, 12, 12, 12, '#c0392b', { parent: roomG }); }
-            P(610, 150, 170, 200, 90, '#6b4b2a');
+            // stone path, lamp post, rose bushes, shed and the greenhouse
+            const path = [];
+            for (let i = 0; i < 9; i++) path.push({ x: 560 + i * 34, y: 0, z: 80 + (i % 2) * 20, w: 30, h: 1.5, d: 28, color: '#8a8f99' });
+            V.boxes(path, { parent: roomG });
+            P(80, 120, 200, 230, 110, '#8fd3ff', { opacity: 0.22, depthWrite: false });
+            for (const [x, y, w, h] of [[80, 120, 6, 230], [274, 120, 6, 230], [80, 120, 200, 6], [177, 120, 6, 230], [80, 234, 200, 5]]) P(x, y, w, h, 112, '#e8ecf1');
+            { const roof = V.shape('cone4', 180, FLOOR - 100, 55, 290, 50, 160, '#bfe6ff', { parent: roomG, opacity: 0.3, depthWrite: false }); roof.rotation.y = Math.PI / 4; }
+            for (let i = 0; i < 4; i++) V.shape('sphere', 120 + i * 40, 30, 60, 30, 30, 30, '#2f8f47', { parent: roomG });
+            const lamp2 = V.shape('sphere', 180, FLOOR - 230, 55, 18, 18, 18, '#ffd66b', { parent: roomG, glow: 1.4 });
+            glowParts.push(lamp2); lamp2.userData.flicker = !st.flags.trueEnding;
+            if (st.flags.greenOpen || st.flags.trueEnding) P(200, 250, 60, 100, 114, '#1a2a1a', { opacity: 0.6 });
+            for (let i = 0; i < 6; i++) {
+              V.shape('sphere', 380 + i * 26, 22, 60, 42, 40, 42, '#2f8f47', { parent: roomG });
+              for (let k = 0; k < 3; k++) V.shape('sphere', 372 + i * 26 + k * 8, 34 + (k % 2) * 10, 76, 10, 10, 10, '#c0392b', { parent: roomG });
+            }
+            // gardener's shed with a slanted roof, door and window
+            P(610, 150, 170, 200, 90, '#8a6a4a');
+            for (let i = 0; i < 8; i++) P(612 + i * 21, 152, 3, 196, 92, '#6b4b2a');
             const roof = V.shape('cone4', 695, FLOOR - 128, 45, 240, 60, 130, '#4a3020', { parent: roomG }); roof.rotation.y = Math.PI / 4;
-            P(670, 250, 50, 100, 94, '#3a2418');
+            P(670, 250, 50, 100, 94, '#3a2418'); P(716, 296, 4, 8, 96, brass, { metal: 0.6 });
+            P(626, 190, 34, 30, 94, '#ffd66b', { glow: 0.5 });
+            // lamp post by the path
+            { const x = atS(560, 140); V.shape('cylLo', x, 90, 140, 6, 180, 6, '#1b1b22', { parent: roomG }); const bulb = V.shape('sphere', x, 186, 140, 22, 22, 22, '#ffe8b0', { parent: roomG, glow: 1.3 }); glowParts.push(bulb); light(x, 180, 150, '#ffd9a0', 90, 600); }
+            // picket fence in front of the hedge
+            const fence = [];
+            for (let x = -140; x < 740; x += 26) fence.push({ x, y: 0, z: 6, w: 8, h: 60, d: 4, color: '#e8e2d0' });
+            V.boxes(fence, { parent: roomG });
+            V.box(300, 20, 6, 880, 6, 3, '#e8e2d0', { parent: roomG }); V.box(300, 44, 6, 880, 6, 3, '#e8e2d0', { parent: roomG });
           } else if (R === 'parlor') {
-            SUSPECTS.forEach((sp, i) => {
-              const look = { skin: ['#e0ac69', '#f1c27d', '#c68642', '#8d5524'][i], shirt: sp.color, shirt2: U.shade(sp.color, 0.3), pants: '#1f2a44', shoes: '#1b1b22', hair: ['#d7dde6', '#ff9a3c', '#1b1b22', '#1b1b22'][i], hat: i === 0 ? '#1b1b22' : null };
-              const rig = BF.char3d.build(look);
+            rug('#4a1e3a', '#c9a227', 130, 160, 830, 330);
+            // the household, each dressed for their part
+            const cast = [
+              { skin: '#e0ac69', equipped: { head: 'head_block', face: { style: 'determined' }, hair: { style: 'short', c1: '#d7dde6' }, shirt: { style: 'tux', c1: '#1b1b22', c2: '#f4f1ea' }, pants: { style: 'plain', c1: '#1b1b22' }, shoes: { style: 'sneaker', c1: '#1b1b22', c2: '#1b1b22' }, neck: { style: 'bowtie', c1: '#1b1b22' } } },
+              { skin: '#f1c27d', equipped: { head: 'head_block', face: { style: 'wink' }, hair: { style: 'long', c1: '#ff9a3c' }, shirt: { style: 'logo', c1: '#8a4ad0', c2: '#e0c8ff' }, pants: { style: 'plain', c1: '#3a2a5a' }, shoes: { style: 'sneaker', c1: '#5a2a7a', c2: '#ffffff' }, neck: { style: 'chain', c1: '#ffd66b' } } },
+              { skin: '#c68642', equipped: { head: 'head_block', face: { style: 'sleepy' }, hair: { style: 'short', c1: '#1b1b22' }, shirt: { style: 'tux', c1: '#6b3a1a', c2: '#e8e2d0' }, pants: { style: 'plain', c1: '#3a2418' }, shoes: { style: 'boot', c1: '#2a1a10', c2: '#1b1b22' }, neck: { style: 'scarf', c1: '#2f8f47', c2: '#f4f1ea' }, accessory: { style: 'monocle', c1: '#c9a227' } } },
+              { skin: '#8d5524', equipped: { head: 'head_block', face: { style: 'smile' }, hair: { style: 'bun', c1: '#1b1b22' }, shirt: { style: 'stripe', c1: '#2f8f47', c2: '#4ad17f' }, pants: { style: 'cargo', c1: '#5a4a2a' }, shoes: { style: 'boot', c1: '#4a3020', c2: '#2a1a10' }, hat: { style: 'explorer', c1: '#c9a26a', c2: '#2f8f47' } } },
+            ];
+            cast.forEach((av, i) => {
+              const rig = BF.char3d.build(av);
               rig.group.scale.setScalar(19);
               rig.group.position.set(250 + i * 140, 0, 60);
-              rig.group.rotation.y = i < 2 ? 0.5 : -0.5;
+              rig.group.rotation.y = i < 2 ? 0.45 : -0.45;
               roomG.add(rig.group);
               suspects.push(rig);
             });
-            P(790, 190, 130, 170, 40, '#6a707c'); P(815, 250, 80, 110, 44, '#1b1b22', { basic: true });
-            const fire = V.shape('cone', 855, 16, 30, 40, 36, 20, '#ff7a2e', { parent: roomG, glow: 1.5, shadow: false });
-            glowParts.push(fire);
-            P(180, 300, 90, 60, 60, '#7a3b4a');
+            // fireplace: brick surround, mantel, firebox with logs and a real glow
+            P(780, 180, 150, 180, 36, '#ffffff', { map: brickTex('#8a4a3a') });
+            P(772, 172, 166, 12, 48, woodC); P(768, 164, 174, 8, 52, U.shade(woodC, 0.1));
+            P(815, 250, 80, 110, 38, '#120a08', { basic: true });
+            for (const [x, rz] of [[835, 0.2], [860, -0.15]]) { const log = V.shape('cyl', x, 10, 30, 12, 50, 12, '#5a3a22', { parent: roomG }); log.rotation.z = Math.PI / 2 + rz; }
+            const fire = V.shape('cone', 855, 26, 30, 44, 44, 22, '#ff7a2e', { parent: roomG, glow: 1.5, shadow: false });
+            const fire2 = V.shape('cone', 855, 22, 34, 24, 30, 14, '#ffd66b', { parent: roomG, glow: 1.6, shadow: false });
+            glowParts.push(fire, fire2);
+            fireLight = light(855, 60, 110, '#ff9a4a', 110, 700);
+            for (let i = 0; i < 2; i++) V.shape('cylLo', 800 + i * 110, FLOOR - 186, 30, 10, 26, 10, '#f4ecd0', { parent: roomG });
+            frame(830, 60, 70, 88, 'lady');
+            // armchair and sofa for the waiting household, plus a tea table
+            armchair(150, 150, '#7a3b4a', 0.5);
+            { const g = V.group(roomG); g.position.set(atS(120, 60), 0, 60); V.box(0, 0, 0, 80, 26, 50, '#5a2a36', { parent: g }); V.box(0, 26, -18, 80, 44, 12, '#7a3b4a', { parent: g }); }
+            table(300, 250, 90, 50, 40, woodC);
+            { const x = atS(300, 250); V.shape('cyl', x - 14, 44, 250, 16, 12, 16, '#f4f1ea', { parent: roomG }); V.shape('sphere', x + 14, 50, 250, 20, 20, 20, '#f4f1ea', { parent: roomG }); }
+            sconce(140, 120); plant(760, 40, 1);
           } else if (R === 'cellar') {
             P(90, 110, 170, 240, 50, '#3a2418');
             const bottles = [];
             for (let r2 = 0; r2 < 5; r2++) for (let c = 0; c < 4; c++) bottles.push({ x: 115 + c * 40, y: FLOOR - (140 + r2 * 44) - 10, z: 52, w: 20, h: 20, d: 14, color: '#1a3a2a' });
             V.boxes(bottles, { parent: roomG, geo: 'cylLo' });
+            for (let r2 = 0; r2 < 6; r2++) P(90, 110 + r2 * 44, 170, 4, 54, '#2a1a10');
             const chute = P(300, 60, 100, 130, 60, '#2a2f3a', { metal: 0.5 }); chute.rotation.x = -0.2;
+            P(310, 70, 80, 20, 64, '#141418');
             P(470, 110, 220, 250, 44, '#2a2426');
             P(500, 180, 160, 140, 46, furnaceGlow > 0 ? '#3a1a0a' : '#141012');
             for (let i = 0; i < 5; i++) P(506 + i * 31, 138, 26, 30, 46, '#8a6a2a', { metal: 0.5 });
             P(560, 30, 40, 80, 40, '#2a2426');
+            for (const bx of [476, 676]) for (let i = 0; i < 6; i++) V.shape('sphere', bx + 4, FLOOR - (124 + i * 40), 46, 8, 8, 6, '#5a5055', { parent: roomG, metal: 0.5 });
             if (furnaceGlow > 0) {
               const f1 = V.shape('sphere', 580, FLOOR - 270, 44, 110, 90, 30, '#ff7a2e', { parent: roomG, glow: 1.6, shadow: false });
               const f2 = V.shape('sphere', 580, FLOOR - 280, 50, 60, 50, 20, '#ffd66b', { parent: roomG, glow: 1.6, shadow: false });
@@ -644,8 +878,16 @@
             }
             P(730, 290, 120, 40, 50, '#39414f', { metal: 0.4 }); P(760, 330, 60, 30, 40, '#2a2f3a');
             for (let i = 0; i < 6; i++) P(840 + i * 14, 200 - i * 22, 90 - i * 14, 12, 60, '#3a3030');
+            // barrels and a hanging bulb that lights when the power is on
+            for (const [sx, z] of [[300, 120], [360, 150]]) { const x = atS(sx, z); V.shape('cyl', x, 30, z, 50, 60, 50, '#6b4226', { parent: roomG }); for (const y of [8, 52]) V.shape('cyl', x, y, z, 52, 4, 52, '#39414f', { parent: roomG, metal: 0.5 }); }
+            P(418, 0, 2, 40, 90, '#1b1b22');
+            const bulb = V.shape('sphere', 419, FLOOR - 46, 91, 14, 16, 14, powered() ? '#ffe8b0' : '#3a3a3a', { parent: roomG, glow: powered() ? 1.3 : 0 });
+            if (powered()) glowParts.push(bulb);
+            // cobwebs in the corners
+            for (const [x, y] of [[20, 20], [900, 20]]) { const web = P(x, y, 40, 40, 2, '#d7dde6', { opacity: 0.25, depthWrite: false }); web.rotation.z = 0.785; }
           }
         }
+
         const key = () => [st.room, JSON.stringify(st.flags), st.fuses.join(''), d.beetles.length, furnaceGlow > 0 ? 1 : 0, powered() ? 1 : 0].join('|');
 
         return function sync(dt) {
@@ -694,11 +936,18 @@
               if (panelOpen === 'puzzle') renderRhythm();
             }
           }
-          for (const b of bots) { b.t -= dt; if (b.t <= 0) { b.t = 15 + Math.random() * 25; b.room = U.pick(Object.keys(ROOMS).filter((x) => x !== 'cellar')); b.x = 300 + Math.random() * 450; b.facing = Math.random() < 0.5 ? 1 : -1; } }
+          for (const b of bots) {
+            // orders from chat: follow / come / help stay in your room, stay keeps them where they are, leave sends them elsewhere
+            const ord = ctx.botOrder(b.bot.id);
+            if (ord && ['follow', 'come', 'help'].includes(ord.verb) && b.room !== st.room) { b.room = st.room; b.x = 200 + Math.random() * 500; b.t = 20; if (ord.verb === 'come') ctx.clearOrder(b.bot.id); }
+            if (ord && ord.verb === 'leave' && b.room === st.room) { b.room = U.pick(Object.keys(ROOMS).filter((x) => x !== 'cellar' && x !== st.room)); ctx.clearOrder(b.bot.id); }
+            if (ord && ord.verb === 'stay') { b.t = Math.max(b.t, 2); continue; }
+            b.t -= dt; if (b.t <= 0) { b.t = 15 + Math.random() * 25; b.room = U.pick(Object.keys(ROOMS).filter((x) => x !== 'cellar')); b.x = 300 + Math.random() * 450; b.facing = Math.random() < 0.5 ? 1 : -1; }
+          }
           if (phase !== 'play') return;
           time += dt;
-          if (time >= T.limit) { closePanels(); finish(false); return; }
-          if (T.limit - time < 60 && Math.floor(T.limit - time) !== Math.floor(T.limit - time + dt) && Math.floor(T.limit - time) % 15 === 0) ctx.banner('The clock strikes...', Math.floor(T.limit - time) + ' seconds until midnight', 1200);
+          if (time >= limit) { closePanels(); finish(false); return; }
+          if (limit - time < 60 && Math.floor(limit - time) !== Math.floor(limit - time + dt) && Math.floor(limit - time) % 15 === 0) ctx.banner('The clock strikes...', Math.floor(limit - time) + ' seconds until midnight', 1200);
           const p = ctx.input.pointer;
           hover = visibleSpots().find((s) => p.x > s.x && p.x < s.x + s.w && p.y > s.y && p.y < s.y + s.h) || null;
           ctx.canvas.style.cursor = hover ? 'pointer' : 'default';
@@ -717,6 +966,14 @@
         },
 
         render3d(dt) { view(dt); },
+        /** "help me" in chat: a detective shares the next step from the hint journal. */
+        onBotOrder(bot, order) {
+          if (order.verb !== 'help') return;
+          const b = bots.find((x) => x.bot.id === bot.id);
+          if (b) { b.room = st.room; b.x = 200 + Math.random() * 500; }
+          const tip = nextHint();
+          if (tip) ctx.botText(bot, 'i think... ' + tip.charAt(0).toLowerCase() + tip.slice(1), 2200);
+        },
         hud(g) { drawHud(g); },
 
         /** Automated-test hooks (not used by gameplay). */
@@ -746,7 +1003,7 @@
           // HUD
           G.panel(g, 10, 10, 240, 50);
           G.text(g, room.name, 22, 32, { size: 16, weight: 800, color: '#fff' });
-          const left = Math.max(0, T.limit - time);
+          const left = Math.max(0, limit - time);
           G.text(g, 'Midnight in ' + U.fmtClock(left), 238, 32, { size: 12, align: 'right', color: left < 60 ? '#ff8b98' : '#cfd6e2' });
           G.text(g, 'Ashcombe Manor · ' + st.clues.length + ' clues', 22, 52, { size: 11, color: '#a1abbb' });
           if (st.selected) G.text(g, 'Using: ' + st.items.find((i) => i.id === st.selected).name + ' (click an object)', W / 2, DOCK - 10, { size: 12, align: 'center', color: '#8fd3ff', stroke: 'rgba(0,0,0,.7)', strokeW: 3 });
