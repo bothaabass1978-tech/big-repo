@@ -153,6 +153,32 @@ async function signIn(page) {
     check('Classic 2D graphics setting plays games with the flat renderer', s2.active && s2.use3d === false && page.errors.length === before, JSON.stringify(s2) + page.errors.slice(before).join(' | '));
   }
 
+  // Mystery Mansion: the signet ring opens the beetle drawer
+  {
+    const before = page.errors.length;
+    await page.evaluate(() => BF.play('mystery-mansion'));
+    await page.waitForTimeout(1800);
+    const r = await page.evaluate(() => {
+      const T = BF.runtime.session().instance._test;
+      const panel = () => (document.querySelector('#game-root') || document.body).textContent;
+      T.st.flags.studyOpen = true; T.go('study');
+      T.st.items.push({ id: 'ring', name: 'Signet ring' });
+      T.d.beetles = ['foyer', 'library'];
+      T.st.selected = 'ring'; T.click('case');
+      const early = { open: !!T.st.flags.drawerOpen, text: /Only 2 of the five/.test(panel()) };
+      T.d.beetles = ['foyer', 'library', 'kitchen', 'cellar', 'garden'];
+      T.st.selected = 'ring'; T.click('case');
+      const opened = { open: !!T.st.flags.drawerOpen, note: T.st.clues.includes('note'), key: T.st.items.some((i) => i.id === 'greenkey'), ring: T.st.items.some((i) => i.id === 'ring'), beetle: BF.inventory.owns('col_golden_beetle') };
+      T.go('garden'); T.st.selected = 'greenkey'; T.click('greenhouse');
+      return { early, opened, green: !!T.st.flags.greenOpen };
+    });
+    await page.evaluate(() => BF.runtime.leave());
+    await page.waitForTimeout(200);
+    check('Mystery Mansion: the signet ring opens the beetle drawer once all five beetles are found',
+      !r.early.open && r.early.text && r.opened.open && r.opened.note && r.opened.key && !r.opened.ring && r.opened.beetle && r.green && page.errors.length === before,
+      JSON.stringify(r) + page.errors.slice(before).join(' | '));
+  }
+
   // ------------------------------------------------------------ bot chat
   {
     const bot = await page.evaluate(() => BF.friends.list()[0].id);

@@ -111,7 +111,7 @@ npm i -D playwright   # once, if Playwright is not installed globally
 node tests/blockforge/e2e/platform_smoke_e2e_test.js --shots /tmp/blockforge-shots
 ```
 
-Current status: 81 unit tests and 76 end-to-end checks, all passing.
+Current status: 81 unit tests and 77 end-to-end checks, all passing.
 
 ## Code layout
 

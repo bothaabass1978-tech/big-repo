@@ -31,6 +31,7 @@
     clock: { name: 'Stopped clock', text: 'The grandfather clock stopped at 11:07 on the night Lord Ashcombe vanished.' },
     scarf: { name: 'Snagged scarf', text: 'A green scarf caught in the coal chute. It is monogrammed "E.T."', key: true },
     ticket: { name: 'Train ticket', text: 'A ticket for the 11:40 night train, bought by E. Thorne, dated the night of the disappearance.', key: true },
+    note: { name: "Ashcombe's note", text: '"If you are reading this, Thorne has made his move. I am safe, and so is the fortune. Name him, and I will come out." — A.', key: true },
     poem: { name: 'Library poem', text: '"First the crimson, then the sea, the eldest next, and last the tree."' },
   };
   const BEETLES = ['foyer', 'library', 'kitchen', 'cellar', 'garden'];
@@ -49,6 +50,7 @@
     create(ctx) {
       const W = ctx.W, H = ctx.H;
       const V = ctx.g3;
+      if (V) V.sepAxis = 'z';
       // In 3D the back wall of every room sits on the plane Z = 0 and the camera is placed so that
       // plane maps 1:1 onto the 960×540 screen (screen x = X, screen y = FLOOR - Y). Hotspots,
       // puzzles and the cellar secret therefore keep their 2D screen rectangles unchanged.
@@ -96,6 +98,22 @@
         ctx.feed('Added to your bag: ' + name, 'info', '#8fd3ff');
         renderDock();
       }
+      function hasItem(id) { return st.items.some((i) => i.id === id); }
+      function useUp(id) { st.items = st.items.filter((i) => i.id !== id); if (st.selected === id) st.selected = null; renderDock(); }
+      /** The signet ring opens the drawer under the beetle case once all five beetles are home. */
+      function openDrawer() {
+        const n = d.beetles.length;
+        if (st.flags.drawerOpen) return say('The drawer is already open.');
+        if (n < 5) { ctx.sfx('error'); st.selected = null; renderDock(); return say('The ring slides into the keyhole, but the drawer will not turn. Something inside clicks five times, as if counting. Only ' + n + ' of the five velvet slots are filled.'); }
+        st.flags.drawerOpen = true;
+        useUp('ring');
+        ctx.sfx('secret');
+        parts.emit(820, 290, { count: 30, colors: ['#ffd66b', '#fff1a8'], speed: 160, life: 0.8 });
+        say('The ring turns and the five beetles click into place. The drawer slides open. Inside: a folded note in Lord Ashcombe\'s hand and a tiny brass key tied with a green ribbon.', 'The beetle drawer');
+        addClue('note');
+        addItem('greenkey', 'Greenhouse key');
+        if (!ctx.hasItem('col_golden_beetle')) ctx.collectible('col_golden_beetle');
+      }
       function beetle(where) {
         if (d.beetles.includes(where)) { say('A golden beetle... wait, you already have this one in your collection.'); return; }
         d.beetles.push(where);
@@ -129,7 +147,8 @@
         ] },
         upper: { name: 'Upper Hall', wall: '#3a3a5a', floor: '#3a2a20', spots: [
           { id: 'toLibrary', x: 140, y: 110, w: 120, h: 250, label: 'Library', door: 'library' },
-          { id: 'toStudy', x: 620, y: 110, w: 120, h: 250, label: 'Study', on() { if (st.flags.studyOpen) return go('study'); if (st.selected === 'studykey') { st.flags.studyOpen = true; st.selected = null; ctx.sfx('open'); say('The key turns with a heavy click. The study is open.'); renderDock(); } else say('Locked. The keyhole is small and brass.'); } },
+          { id: 'toStudy', x: 620, y: 110, w: 120, h: 250, label: 'Study', on() { if (st.flags.studyOpen) return go('study'); say('Locked. The keyhole is small and brass.'); },
+            use: { studykey() { if (st.flags.studyOpen) return go('study'); st.flags.studyOpen = true; useUp('studykey'); ctx.sfx('open'); say('The key turns with a heavy click. The study is open.'); } } },
           { id: 'window', x: 380, y: 70, w: 160, h: 170, label: 'Hall window', on() { say('Moonlight over the hill. The house must look lovely from the village, with the moon behind it.'); } },
           { id: 'toFoyer', x: 400, y: 300, w: 160, h: 60, label: 'Stairs down', door: 'foyer' },
         ] },
@@ -143,7 +162,12 @@
         study: { name: 'Study', wall: '#3a2a4a', floor: '#2a1e18', spots: [
           { id: 'safe', x: 560, y: 90, w: 130, h: 140, label: 'Painting (a safe behind it)', on() { if (st.flags.safeOpen) say('The safe is empty.'); else openSafe(); } },
           { id: 'desk', x: 220, y: 240, w: 260, h: 120, label: 'Desk', on() { say('The will lies on the desk: Ivy inherits the manor. A note in the margin says the fortune was moved to a private vault.'); addClue('will'); } },
-          { id: 'case', x: 760, y: 200, w: 120, h: 120, label: 'Beetle display case', on() { const n = d.beetles.length; say(n >= 5 ? 'Five golden beetles glitter in the case. A tiny drawer beneath it has a keyhole shaped like a signet ring.' + (st.items.some((i) => i.id === 'ring') ? ' The ring would fit.' : '') : 'An empty display case with five velvet slots, each shaped like a beetle. You have found ' + n + ' / 5.'); } },
+          { id: 'case', x: 760, y: 200, w: 120, h: 120, label: 'Beetle display case', on() {
+            const n = d.beetles.length;
+            if (st.flags.drawerOpen) return say('Five golden beetles glitter in the case. The little drawer beneath it stands open and empty.');
+            if (n < 5) return say('A display case with five velvet slots, each shaped like a beetle. You have found ' + n + ' / 5. Beneath it, a tiny locked drawer.');
+            say('Five golden beetles glitter in the case. A tiny drawer beneath it has a keyhole shaped like a signet ring.' + (hasItem('ring') ? ' The ring would fit: pick it in your bag, then click the case.' : ''));
+          }, use: { ring: openDrawer } },
           { id: 'toUpper', x: 20, y: 150, w: 60, h: 210, label: 'Upper Hall', door: 'upper' },
         ] },
         kitchen: { name: 'Kitchen', wall: '#4a4a3a', floor: '#6a6a6a', spots: [
@@ -156,7 +180,11 @@
         garden: { name: 'Garden', wall: '#1a2a4a', floor: '#2a4a2a', outdoor: true, spots: [
           { id: 'roses', x: 360, y: 240, w: 160, h: 110, label: 'Rose bushes', on() { if (!d.beetles.includes('garden')) { say('A glint between the roses: a golden beetle!'); beetle('garden'); } else say('Red roses, carefully tended.'); }, hidden: () => !d.beetles.includes('garden') },
           { id: 'shed', x: 610, y: 150, w: 170, h: 200, label: "Gardener's shed", on() { say("Rosa's boots stand by the door: size 8. Too small for the print in the kitchen."); addClue('rosaBoots'); } },
-          { id: 'greenhouse', x: 80, y: 120, w: 200, h: 230, label: 'Greenhouse', on() { say(st.flags.trueEnding ? 'The greenhouse is warm and full of light.' : 'The greenhouse door is locked from the inside. Somebody lit a lamp in there recently...'); } },
+          { id: 'greenhouse', x: 80, y: 120, w: 200, h: 230, label: 'Greenhouse', on() {
+            if (st.flags.trueEnding) return say('The greenhouse is warm and full of light.');
+            if (st.flags.greenOpen) return say('A shadow moves behind the glass and a voice whispers: "Name him in the parlor, detective. Then I will come out."');
+            say('The greenhouse door is locked. Somebody lit a lamp in there recently...');
+          }, use: { greenkey() { st.flags.greenOpen = true; useUp('greenkey'); ctx.sfx('open'); say('The little brass key turns. Before you can step inside, a familiar voice whispers from behind the ferns: "Not yet, detective. Thorne must not know I am here. Name him in the parlor, and I will come out."', 'A voice in the greenhouse'); } } },
           { id: 'toKitchen', x: 860, y: 150, w: 80, h: 210, label: 'Kitchen', door: 'kitchen' },
         ] },
         parlor: { name: 'Parlor', wall: '#4a2a3a', floor: '#3a2418', spots: [
@@ -278,9 +306,10 @@
           [!hasClue('letter'), 'The portrait in the foyer hangs a little crooked.'],
           [!st.flags.power, 'The fuse box in the kitchen controls the cellar lights. Each switch flips its neighbours too.'],
           [!hasClue('scarf'), 'Search the cellar once the power is on. Check how someone could get in from outside.'],
-          [!st.items.some((i) => i.id === 'studykey'), 'The library poem tells you which books to pull: crimson, sea, the eldest, the tree.'],
+          [!st.flags.shelfOpen, 'The library poem tells you which books to pull: crimson, sea, the eldest, the tree.'],
           [!st.flags.studyOpen, 'Use the study key on the study door upstairs (select it in your bag first).'],
           [!st.flags.safeOpen, 'The clock in the foyer stopped at a time. Try it on the safe.'],
+          [d.beetles.length >= 5 && !st.flags.drawerOpen && st.flags.safeOpen, 'All five beetles are home. Try the signet ring on the display case in the study.'],
           [true, 'Go to the parlor and name the culprit. The letter, the scarf and the ticket all point one way.'],
         ];
         say(steps.find((s) => s[0])[1], 'Hint journal');
@@ -548,8 +577,22 @@
             if (st.flags.safeOpen) P(585, 115, 80, 90, 14, '#1b1b22', { basic: true });
             P(220, 250, 260, 110, 70, '#5a3a2a'); P(250, 236, 110, 14, 50, '#f4ecd0');
             V.shape('cylLo', 430, FLOOR - 250, 30, 16, 24, 16, '#e8d3a8', { parent: roomG, glow: 0.8 });
-            P(760, 200, 120, 120, 40, '#6a4a2a'); P(768, 208, 104, 60, 44, '#bfe6ff', { opacity: 0.35 });
-            for (let i = 0; i < 5; i++) { const b = V.shape('sphere', 782 + i * 19, FLOOR - 250, 30, 12, 8, 12, i < d.beetles.length ? '#ffd66b' : '#2a1e18', { parent: roomG, metal: i < d.beetles.length ? 0.7 : 0, glow: i < d.beetles.length ? 0.3 : 0 }); if (i < d.beetles.length) glowParts.push(b); }
+            // beetle cabinet: a glass case on a wooden base with the signet drawer
+            P(760, 270, 120, 50, 40, '#6a4a2a'); P(756, 266, 128, 6, 44, '#4e3420');
+            P(764, 204, 112, 62, 4, '#5a1e2e');
+            for (const [x, w] of [[760, 4], [876, 4]]) P(x, 200, w, 66, 40, '#4e3420');
+            P(760, 196, 120, 6, 40, '#4e3420');
+            P(764, 204, 112, 62, 38, '#cfeeff', { opacity: 0.18, depthWrite: false, shadow: false });
+            for (let i = 0; i < 5; i++) {
+              const has = i < d.beetles.length;
+              P(772 + i * 21, 252, 14, 3, 30, '#3a1420');
+              const b = V.shape('sphere', 779 + i * 21, FLOOR - 245, 22, 12, 8, 14, has ? '#ffd66b' : '#2a1e18', { parent: roomG, metal: has ? 0.7 : 0, rough: 0.3, glow: has ? 0.3 : 0 });
+              if (has) { V.shape('sphere', 779 + i * 21, FLOOR - 243, 29, 6, 5, 5, '#c89a2a', { parent: roomG, metal: 0.7 }); glowParts.push(b); }
+            }
+            const drawerOut = st.flags.drawerOpen ? 20 : 0;
+            if (drawerOut) P(792, 284, 56, 22, 40, '#1a1008', { z: 0.5 });
+            P(790, 282, 60, 24, 40, '#7a5634', { z: drawerOut + 2 });
+            P(816, 290, 8, 8, 44, '#b8860b', { metal: 0.7, z: drawerOut });
           } else if (R === 'kitchen') {
             P(110, 110, 110, 130, 30, '#6a707c', { metal: 0.4 });
             for (let i = 0; i < 5; i++) V.shape('sphere', 130 + i * 18, FLOOR - 150, 32, 11, 11, 6, st.fuses[i] ? '#ffd66b' : '#2a2f3a', { parent: roomG, glow: st.fuses[i] ? 1.2 : 0 });
@@ -660,7 +703,10 @@
           hover = visibleSpots().find((s) => p.x > s.x && p.x < s.x + s.w && p.y > s.y && p.y < s.y + s.h) || null;
           ctx.canvas.style.cursor = hover ? 'pointer' : 'default';
           if (p.pressed && hover && !panelOpen) {
+            const item = st.selected;
             if (hover.door) go(hover.door);
+            else if (item && hover.use && hover.use[item]) hover.use[item]();
+            else if (item) { const it = st.items.find((i) => i.id === item); st.selected = null; renderDock(); say('You try the ' + (it ? it.name.toLowerCase() : 'item') + ' on the ' + hover.label.toLowerCase() + '. Nothing happens.'); }
             else if (hover.on) hover.on();
           } else if (p.pressed && panelOpen === 'say') closePanels();
         },
@@ -674,7 +720,7 @@
         hud(g) { drawHud(g); },
 
         /** Automated-test hooks (not used by gameplay). */
-        _test: { st, go, get glow() { return furnaceGlow; } },
+        _test: { st, d, go, click(id) { const s = visibleSpots().find((x) => x.id === id); if (!s) return false; if (s.door) go(s.door); else if (st.selected && s.use && s.use[st.selected]) s.use[st.selected](); else s.on(); return true; }, get glow() { return furnaceGlow; } },
         onBotJoin(b) { addBot(b); },
         onBotLeave(b) { const i = bots.findIndex((x) => x.bot.id === b.id); if (i >= 0) bots.splice(i, 1); },
         destroy() { ctx.canvas.style.cursor = ''; ctx.save(); },
