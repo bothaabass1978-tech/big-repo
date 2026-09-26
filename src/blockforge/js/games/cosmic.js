@@ -303,7 +303,7 @@
           steerShip(me, dt, turn, thrust, inp.act('brake') || ax.y > 0.5);
           if (me.inv > 0) me.inv -= dt;
           me.cd -= dt;
-          if ((inp.act('fire') || p.down) && me.cd <= 0) { me.cd = me.power === 'rapid' ? T.rapid : T.fire; fire(me, true); }
+          if ((inp.act('fire') || p.down) && me.cd <= 0) { me.cd = me.power === 'rapid' ? T.rapid : T.fire * (ctx.hasPass('overcharge') ? 0.7 : 1); fire(me, true); }
           if (me.powerT > 0) { me.powerT -= dt; if (me.powerT <= 0) me.power = null; }
           mates.forEach((m) => { m.thrusting = false; mateAI(m, dt); });
           // spawning

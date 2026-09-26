@@ -37,6 +37,7 @@
   const STARS = (() => { const r = U.rng('ec-stars'); return Array.from({ length: 90 }, () => ({ x: r() * 960, y: r() * 540, s: r() * 1.6 + 0.4, t: r() * 6 })); })();
 
   BF.GameModules.register('elemental', {
+    orders: ['ally', 'attack', 'help', 'follow'],
     three: true,
     maxBots: 7,
     feedTop: 0.12,
@@ -130,6 +131,8 @@
       // ------------------------------------------------------------ combat
       function damage(t, amount, src, kbx, kby, o) {
         if (!t || t.dead || t.falling || t.prot > 0 || (t.dashT > 0 && t.el === 'air')) return;
+        if (friendly(src, t)) return;
+        if (t.isMe && ctx.hasPass('stoneskin')) amount *= 0.8;
         amount = Math.round(amount);
         t.hp -= amount;
         t.flash = 0.12;
@@ -208,9 +211,14 @@
       }
 
       // --------------------------------------------------------------- bots
+      /** Truce from chat ("team up", "don't attack me", "follow me"): allies never hurt the player or each other. */
+      const allied = (f) => { const o = f.bot && ctx.botOrder(f.bot.id); return !!o && ['ally', 'help', 'follow'].includes(o.verb); };
+      const friendly = (a, b) => !!a && !!b && ((a.isMe && allied(b)) || (b.isMe && allied(a)) || (allied(a) && allied(b)));
       function nearestFoe(f) {
+        const ord = f.bot && ctx.botOrder(f.bot.id);
+        if (ord && ord.verb === 'attack') { const want = ord.target === 'me' ? fighters.find((o) => o.isMe) : fighters.find((o) => o.bot && o.bot.id === ord.target); if (want && !want.dead && !want.falling) return want; }
         let best = null, bd = Infinity;
-        for (const o of fighters) { if (o === f || o.dead || o.falling) continue; const dd = U.dist(o.x, o.y, f.x, f.y); if (dd < bd) { bd = dd; best = o; } }
+        for (const o of fighters) { if (o === f || o.dead || o.falling || friendly(f, o)) continue; const dd = U.dist(o.x, o.y, f.x, f.y); if (dd < bd) { bd = dd; best = o; } }
         return best;
       }
       function botThink(f, dt) {

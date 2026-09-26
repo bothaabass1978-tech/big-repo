@@ -590,4 +590,41 @@
       { v: '1.0', date: '2019-10-31', notes: 'Ashcombe Manor opens its doors.' },
     ],
   });
+
+  // ---------------------------------------------------------------- more passes for every game
+  // Every built-in game also sells a VIP pass (+50% ForgeCoins and XP, VIP chat tag) and a
+  // Sparkle Trail (cosmetic), both handled by the runtime, plus one pass whose effect the
+  // game module checks itself.
+  const EXTRA = {
+    'block-battlegrounds': ['medic', 'Medic Kit', 300, 'Slowly regenerate health, and health packs heal you to full.', 'heart'],
+    'skyline-racers': ['rocket_start', 'Rocket Start', 250, 'Launch off the grid with a 2-second boost when the race starts.', 'rocket'],
+    'treasure-islands': ['tide_charm', 'Tide Charm', 300, 'The tide comes in a whole minute later.', 'clock'],
+    'towerfall-legends': ['sharpshooter', 'Sharpshooter', 350, 'Every tower fires 25% faster.', 'crosshair'],
+    'pet-world': ['swift_pets', 'Swift Pets', 350, 'Your pets run 35% faster and mine 20% harder.', 'bolt'],
+    'sky-obby': ['feather', 'Feather Fall', 250, 'Fall more gently: more time to steer onto the next platform.', 'sparkle'],
+    'city-life': ['overtime', 'Overtime Permit', 250, 'Your shift lasts 90 seconds longer.', 'clock'],
+    'dungeon-frontier': ['potion_belt', 'Potion Belt', 300, 'Start every run with two extra potions.', 'heart'],
+    'elemental-clash': ['stoneskin', 'Stoneskin', 350, 'Take 20% less damage from every element.', 'shield'],
+    'zombie-outbreak': ['body_armor', 'Body Armor', 300, '+50 max health for the whole siege.', 'shield'],
+    'factory-tycoon': ['overdrive', 'Belt Overdrive', 350, 'Conveyor belts run 30% faster.', 'bolt'],
+    'treasure-tycoon': ['hustle', 'Hard Workers', 300, 'Your workers gather 35% faster.', 'hammer'],
+    'mega-miners': ['appraiser', 'Ore Appraiser', 350, 'Sell every backpack for 30% more.', 'gem'],
+    'battle-boats': ['fast_reload', 'Quick Crew', 300, 'Your cannons reload 35% faster.', 'crosshair'],
+    'pixel-soccer': ['endurance', 'Endurance', 250, 'Your stamina refills 70% faster.', 'run'],
+    'cosmic-survival': ['overcharge', 'Overcharged Blaster', 300, 'Fire 30% faster.', 'bolt'],
+    'castle-siege': ['royal_mint', 'Royal Mint', 350, 'Mines and quarries produce 30% more.', 'wallet'],
+    'speed-trials': ['grip', 'Grip Tyres', 250, 'Better control on ice and less slowdown in mud.', 'target'],
+    'pet-battle-arena': ['vitality', 'Vitality Charm', 300, 'Your pets start every battle with 15% more health.', 'heart'],
+    'mystery-mansion': ['pocketwatch', 'Pocket Watch', 250, 'Three more minutes before the clock strikes midnight.', 'clock'],
+  };
+  for (const g of BF.GAME_REGISTRY) {
+    if (!g.builtIn) continue;
+    const more = [
+      pass('gp_' + g.id + '_vip', 'VIP', 800, 'VIP in ' + g.name + ': +50% ForgeCoins and XP from every session, and a gold VIP tag in chat.', 'vip', 'crown'),
+      pass('gp_' + g.id + '_trail', 'Sparkle Trail', 150, 'Leave a trail of glitter behind you wherever you go in ' + g.name + ' (3D).', 'trail', 'sparkle'),
+    ];
+    const x = EXTRA[g.id];
+    if (x) more.push(pass('gp_' + g.id + '_' + x[0], x[1], x[2], x[3], x[0], x[4]));
+    for (const p of more) if (!g.passes.some((q) => q.id === p.id)) { p.gameId = g.id; p.kind = 'pass'; g.passes.push(p); }
+  }
 })((window.BF = window.BF || {}));

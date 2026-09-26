@@ -52,6 +52,7 @@
 
   BF.GameModules.register('arena', {
     three: true,
+    orders: ['follow', 'come', 'stay', 'leave', 'ally', 'attack', 'help'],
     actions: { attack: ['Space', 'Mouse0', 'KeyJ'], dash: ['ShiftLeft', 'ShiftRight', 'KeyK'], swap: ['KeyQ', 'KeyL'] },
     controls: { joystick: true, buttons: [{ act: 'attack', label: 'Attack', icon: 'sword' }, { act: 'dash', label: 'Dash', icon: 'bolt' }, { act: 'swap', label: 'Swap', icon: 'refresh' }] },
     create(ctx) {
@@ -180,6 +181,7 @@
 
       function damage(target, amount, from, kx, ky) {
         if (!target.alive || target.protect > 0 || phase !== 'play') return;
+        if (from && friendly(from, target)) return;
         if (from && from.buffs.damage > 0) amount *= 1.4;
         if (target.shield > 0) {
           const absorbed = Math.min(target.shield, amount);
@@ -272,10 +274,13 @@
         if (f.isPlayer) ctx.sfx('boost');
       }
 
+      /** Allies of the player (from chat orders) never fight the player or each other. */
+      const allied = (f) => { const o = f.bot && ctx.botOrder(f.bot.id); return !!o && ['ally', 'help', 'follow'].includes(o.verb); };
+      const friendly = (a, b) => (a.isPlayer && allied(b)) || (b.isPlayer && allied(a)) || (allied(a) && allied(b));
       function nearestEnemy(f, maxD) {
         let best = null, bd = maxD || 9999;
         for (const o of fighters) {
-          if (o === f || !o.alive) continue;
+          if (o === f || !o.alive || friendly(f, o)) continue;
           const d = U.dist(f.x, f.y, o.x, o.y);
           if (d < bd) { bd = d; best = o; }
         }
@@ -307,6 +312,23 @@
             if (pk && (f.hp < 40 ? pk.type === 'health' || Math.random() < 0.5 : true)) ai.goal = pk;
           }
           if (!ai.target && !ai.goal) ai.wander = { x: 80 + Math.random() * (W - 160), y: 80 + Math.random() * (H - 160) };
+          // orders from the player's chat
+          const ord = ctx.botOrder(bot.id), me = fighters.find((o) => o.isPlayer);
+          ai.hold = null;
+          if (ord && me) {
+            if (ord.verb === 'attack') { const tg = ord.target === 'me' ? me : fighters.find((o) => o.bot && o.bot.id === ord.target); if (tg && tg.alive) { ai.target = tg; ai.goal = null; } }
+            else if (ord.verb === 'leave') { ai.target = ai.target === me ? null : ai.target; ai.goal = null; ai.wander = { x: me.x < W / 2 ? W - 90 : 90, y: me.y < H / 2 ? H - 90 : 90 }; }
+            else if (ord.verb === 'stay') { ai.goal = null; ai.wander = null; ai.hold = { x: f.x, y: f.y }; }
+            else if (['follow', 'come', 'help'].includes(ord.verb)) {
+              // stay near the player and fight whoever is closest to them
+              const near = U.dist(f.x, f.y, me.x, me.y);
+              const guard = fighters.filter((o) => o !== f && o.alive && !o.isPlayer && !friendly(f, o) && U.dist(o.x, o.y, me.x, me.y) < 200).sort((a, b) => U.dist(a.x, a.y, me.x, me.y) - U.dist(b.x, b.y, me.x, me.y))[0];
+              ai.target = guard || (near > 70 ? null : ai.target && !friendly(f, ai.target) ? ai.target : null);
+              ai.goal = null;
+              if (!ai.target || near > 170) ai.wander = { x: me.x + Math.cos(U.hash(bot.id) % 6) * 55, y: me.y + Math.sin(U.hash(bot.id) % 6) * 55 };
+              if (ord.verb === 'come' && near < 70) ctx.clearOrder(bot.id);
+            }
+          }
         }
         let mx = 0, my = 0;
         const t = ai.target && ai.target.alive ? ai.target : null;
@@ -331,6 +353,7 @@
           if (Math.hypot(mx, my) < 20) ai.wander = null;
           f.angle = Math.atan2(my, mx);
         }
+        if (ai.hold) { mx = 0; my = 0; }
         if (bot.personality === 'chaotic' && Math.random() < 0.01) dash(f, Math.random() - 0.5, Math.random() - 0.5);
         if (t && f.hp < 45 && Math.random() < 0.004 * skill * 10) dash(f, -(t.x - f.x), -(t.y - f.y));
         const l = Math.hypot(mx, my);
@@ -389,7 +412,9 @@
           move(f, m.x, m.y, dt);
         }
         // timers
+        const medic = ctx.hasPass('medic');
         for (const f of fighters) {
+          if (medic && f.isPlayer && f.alive) f.hp = Math.min(T.hp, f.hp + 2.5 * dt);
           f.cd = Math.max(0, f.cd - dt);
           f.dashCd = Math.max(0, f.dashCd - dt);
           f.protect = Math.max(0, f.protect - dt);
@@ -433,7 +458,7 @@
           pk.t += dt;
           const f = fighters.find((o) => o.alive && U.dist(o.x, o.y, pk.x, pk.y) < T.radius + 14);
           if (!f) continue;
-          if (pk.type === 'health') f.hp = Math.min(T.hp, f.hp + 40);
+          if (pk.type === 'health') f.hp = Math.min(T.hp, f.hp + (f.isPlayer && ctx.hasPass('medic') ? 100 : 40));
           if (pk.type === 'speed') f.buffs.speed = T.buffTime;
           if (pk.type === 'damage') f.buffs.damage = T.buffTime;
           if (pk.type === 'shield') f.shield = 40;

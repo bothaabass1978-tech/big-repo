@@ -31,6 +31,7 @@
   const TEAM = { blue: { color: '#46a8ff', sail: '#dff0ff', name: 'Blue fleet' }, red: { color: '#ff5a6a', sail: '#ffe3e6', name: 'Red fleet' } };
 
   BF.GameModules.register('boats', {
+    orders: ['follow', 'come', 'stay', 'help', 'attack'],
     three: true,
     maxBots: 9,
     feedTop: 0.14,
@@ -80,7 +81,7 @@
 
       function fire(b, side) {
         if (b.dead || b.cd[side] > 0) return false;
-        b.cd[side] = T.reload;
+        b.cd[side] = T.reload * (b.isMe && ctx.hasPass('fast_reload') ? 0.65 : 1);
         const dir = b.a + (side === 'port' ? -Math.PI / 2 : Math.PI / 2);
         const per = b.isMe && twin ? 2 : 1;
         for (let i = -1; i <= 1; i++) for (let k = 0; k < per; k++) {
@@ -157,6 +158,22 @@
           const nearBoat = enemies.sort((x, y) => U.dist(x.x, x.y, b.x, b.y) - U.dist(y.x, y.y, b.x, b.y))[0];
           const nearFort = eforts.sort((x, y) => U.dist(x.x, x.y, b.x, b.y) - U.dist(y.x, y.y, b.x, b.y))[0];
           b.target = nearBoat && (!nearFort || U.dist(nearBoat.x, nearBoat.y, b.x, b.y) < 420 || Math.random() < 0.5) ? nearBoat : nearFort || nearBoat || null;
+        }
+        // orders from chat (your fleet only): stay, follow / escort me, attack a named captain
+        const ord = b.bot && b.team === me.team ? ctx.botOrder(b.bot.id) : null;
+        if (ord) {
+          if (ord.verb === 'stay') return { throttle: 0, steer: 0 };
+          if (ord.verb === 'attack' && ord.target && ord.target !== 'me') { const t2 = boats.find((o) => o.bot && o.bot.id === ord.target && !o.dead && o.team !== b.team); if (t2) b.target = t2; }
+          if (['follow', 'help', 'come'].includes(ord.verb) && !me.dead) {
+            const threat = boats.filter((o) => o.team !== b.team && !o.dead && U.dist(o.x, o.y, me.x, me.y) < 380)[0];
+            if (threat) b.target = threat;
+            else {
+              const dm = U.dist(me.x, me.y, b.x, b.y);
+              if (ord.verb === 'come' && dm < 150) ctx.clearOrder(b.bot.id);
+              const want = U.angleTo(b.x, b.y, me.x - Math.cos(me.a) * 90, me.y - Math.sin(me.a) * 90);
+              return { throttle: dm > 160 ? 1 : 0.25, steer: U.clamp(U.wrapAngle(want - b.a) * 2, -1, 1) };
+            }
+          }
         }
         const tg = b.target;
         if (!tg) return { throttle: 0.3, steer: 0 };

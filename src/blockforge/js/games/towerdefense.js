@@ -51,6 +51,7 @@
   BF.tdGenPath = genPath;
 
   BF.GameModules.register('towerdefense', {
+    orders: ['build'],
     three: true,
     maxBots: 2,
     feedTop: 0.1,
@@ -173,7 +174,7 @@
           if (prog > best) { best = prog; target = e; }
         }
         if (!target) return;
-        t.cd = s.rate;
+        t.cd = s.rate * (ctx.hasPass('sharpshooter') ? 0.8 : 1);
         t.aim = U.angleTo(t.x, t.y, target.x, target.y);
         if (t.type === 'archer') { shots.push({ kind: 'arrow', x: t.x, y: t.y, tgt: target, dmg: s.dmg, speed: 520 }); ctx.sfx('shoot', { vol: 0.25 }); }
         else if (t.type === 'cannon') { shots.push({ kind: 'ball', x: t.x, y: t.y, sx: t.x, sy: t.y, tx: target.x, ty: target.y, t: 0, dur: 0.55, dmg: s.dmg, splash: s.splash }); ctx.sfx('swing', { vol: 0.3 }); }
@@ -202,8 +203,12 @@
         if (a.t > 0) return;
         a.t = 8 + Math.random() * 8;
         const types = ['archer', 'cannon', 'frost'];
-        const type = U.pick(types);
-        if (a.gold < TOWERS[type].cost) return;
+        // "build a cannon" in chat picks the tower type; if they are short they build the cheapest they can
+        const asked = a.want && types.find((k) => a.want.indexOf(k) === 0);
+        let type = asked || U.pick(types);
+        if (a.want && a.gold < TOWERS[type].cost) type = types.filter((k) => a.gold >= TOWERS[k].cost).sort((x, y) => TOWERS[x].cost - TOWERS[y].cost)[0] || type;
+        a.want = null;
+        if (a.gold < TOWERS[type].cost) { if (asked) ctx.botText(a.bot, 'not enough gold for that yet, need ' + TOWERS[type].cost, 400); return; }
         const spots = [];
         for (let cy = 0; cy < ROWS; cy++) for (let cx = 0; cx < COLS; cx++) {
           if (!buildable(cx, cy)) continue;
@@ -631,6 +636,15 @@
         render3d(dt) { view(dt); },
         hud(g) { drawHud(g); },
         onBotJoin(b) { if (!allies.has(b.id) && allies.size < 2) allies.set(b.id, { bot: b, gold: 60, t: 8 }); },
+        /** "build a tower" in chat: the ally builds right away. */
+        onBotOrder(bot, order) {
+          const a = allies.get(bot.id);
+          if (!a || order.verb !== 'build') return;
+          a.want = String(order.arg || 'tower').replace(/s$/, '');
+          a.t = 0;
+          allyBuild(a, 0);
+          ctx.clearOrder(bot.id);
+        },
         onBotLeave(b) { allies.delete(b.id); towers.forEach((t) => { if (t.owner && t.owner.id === b.id) t.owner = null; }); },
         destroy() { offPass(); },
       };

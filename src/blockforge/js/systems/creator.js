@@ -14,6 +14,7 @@
     obby: { label: 'Obby', gameType: 'obby', base: 'sky-obby', icon: 'chevronUp', genre: 'Obby', desc: 'A procedurally built parkour course with checkpoints.' },
     simulator: { label: 'Simulator', gameType: 'miner', base: 'mega-miners', icon: 'gem', genre: 'Simulator', desc: 'Dig, collect, sell and upgrade in a generated mine.' },
     towerdefense: { label: 'Tower Defense', gameType: 'towerdefense', base: 'towerfall-legends', icon: 'shield', genre: 'Strategy', desc: 'A generated path with towers, upgrades and waves.' },
+    custom: { label: 'Custom (from scratch)', gameType: 'custom', base: null, icon: 'brush', genre: 'Adventure', desc: 'Build your own world tile by tile and choose the rules: collect, reach the flag, survive or score.' },
   };
 
   const VISIT_PAYOUT = 0.2; // ForgeCoins a creator earns per visit
@@ -22,13 +23,18 @@
   const PASS_EFFECTS = {
     double_xp: 'Double XP in this game',
     bonus_coins: '+25% ForgeCoin rewards in this game',
-    vip: 'VIP tag and a golden name in chat',
+    vip: 'VIP: +50% ForgeCoins and XP, and a VIP tag in chat',
+    trail: 'Sparkle trail behind the player (3D)',
+    supporter: 'Supporter badge: a thank-you with no gameplay effect',
   };
+  /** Most passes one creation can sell. */
+  const MAX_PASSES = 25;
 
   const creator = (BF.creator = {
     TEMPLATES,
     VISIT_PAYOUT,
     PASS_EFFECTS,
+    MAX_PASSES,
     THUMB_COLORS: ['#ff7a2e', '#46a8ff', '#4ad17f', '#b67cff', '#ff4f9a', '#ffc940', '#39f3ff', '#e03e5a'],
     THUMB_PATTERNS: ['grid', 'stripes', 'dots', 'stars', 'none'],
 
@@ -82,8 +88,8 @@
         badges: [],
         leaderboard: base ? base.leaderboard.slice(0, 1) : [],
         chat: base ? base.chat : {},
-        controls: base ? base.controls : '',
-        howTo: base ? base.howTo : '',
+        controls: base ? base.controls : t.gameType === 'custom' ? 'WASD / arrows move · Jump pads launch you · Talk to bots to give orders' : '',
+        howTo: base ? base.howTo : t.gameType === 'custom' ? BF.studio.CUSTOM.goals[BF.studio.rules(ug.layout).goal] + '.' : '',
         activeBots: base ? base.activeBots : 5,
         changelog: [{ v: String(ug.version || 1), date: new Date(ug.updatedAt).toISOString().slice(0, 10), notes: 'Updated by the creator.' }],
         builtIn: false,
@@ -199,7 +205,7 @@
       if (!ug) return { ok: false, error: 'Game not found.' };
       if (name.length < 3 || name.length > 30) return { ok: false, error: 'Pass names need 3-30 characters.' };
       if (!(price >= 10 && price <= 100000)) return { ok: false, error: 'Price must be between 10 and 100,000 ForgeCoins.' };
-      if ((ug.passes || []).length >= 6) return { ok: false, error: 'A game can have up to 6 passes.' };
+      if ((ug.passes || []).length >= MAX_PASSES) return { ok: false, error: 'A game can have up to ' + MAX_PASSES + ' passes.' };
       const pass = { id: U.uid('ugp'), name, price, desc: String(p.desc || PASS_EFFECTS[p.effect] || '').trim(), effect: PASS_EFFECTS[p.effect] ? p.effect : 'vip' };
       BF.store.update('created', () => { ug.passes = (ug.passes || []).concat(pass); ug.updatedAt = BF.clock.now(); });
       return { ok: true, pass };
@@ -251,6 +257,7 @@
       if (!(visits > 0)) return;
       const q = creator.quality(ug);
       ug.visits += visits;
+      if (BF.followers) BF.followers.fromVisits(visits, ug.name);
       const likeP = 1 - Math.pow(1 - 0.06 * q, visits), favP = 1 - Math.pow(1 - 0.02 * q, visits);
       if (Math.random() < Math.min(0.95, likeP * 3)) ug.likes += Math.max(1, Math.round(visits * 0.06 * q));
       if (Math.random() < 0.015 * Math.min(4, visits)) ug.dislikes += 1;
@@ -331,7 +338,9 @@
         if (!ug.published || ug.visibility === 'private') continue;
         const quality = creator.quality(ug);
         const playing = BF.world.playerCount(ug.id);
-        const visits = (Math.random() < 0.55 * quality ? U.randInt(1, 3) : 0) + (playing > 0 && Math.random() < 0.3 ? 1 : 0);
+        // word of mouth: a game that already has an audience keeps attracting more of it
+        const momentum = Math.sqrt(ug.visits || 0) / 40 * quality;
+        const visits = (Math.random() < 0.55 * quality ? U.randInt(1, 3) : 0) + (playing > 0 && Math.random() < 0.3 ? 1 : 0) + Math.floor(momentum * Math.random() * 2);
         if (!visits) continue;
         touched = true;
         creator.receiveVisits(ug, visits, 'organic');

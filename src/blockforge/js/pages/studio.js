@@ -36,7 +36,7 @@
 
   function studioGrid(template) {
     const spec = BF.studio.SPEC[template];
-    const cell = template === 'obby' ? 16 : template === 'towerdefense' ? 34 : 28;
+    const cell = template === 'obby' ? 16 : template === 'towerdefense' ? 34 : template === 'custom' ? 26 : 28;
     return { spec, cell, w: spec.cols * cell, h: spec.rows * cell };
   }
 
@@ -49,6 +49,7 @@
     // backdrop per template
     if (template === 'obby') { const gr = g.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, '#5fb4ff'); gr.addColorStop(1, '#cfeaff'); g.fillStyle = gr; }
     else if (template === 'towerdefense') g.fillStyle = '#3e7a38';
+    else if (template === 'custom') g.fillStyle = BF.studio.CUSTOM.themes[BF.studio.rules(ST.layout).theme].floor;
     else g.fillStyle = '#1b2333';
     g.fillRect(0, 0, w, h);
     g.strokeStyle = template === 'obby' ? 'rgba(255,255,255,.35)' : 'rgba(255,255,255,.08)';
@@ -64,7 +65,12 @@
       const info = spec.tiles[t] || { color: '#ffffff' };
       g.fillStyle = info.color;
       if (template === 'obby') { g.fillRect(c * cell, r * cell + cell * 0.25, cell, cell * 0.55); g.fillStyle = 'rgba(0,0,0,.18)'; g.fillRect(c * cell, r * cell + cell * 0.62, cell, cell * 0.18); }
-      else { g.fillRect(c * cell + 1, r * cell + 1, cell - 2, cell - 2); if (template === 'towerdefense') { g.fillStyle = 'rgba(0,0,0,.12)'; g.fillRect(c * cell + 1, r * cell + cell - 6, cell - 2, 5); } }
+      else if (template === 'custom' && ['coin', 'gem', 'enemy', 'key', 'heal'].includes(t)) {
+        // pickups and enemies as round markers so walls read as walls
+        g.beginPath(); g.arc(c * cell + cell / 2, r * cell + cell / 2, cell * (t === 'enemy' ? 0.42 : 0.3), 0, Math.PI * 2); g.fill();
+        if (t === 'enemy') { g.fillStyle = '#ff3d5a'; g.fillRect(c * cell + cell * 0.3, r * cell + cell * 0.38, 3, 3); g.fillRect(c * cell + cell * 0.6, r * cell + cell * 0.38, 3, 3); }
+      } else { g.fillRect(c * cell + 1, r * cell + 1, cell - 2, cell - 2); if (template === 'towerdefense') { g.fillStyle = 'rgba(0,0,0,.12)'; g.fillRect(c * cell + 1, r * cell + cell - 6, cell - 2, 5); } }
+      if (template === 'custom' && (t === 'start' || t === 'goal' || t === 'check')) { g.fillStyle = '#1b1b22'; g.font = '800 ' + Math.round(cell * 0.5) + 'px system-ui'; g.textAlign = 'center'; g.fillText(t === 'start' ? 'S' : t === 'goal' ? 'G' : 'C', c * cell + cell / 2, r * cell + cell * 0.68); g.textAlign = 'left'; }
       if (t === 'spin') { g.strokeStyle = '#ff3d5a'; g.lineWidth = 3; g.beginPath(); g.moveTo(c * cell, r * cell); g.lineTo(c * cell + cell, r * cell + cell); g.stroke(); g.lineWidth = 1; }
     }
     // the traced road in Tower Defense
@@ -82,10 +88,28 @@
     if (save) save.disabled = !v.ok || !ST.dirty;
   }
 
+  /** Rules of a custom game: goal, timer, lives, speeds, theme and bots. */
+  function rulesForm() {
+    const r = BF.studio.rules(ST.layout), SPC = BF.studio.CUSTOM;
+    const opt = (list, cur) => Object.entries(list).map(([k, v]) => '<option value="' + k + '"' + (k === cur ? ' selected' : '') + '>' + esc(typeof v === 'string' ? v : v.label) + '</option>').join('');
+    const sp = { slow: 'Slow', normal: 'Normal', fast: 'Fast' };
+    return '<form class="panel studio-rules" id="studio-rules"><h3 class="panel-title">' + BF.icon('gear', 16) + 'Game rules</h3><div class="rules-grid">' +
+      '<label>Goal<select class="select" name="goal">' + opt(SPC.goals, r.goal) + '</select></label>' +
+      '<label>Theme<select class="select" name="theme">' + opt(SPC.themes, r.theme) + '</select></label>' +
+      '<label>Time limit (seconds)<input class="input" name="time" type="number" min="30" max="900" step="10" value="' + r.time + '"></label>' +
+      '<label>Lives<input class="input" name="lives" type="number" min="1" max="9" value="' + r.lives + '"></label>' +
+      '<label>Player speed<select class="select" name="speed">' + opt(sp, r.speed) + '</select></label>' +
+      '<label>Enemy speed<select class="select" name="enemySpeed">' + opt(sp, r.enemySpeed) + '</select></label>' +
+      '<label class="check-row"><input type="checkbox" name="bots"' + (r.bots ? ' checked' : '') + '> Bots play too (they chase coins and take chat orders)</label>' +
+      '</div></form>';
+  }
+  /** Repack cells without losing a custom game's rules. */
+  const repack = (template, m) => { const rules = ST.layout && ST.layout.rules; const out = BF.studio.pack(template, m); if (rules) out.rules = rules; return out; };
+
   tabs.studio = {
     render(ug) {
       if (!BF.studio.supports(ug.template)) {
-        return '<div class="panel notice">' + BF.icon('info', 18) + '<div><b>' + esc(BF.creator.TEMPLATES[ug.template].label) + ' levels are generated from a seed.</b><p class="faint">The Studio tile editor supports Obby, Tower Defense and Arena games. Use Settings to pick a difficulty or regenerate a fresh layout.</p></div><a class="btn btn-outline" href="#/create/' + ug.id + '/settings">' + BF.icon('gear', 14) + 'Settings</a></div>';
+        return '<div class="panel notice">' + BF.icon('info', 18) + '<div><b>' + esc(BF.creator.TEMPLATES[ug.template].label) + ' levels are generated from a seed.</b><p class="faint">The Studio tile editor supports Obby, Tower Defense, Arena and Custom games. Use Settings to pick a difficulty or regenerate a fresh layout.</p></div><a class="btn btn-outline" href="#/create/' + ug.id + '/settings">' + BF.icon('gear', 14) + 'Settings</a></div>';
       }
       if (ST.id !== ug.id || !ST.layout) {
         ST.id = ug.id;
@@ -96,7 +120,7 @@
       }
       const spec = BF.studio.SPEC[ug.template];
       const palette = Object.entries(spec.tiles).map(([k, t]) => '<button type="button" class="tile-btn' + (!ST.erase && ST.tile === k ? ' on' : '') + '" data-tile="' + k + '"><i style="background:' + t.color + '"></i>' + esc(t.label) + '</button>').join('');
-      const help = { obby: 'Paint platforms on the side-view grid. Players start on the Start platform and win at the Finish portal. Checkpoints are numbered left to right.', towerdefense: 'Paint one unbroken road from the left edge to the castle on the right. Towers can be built on every grass tile.', arena: 'Place cover blocks. The glowing spawn zone in the middle always stays clear.' }[ug.template];
+      const help = { obby: 'Paint platforms on the side-view grid. Players start on the Start platform and win at the Finish portal. Checkpoints are numbered left to right.', towerdefense: 'Paint one unbroken road from the left edge to the castle on the right. Towers can be built on every grass tile.', arena: 'Place cover blocks. The glowing spawn zone in the middle always stays clear.', custom: 'Build your world from above: walls, coins and gems, lava and spikes, patrolling enemies, keys and locked doors, pads, extra lives, checkpoints and a goal flag. Then choose the rules below.' }[ug.template];
       return '<div class="studio">' +
         '<div class="studio-bar panel"><div class="studio-palette">' + palette + '<button type="button" class="tile-btn' + (ST.erase ? ' on' : '') + '" data-erase>' + BF.icon('eraser', 14) + 'Erase</button></div>' +
         '<div class="studio-actions"><button class="btn btn-sm btn-ghost" data-studio-gen>' + BF.icon('refresh', 13) + 'Start from generated</button><button class="btn btn-sm btn-ghost" data-studio-clear>' + BF.icon('trash', 13) + 'Clear</button>' +
@@ -104,7 +128,7 @@
         '<button class="btn btn-sm btn-play" data-act="play" data-game="' + ug.id + '">' + BF.icon('play', 12) + 'Test play</button><button class="btn btn-sm btn-primary" data-studio-save>' + BF.icon('save', 13) + 'Save layout</button></div></div>' +
         '<p class="faint studio-help">' + BF.icon('brush', 13) + ' ' + esc(help) + ' Click or drag to paint; right-click erases. ' + (ug.layout ? 'This game uses your Studio layout.' : 'Until you save, the game uses its generated level.') + '</p>' +
         '<div class="studio-scroll"><canvas id="studio-canvas" class="studio-canvas"></canvas></div>' +
-        '<div class="studio-status" id="studio-status"></div></div>';
+        '<div class="studio-status" id="studio-status"></div>' + (ug.template === 'custom' ? rulesForm() : '') + '</div>';
     },
 
     mount(root, ug) {
@@ -127,7 +151,7 @@
           m.set(k, ST.tile);
         }
         if (m.get(k) === before) return;
-        ST.layout = BF.studio.pack(ug.template, m);
+        ST.layout = repack(ug.template, m);
         ST.dirty = true;
         redraw();
       };
@@ -142,7 +166,14 @@
       const er = root.querySelector('[data-erase]');
       if (er) er.addEventListener('click', () => { ST.erase = true; root.querySelectorAll('.tile-btn').forEach((x) => x.classList.toggle('on', x === er)); });
       root.querySelector('[data-studio-gen]').addEventListener('click', () => { ST.layout = BF.studio.fromGenerated(ug.template, ug.seed, ug.difficulty); ST.dirty = true; redraw(); });
-      root.querySelector('[data-studio-clear]').addEventListener('click', () => { ST.layout = BF.studio.blank(ug.template); ST.dirty = true; redraw(); });
+      root.querySelector('[data-studio-clear]').addEventListener('click', () => { const rules = ST.layout && ST.layout.rules; ST.layout = BF.studio.blank(ug.template); if (rules) ST.layout.rules = rules; ST.dirty = true; redraw(); });
+      const rf = root.querySelector('#studio-rules');
+      if (rf) rf.addEventListener('change', () => {
+        const f = new FormData(rf);
+        ST.layout = Object.assign({}, ST.layout, { rules: BF.studio.rules({ rules: { goal: f.get('goal'), theme: f.get('theme'), time: f.get('time'), lives: f.get('lives'), speed: f.get('speed'), enemySpeed: f.get('enemySpeed'), bots: f.get('bots') === 'on' } }) });
+        ST.dirty = true;
+        redraw();
+      });
       const drop = root.querySelector('[data-studio-drop]');
       if (drop) drop.addEventListener('click', async () => {
         const ok = await BF.ui.confirm({ title: 'Go back to the generated level?', message: 'Your Studio layout is removed and the game uses its seed-generated level again.', confirmLabel: 'Use generated level' });

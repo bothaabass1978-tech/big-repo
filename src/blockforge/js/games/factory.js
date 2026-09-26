@@ -60,6 +60,7 @@
   const COLLECTORS = { main: { layer: 0, x: 760, y: 480 }, east: { layer: 0, x: 1340, y: 480 }, upper: { layer: 1, x: 760, y: 480 } };
 
   BF.GameModules.register('factory', {
+    orders: ['follow', 'come', 'stay', 'leave'],
     three: true,
     maxBots: 6,
     feedTop: 0.17,
@@ -449,7 +450,7 @@
           for (let i = blocks.length - 1; i >= 0; i--) {
             const b = blocks[i];
             if (b.drop > 0) { b.drop -= dt; continue; }
-            b.x += T.beltSpeed * dt;
+            b.x += T.beltSpeed * (ctx.hasPass('overdrive') ? 1.3 : 1) * dt;
             for (const up of ITEMS) if (up.kind === 'upgrader' && up.line === b.line && owns(up.id) && !b.passed.has(up.id) && b.x >= up.x) { b.passed.add(up.id); b.v *= up.mult; if (LINES[b.line].layer === layer && Math.random() < 0.4) parts.emit(up.x, b.y, { count: 3, color: '#ffffff', speed: 60, life: 0.3 }); }
             if (b.x >= LINES[b.line].x1 + 20) { blocks.splice(i, 1); produce(b.line, b.v * m); }
           }
@@ -480,8 +481,12 @@
           for (const bt of bots) {
             bt.t -= dt; bt.buyT -= dt;
             if (bt.t <= 0) { bt.t = 2 + Math.random() * 4; const bb = bounds(); bt.tx = bb.x + 40 + Math.random() * (bb.w - 80); bt.ty = 460 + Math.random() * 260; }
+            // orders from chat: follow, come, stay, go away
+            const og = BF.orders.goal(ctx, bt.bot.id, bt, me, { near: 45 });
+            if (og) { if (og.hold) { bt.tx = bt.x; bt.ty = bt.y; } else { bt.tx = og.x; bt.ty = og.y; } }
             const ddx = bt.tx - bt.x, ddy = bt.ty - bt.y, l = Math.hypot(ddx, ddy);
-            if (l > 5) { bt.x += (ddx / l) * 90 * dt; bt.y += (ddy / l) * 90 * dt; bt.a = Math.atan2(ddy, ddx); bt.walk += dt * 9; }
+            const bsp = og && !og.hold ? T.speed : 90;
+            if (l > 5) { bt.x += (ddx / l) * bsp * dt; bt.y += (ddy / l) * bsp * dt; bt.a = Math.atan2(ddy, ddx); bt.walk += dt * 9; }
             if (bt.buyT <= 0) {
               bt.buyT = 30 + Math.random() * 50;
               const it = U.pick(ITEMS.filter((x) => x.price > 0 && x.price < bt.value / 2 + 5000));

@@ -85,7 +85,7 @@
         ctx: null, instance: null, input: null,
         paused: false, ended: false, loading: true, crashed: 0,
         all: [], active: [], lines: [], partner: null,
-        timers: [], offs: [],
+        timers: [], offs: [], orders: new Map(),
         raf: 0, lastT: 0, playTime: 0, timeBank: 0,
         pendingCoins: 0, pendingReasons: new Set(), flushTimer: null,
         bubbles: new Map(), badges: [], sessionCoins: 0, sessionXp: 0,
@@ -386,6 +386,7 @@
       if (s.g3) {
         const vdt = s.paused ? 0 : dt;
         if (inst.render3d) inst.render3d(vdt);
+        if (vdt > 0 && passEffect('trail')) sparkleTrail(vdt);
         s.g3.update(vdt);
         s.g3.render();
         g.clearRect(0, 0, W, H);
@@ -617,7 +618,8 @@
     const color = me ? '#ffb454' : from === 'system' ? '#8fd3ff' : BF.gfx.nameColor(from.username);
     const el = document.createElement('div');
     el.className = 'gr-msg' + (from === 'system' ? ' sys' : '') + (o.emote ? ' emote' : '');
-    el.innerHTML = from === 'system' ? esc(text) : '<b style="color:' + color + '">[' + esc(name) + ']:</b> ' + esc(text);
+    const vipTag = me && passEffect('vip') ? '<span class="vip-tag">VIP</span> ' : '';
+    el.innerHTML = from === 'system' ? esc(text) : vipTag + '<b style="color:' + color + '">[' + esc(name) + ']:</b> ' + esc(text);
     s.lines.push({ who: me ? 'me' : from === 'system' ? 'system' : from.id, text: String(text) });
     if (s.lines.length > 60) s.lines.shift();
     s.chatLog.appendChild(el);
@@ -712,7 +714,7 @@
         const item = owned.find((i) => i.look.anim === arg || i.name.toLowerCase() === arg || i.name.toLowerCase().includes(arg));
         if (item) doEmote(item);
         else systemChat('You do not own that emote. Owned: ' + owned.map((i) => i.look.anim).join(', '));
-      } else if (cmd === 'help') systemChat('Commands: /e <emote>, /players, /help');
+      } else if (cmd === 'help') systemChat('Commands: /e <emote>, /players, /help. Talk to bots to give orders: "Mocha follow me", "everyone come here", "team up", "fight me", "help me", "dance".');
       else if (cmd === 'players') systemChat('Players here: You, ' + s.all.map((b) => b.displayName).join(', '));
       else systemChat('Unknown command. Try /help');
       return;
@@ -726,7 +728,38 @@
     if (s.instance && s.instance.onChat) { try { s.instance.onChat(clean); } catch (e) { /* optional */ } }
     const pool = s.active.concat(s.all.filter((b) => !s.active.some((a) => a.id === b.id)));
     const partner = s.partner && s.ctx && s.ctx.time - s.partner.t < 45 ? s.partner : null;
+    // an instruction ("Mocha follow me", "everyone come here", "fight me") is acted on, not chatted about
+    const order = BF.orders && pool.length ? BF.orders.parse(clean, pool, { partner: partner && partner.id, nearest: s.active[0] }) : null;
+    if (order && giveOrder(order)) return;
     BF.chat.responders(pool, clean, { partner }).list.forEach((b, i) => botAnswer(b, clean, i));
+  }
+
+  /**
+   * Hand an order to the addressed bots. Emotes and jumps work in every 3D game; other
+   * verbs need the module to list them in `orders`. Returns false when nothing applied.
+   */
+  function giveOrder(order) {
+    const mod = s.mod;
+    const generic = order.verb === 'emote' || order.verb === 'jump' || order.verb === 'free';
+    const supported = generic || (mod.orders || []).includes(order.verb);
+    if (!supported && order.targets.length > 1) return false;
+    const sess = s;
+    order.targets.forEach((bot, i) => {
+      const ok = supported && BF.orders.willing(bot, order);
+      if (ok) {
+        const now = s.ctx ? s.ctx.time : 0;
+        if (order.verb === 'free') s.orders.delete(bot.id);
+        else s.orders.set(bot.id, { verb: order.verb, arg: order.arg, target: order.target, t: now, until: now + BF.orders.duration(order.verb) });
+        if ((order.verb === 'emote' || order.verb === 'jump') && s.g3) {
+          const a = s.g3.actors.get(bot.id);
+          if (a) a.rig.emote(order.verb === 'jump' ? 'jacks' : order.arg || 'dance', order.verb === 'jump' ? 1.2 : 3);
+        }
+        if (s.instance && s.instance.onBotOrder) { try { s.instance.onBotOrder(bot, s.orders.get(bot.id) || order); } catch (e) { console.error(e); } }
+      }
+      const delay = 500 + i * 700 + Math.random() * 500;
+      s.timers.push(setTimeout(() => { if (s === sess) { botChat(bot, BF.orders.ack(bot, order, ok, supported)); s.partner = { id: bot.id, t: s.ctx ? s.ctx.time : 0 }; } }, delay));
+    });
+    return true;
   }
 
   /** One bot answers the player's chat line: "..." bubble, then the reply and any action. */
@@ -750,6 +783,17 @@
   }
 
   // --------------------------------------------------------------- rewards
+
+  /** Sparkle Trail pass: a ribbon of glitter behind the player's rig while it moves. */
+  function sparkleTrail(dt) {
+    const a = s.g3.actors.get('me');
+    if (!a) return;
+    const p = a.rig.group.position, sc = a.rig.group.scale.x;
+    const last = s.trailAt;
+    s.trailAt = { x: p.x, y: p.y, z: p.z };
+    if (!last || Math.hypot(p.x - last.x, p.z - last.z, p.y - last.y) < sc * 0.04) return;
+    s.g3.fx.emit(p.x, p.y + sc * 0.6, p.z, { count: 2, colors: ['#ffd66b', '#ff7ad9', '#7fe7ff', '#b67cff'], speed: sc * 2, life: 0.7, size: sc * 0.35, gravity: -sc * 3, up: 0.8 });
+  }
 
   function passEffect(effect) {
     const g = s.game;
@@ -787,10 +831,14 @@
     const outcome = r.outcome || 'complete';
     const doubleXp = passEffect('double_xp');
     const bonus = passEffect('bonus_coins');
-    const coins = Math.max(0, Math.round((r.coins || 0) * (bonus ? 1.25 : 1)));
-    const xp = Math.max(0, Math.round((r.xp || 0) * (doubleXp ? 2 : 1)));
+    const vip = passEffect('vip') ? 1.5 : 1;
+    const coins = Math.max(0, Math.round((r.coins || 0) * (bonus ? 1.25 : 1) * vip));
+    const eventXp = BF.updates ? BF.updates.xpMult(s.gameId) : 1;
+    const xp = Math.max(0, Math.round((r.xp || 0) * (doubleXp ? 2 : 1) * vip * eventXp));
     flushRewards();
     if (coins > 0) BF.economy.earn(coins, g.name + ': ' + (r.title || (outcome === 'win' ? 'Victory' : 'Match')) + ' rewards', 'game');
+    // ultra-rare finds (free, earned by finishing a game)
+    if (BF.limiteds) { const found = BF.limiteds.rollDrops(g.name); if (found.length) r.found = found; }
     if (xp > 0) BF.progression.addXP(xp, 'game');
     BF.store.update(['progress', 'player'], (st) => {
       const pr = BF.progressFor(st, s.gameId);
@@ -891,6 +939,18 @@
       input: s.input,
       /** 3D world (BF.g3d) when the module runs in 3D, else null. */
       g3: null,
+      /**
+       * The order the player gave a bot in chat, or null: {verb, arg, target, t, until}.
+       * Verbs: follow, come, stay, leave, ally, attack, help, race, build, pass, gather.
+       */
+      botOrder(botId) {
+        const o = s && s.orders.get(botId);
+        if (!o) return null;
+        if (s.ctx && s.ctx.time > o.until) { s.orders.delete(botId); return null; }
+        return o;
+      },
+      /** Finish an order (the bot arrived, built its tower, passed the ball...). */
+      clearOrder(botId) { if (s) s.orders.delete(botId); },
       /** Pointer in world coordinates: the ground point under it in 3D (height h), the screen point in 2D. */
       pointerWorld(h) {
         const p = s.input.pointer;
@@ -954,6 +1014,7 @@
         coins = Math.round(coins);
         if (!(coins > 0) || !s) return 0;
         if (passEffect('bonus_coins')) coins = Math.round(coins * 1.25);
+        if (passEffect('vip')) coins = Math.round(coins * 1.5);
         s.pendingCoins += coins;
         if (reason) s.pendingReasons.add(reason);
         clearTimeout(s.flushTimer);
@@ -964,7 +1025,7 @@
       },
       /** Grant XP now (Double XP passes apply). */
       xp(n) {
-        n = Math.round(n * (passEffect('double_xp') ? 2 : 1));
+        n = Math.round(n * (passEffect('double_xp') ? 2 : 1) * (passEffect('vip') ? 1.5 : 1) * (BF.updates && s ? BF.updates.xpMult(s.gameId) : 1));
         if (n > 0) { BF.progression.addXP(n, 'game'); if (s) s.sessionXp += n; }
         return n;
       },
@@ -990,6 +1051,11 @@
       botSay(bot, kind, delay) {
         if (!bot) return;
         botChat(bot, BF.dialogue.line(bot, kind, s.game), delay == null ? 300 + Math.random() * 1500 : delay);
+      },
+      /** A bot says a specific line (styled in its own voice). */
+      botText(bot, text, delay) {
+        if (!bot || !text) return;
+        botChat(bot, BF.dialogue.styleFor(bot, text), delay == null ? 900 + Math.random() * 900 : delay);
       },
       /** Latest chat bubble text for 'me' or a bot id (4.5s lifetime). */
       bubbleText(id) {

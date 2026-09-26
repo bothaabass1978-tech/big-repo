@@ -112,6 +112,7 @@
         const lv = RANKS[rank].lvl;
         foes = ids.map((id, i) => makeFighter(id, lv + (i === 2 ? 1 : 0)));
         mine = d.team.map((id) => makeFighter(id, lvlOf(id)));
+        if (ctx.hasPass('vitality')) mine.forEach((m) => { m.maxHp = Math.round(m.maxHp * 1.15); m.hp = m.maxHp; });
         mi = 0; fi = 0; turns = 0;
         phase = 'battle';
         say(trainer.name + ' wants to battle!', 1.2);

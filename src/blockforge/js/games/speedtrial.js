@@ -78,11 +78,12 @@
     const ph = PHYS[near.sg.surf];
     const il = Math.hypot(ix, iy);
     if (il > 0.05) { b.vx += (ix / Math.max(1, il)) * ph.accel * dt; b.vy += (iy / Math.max(1, il)) * ph.accel * dt; }
-    const damp = ph.drag + (brake ? BRAKE : 0);
+    // Grip Tyres pass: extra bite on ice and less drag in mud
+    const damp = ph.drag + (b.grip && near.sg.surf === 'ice' ? 1.1 : 0) + (brake ? BRAKE : 0);
     b.vx *= Math.exp(-damp * dt); b.vy *= Math.exp(-damp * dt);
     const sp = Math.hypot(b.vx, b.vy);
     const cap = b.boostT > 0 ? Math.max(ph.max, BOOST) : ph.max;
-    if (sp > cap) { const k = U.lerp(1, cap / sp, near.sg.surf === 'mud' ? 0.3 : 0.08); b.vx *= k; b.vy *= k; }
+    if (sp > cap) { const k = U.lerp(1, cap / sp, near.sg.surf === 'mud' ? (b.grip ? 0.15 : 0.3) : 0.08); b.vx *= k; b.vy *= k; }
     if (b.boostT > 0) b.boostT -= dt;
     b.x += b.vx * dt; b.y += b.vy * dt;
     // walls
@@ -173,7 +174,7 @@
         course = COURSES[selIdx];
         d.lastCourse = course.id; ctx.save();
         ctx.ui.remove('lobby');
-        ball = { x: course.pts[0][0], y: course.pts[0][1], vx: 0, vy: 0, s: 0, boostT: 0 };
+        ball = { x: course.pts[0][0], y: course.pts[0][1], vx: 0, vy: 0, s: 0, boostT: 0, grip: ctx.hasPass('grip') };
         cam.bounds = course.bounds;
         cam.x = ball.x - W / 2; cam.y = ball.y - H / 2;
         phase = 'count'; countT = 3; time = 0; gate = 0; rec = 0; path = []; splits = []; lastSplit = null;

@@ -56,6 +56,7 @@
   const TREES = (() => { const r = U.rng('zo-trees'); const out = []; while (out.length < 26) { const x = r() * 960, y = r() * 540; if (x > HX0 - 70 && x < HX1 + 70 && y > HY0 - 70 && y < HY1 + 70) continue; out.push({ x, y, s: 0.7 + r() * 0.7 }); } return out; })();
 
   BF.GameModules.register('zombie', {
+    orders: ['follow', 'come', 'stay', 'leave', 'help'],
     three: true,
     maxBots: 3,
     feedTop: 0.19,
@@ -82,7 +83,7 @@
       let chopper = null;
       const me = {
         isMe: true, name: ctx.player.name, look: ctx.player.look, x: 480, y: 330, a: -Math.PI / 2, walk: 0,
-        hp: T.hp, maxHp: T.hp, hurtT: 9, down: 0, reviveT: 0, points: 500, perks: {},
+        hp: T.hp + (ctx.hasPass('body_armor') ? 50 : 0), maxHp: T.hp + (ctx.hasPass('body_armor') ? 50 : 0), hurtT: 9, down: 0, reviveT: 0, points: 500, perks: {},
         guns: [gunState('pistol')].concat(ctx.hasPass('arsenal') ? [gunState('shotgun')] : []), slot: ctx.hasPass('arsenal') ? 1 : 0,
         fireCd: 0, reloadT: 0, repairT: 0, useMouse: false, flash: 0,
       };
@@ -289,6 +290,8 @@
             }
           }
         }
+        // orders from chat: follow/protect me, come, stay, go away (reviving the player always comes first)
+        if (!me.down) { const og = BF.orders.goal(ctx, m.bot.id, m, me, { near: 40 }); if (og) { if (og.hold) { tx = m.x; ty = m.y; } else { tx = og.x; ty = og.y; } } }
         const dd = U.dist(tx, ty, m.x, m.y);
         if (dd > 8) { const a = U.angleTo(m.x, m.y, tx, ty); moveInside(m, Math.cos(a) * 140, Math.sin(a) * 140, dt); m.walk += dt * 10; if (!zombies.length) m.a = a; }
         // shoot

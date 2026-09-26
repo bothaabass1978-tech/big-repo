@@ -70,6 +70,7 @@
   const costText = (cost) => Object.entries(cost).map(([k, v]) => v + ' ' + RES[k].name.toLowerCase()).join(', ');
 
   BF.GameModules.register('treasuretycoon', {
+    orders: ['follow', 'come', 'stay', 'leave', 'help', 'gather'],
     three: true,
     maxBots: 5,
     feedTop: 0.2,
@@ -138,7 +139,7 @@
         } else if (w.state === 'work') {
           w.t += dt * (foreman ? 2 : 1);
           if (Math.random() < 0.08) parts.emit(w.node.x, w.node.y, { count: 1, color: RES[w.node.res].color, speed: 60, life: 0.3 });
-          if (w.t >= T.gatherBase) { if (w.node.left > 0) { w.node.left--; w.carry = { res: w.node.res, n: w.node.amount }; if (w.node.left <= 0) w.node.regrowT = w.node.regrow; } w.state = w.carry ? 'back' : 'idle'; }
+          if (w.t >= T.gatherBase * (ctx.hasPass('hustle') ? 0.65 : 1)) { if (w.node.left > 0) { w.node.left--; w.carry = { res: w.node.res, n: w.node.amount }; if (w.node.left <= 0) w.node.regrowT = w.node.regrow; } w.state = w.carry ? 'back' : 'idle'; }
         } else if (w.state === 'back') {
           if (moveTo(w, home.x, home.y + 50, sp, dt)) { addRes(w.carry.res, w.carry.n); w.carry = null; w.state = 'idle'; }
         }
@@ -156,6 +157,10 @@
       function addBot(b) { const r = U.rng(b.id + ':tt'); bots.push({ bot: b, x: 300 + r() * 600, y: 700 + r() * 300, a: 0, walk: 0, node: null, t: 0, atkCd: 0, lvl: ctx.botLevel(b) || 10 }); }
       ctx.bots.forEach(addBot);
       function botStep(bt, dt) {
+        // orders from chat: follow/come/stay/leave move the bot; "help"/"gather" means its haul goes to you
+        const ord = ctx.botOrder(bt.bot.id);
+        const og = ord && !['help', 'gather', 'attack'].includes(ord.verb) ? BF.orders.goal(ctx, bt.bot.id, bt, me, { near: 45 }) : null;
+        if (og && !(raid && raid.pirates.length && ord.verb === 'follow')) { if (!og.hold) moveTo(bt, og.x, og.y, T.speed, dt); return; }
         if (raid && raid.pirates.length) {
           const p = raid.pirates.reduce((best, x) => (U.dist(x.x, x.y, bt.x, bt.y) < U.dist(best.x, best.y, bt.x, bt.y) ? x : best), raid.pirates[0]);
           if (!moveTo(bt, p.x, p.y, 140, dt)) return;
@@ -164,7 +169,14 @@
           return;
         }
         if (!bt.node || bt.node.left <= 0 || !unlocked(bt.node)) { const opts = nodes.filter((n) => n.left > 0 && n.zone === 'home'); bt.node = U.pick(opts) || null; bt.t = 0; }
-        if (bt.node && moveTo(bt, bt.node.x + 24, bt.node.y + bt.node.r, 120, dt)) { bt.t += dt; if (bt.t > 3) { bt.t = 0; bt.node.left = Math.max(0, bt.node.left - 1); if (bt.node.left <= 0) bt.node.regrowT = bt.node.regrow; bt.node = null; } }
+        if (bt.node && moveTo(bt, bt.node.x + 24, bt.node.y + bt.node.r, 120, dt)) {
+          bt.t += dt;
+          if (bt.t > 3) {
+            bt.t = 0;
+            if (ord && (ord.verb === 'help' || ord.verb === 'gather') && bt.node.left > 0) { addRes(bt.node.res, Math.max(1, Math.round(bt.node.amount / 2)), bt.node.x, bt.node.y); ctx.feed(bt.bot.displayName + ' gathered ' + RES[bt.node.res].name.toLowerCase() + ' for you.', 'info', RES[bt.node.res].color); }
+            bt.node.left = Math.max(0, bt.node.left - 1); if (bt.node.left <= 0) bt.node.regrowT = bt.node.regrow; bt.node = null;
+          }
+        }
       }
 
       // --------------------------------------------------------------- raids

@@ -74,6 +74,7 @@
   }
 
   BF.GameModules.register('racing', {
+    orders: ['race'],
     three: true,
     maxBots: 5,
     actions: { gas: ['KeyW', 'ArrowUp'], brake: ['KeyS', 'ArrowDown', 'Space'], left: ['KeyA', 'ArrowLeft'], right: ['KeyD', 'ArrowRight'], nitro: ['ShiftLeft', 'ShiftRight'] },
@@ -311,7 +312,9 @@
         const me = cars[0];
         const gap = score(me) - score(car);
         const rubber = gap > 600 ? 1.05 : gap < -900 ? 0.96 : 1;
-        car.maxF = (0.82 + car.skill * 0.17) * diff * rubber;
+        // "race me" in chat: this driver goes all out
+        const racing = car.bot && ctx.botOrder(car.bot.id) && ctx.botOrder(car.bot.id).verb === 'race';
+        car.maxF = (0.82 + car.skill * 0.17) * diff * rubber * (racing ? 1.08 : 1);
         const brake = bend > 0.9 - car.skill * 0.25 && Math.abs(car.speed) > car.spec.max * 0.55;
         physics(car, !brake, brake, U.clamp(diffA * 2.2, -1, 1), dt, false);
       }
@@ -621,7 +624,7 @@
             const prev = Math.ceil(countdown);
             countdown -= dt;
             if (Math.ceil(countdown) !== prev && countdown > 0) ctx.sfx('beep');
-            if (countdown <= 0) { phase = 'race'; ctx.sfx('go'); }
+            if (countdown <= 0) { phase = 'race'; ctx.sfx('go'); if (ctx.hasPass('rocket_start')) { me.boostT = 2.4; me.speed = Math.max(me.speed || 0, 260); ctx.feed('Rocket Start!', 'star', '#39f3ff'); } }
             cam.follow(me.x + Math.cos(me.a) * 120, me.y + Math.sin(me.a) * 120, dt, 0.2);
             return;
           }

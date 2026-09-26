@@ -64,6 +64,7 @@
   const costTxt = (c) => Object.entries(c || {}).map(([k, v]) => v + ' ' + k).join(' + ');
 
   BF.GameModules.register('siege', {
+    orders: ['build'],
     three: true,
     maxBots: 2,
     feedTop: 0.19,
@@ -433,7 +434,8 @@
           floats.update(dt);
           if (phase === 'over') return;
           const inc = income();
-          res.gold += inc.gold * dt; res.stone += inc.stone * dt;
+          const mint = ctx.hasPass('royal_mint') ? 1.3 : 1;
+          res.gold += inc.gold * mint * dt; res.stone += inc.stone * mint * dt;
           if (phase === 'build') { buildT -= dt; if (buildT <= 0) startWave(); }
           else {
             if (spawnQ.length) { spawnT -= dt; if (spawnT <= 0) { spawnT = Math.max(0.5, 1.6 - wave * 0.05) + Math.random() * 0.6; spawnFoe(spawnQ.shift()); } }
@@ -451,6 +453,9 @@
           for (const c of commanders) {
             c.gold += dt * (2 + wave * 0.4);
             c.t -= dt;
+            // "build a tower" in chat: a commander acts immediately
+            const ord = ctx.botOrder(c.bot.id);
+            if (ord && ord.verb === 'build') { c.t = 0; ctx.clearOrder(c.bot.id); }
             if (c.t > 0) continue;
             c.t = 8 + Math.random() * 6;
             const s = c.slot;

@@ -213,6 +213,7 @@
   })();
 
   BF.GameModules.register('petsim', {
+    orders: ['follow', 'come', 'stay', 'leave', 'help', 'gather'],
     three: true,
     maxBots: 8,
     feedTop: 0.17,
@@ -615,9 +616,15 @@
               if (opts.length) bt.target = U.pick(opts);
             }
           }
-          const tx = bt.target ? bt.target.x + 40 : bt.x, ty = bt.target ? bt.target.y + 30 : bt.y;
+          // orders from chat: follow/come/stay/leave, or help mine the pile your pets are on
+          const ord = ctx.botOrder(bt.bot.id);
+          const og = BF.orders.goal(ctx, bt.bot.id, bt, me, { near: 70 });
+          if (ord && (ord.verb === 'help' || ord.verb === 'gather')) { const sq = squad.find((q) => q.target && q.target.alive); if (sq) bt.target = sq.target; }
+          else if (og) bt.target = null;
+          let tx = bt.target ? bt.target.x + 40 : bt.x, ty = bt.target ? bt.target.y + 30 : bt.y;
+          if (og && !bt.target && !og.hold) { tx = og.x; ty = og.y; }
           const dx = tx - bt.x, dy = ty - bt.y, l = Math.hypot(dx, dy);
-          if (l > 6) { const k = Math.min(1, (150 * dt) / l); bt.x += dx * k; bt.y += dy * k; bt.a = Math.atan2(dy, dx); bt.walk += dt * 10; }
+          if (l > 6) { const k = Math.min(1, ((og ? T.speed : 150) * dt) / l); bt.x += dx * k; bt.y += dy * k; bt.a = Math.atan2(dy, dx); bt.walk += dt * 10; }
           bt.pets.forEach((p, i) => {
             p.bob += dt * 8;
             let px, py;
@@ -1055,9 +1062,9 @@
             }
             const dx = tx - s.x, dy = ty - s.y, l = Math.hypot(dx, dy);
             if (l > 900) { s.x = me.x; s.y = me.y; }
-            else if (l > 2) { const k = Math.min(1, (T.petSpeed * (l > 260 ? 2 : 1) * dt) / l); s.x += dx * k; s.y += dy * k; }
+            else if (l > 2) { const k = Math.min(1, (T.petSpeed * (ctx.hasPass('swift_pets') ? 1.35 : 1) * (l > 260 ? 2 : 1) * dt) / l); s.x += dx * k; s.y += dy * k; }
             if (s.target && l < 12) {
-              const dmg = petPower(s.pet) * dt;
+              const dmg = petPower(s.pet) * dt * (ctx.hasPass('swift_pets') ? 1.2 : 1);
               s.target.hp -= dmg;
               s.target.dmgMe += dmg;
               s.target.hitters.add(s);

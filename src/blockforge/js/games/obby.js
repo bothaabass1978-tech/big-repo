@@ -117,6 +117,7 @@
   }
 
   BF.GameModules.register('obby', {
+    orders: ['follow', 'come', 'stay', 'race', 'help'],
     three: true,
     maxBots: 8,
     feedTop: 0.18,
@@ -197,6 +198,16 @@
           }
           return;
         }
+        // orders from chat: wait, follow (never get more than a platform ahead), come / race (hurry)
+        const ord = ctx.botOrder(bt.bot.id);
+        if (ord) {
+          const mine = myRouteIndex();
+          if (ord.verb === 'stay') return;
+          if ((ord.verb === 'follow' || ord.verb === 'help') && bt.i > mine) return;
+          if ((ord.verb === 'come' || ord.verb === 'follow' || ord.verb === 'help') && bt.i < mine) bt.t = Math.min(bt.t, 0.05);
+          if (ord.verb === 'come' && bt.i >= mine) ctx.clearOrder(bt.bot.id);
+          if (ord.verb === 'race') bt.t = Math.min(bt.t, 0.12);
+        }
         bt.t -= dt;
         if (bt.t > 0 || bt.i >= route.length - 1) return;
         const next = route[bt.i + 1];
@@ -209,7 +220,13 @@
         bt.arc = 50 + Math.max(0, bt.y - tp.y) + Math.random() * 30;
         bt.facing = tp.x >= bt.x ? 1 : -1;
         const risky = { move: 0.06, fall: 0.05, blink: 0.07, bounce: 0.04 }[next.kind] || 0.025;
-        bt.fail = Math.random() < risky * (1.3 - bt.skill) * (1 + next.stage * 0.08);
+        bt.fail = Math.random() < risky * (1.3 - bt.skill) * (1 + next.stage * 0.08) * (ord && ord.verb === 'race' ? 0.6 : 1);
+      }
+      /** Index of the route platform the player is on or just passed. */
+      function myRouteIndex() {
+        let best = 0;
+        for (let i = 0; i < route.length; i++) if (topOf(route[i]).x <= me.x + 20) best = i;
+        return best;
       }
 
       // --------------------------------------------------------- helpers
@@ -310,7 +327,9 @@
           ctx.sfx('jump', { pitch: 1.3 });
         }
         if (!inp.act('jump') && me.vy < -280) me.vy += T.gravity * 1.1 * dt;
-        me.vy = Math.min(T.maxFall, me.vy + T.gravity * dt);
+        // Feather Fall: gentler descent and a lower terminal speed
+        const feather = me.vy > 0 && ctx.hasPass('feather');
+        me.vy = Math.min(T.maxFall * (feather ? 0.6 : 1), me.vy + T.gravity * (feather ? 0.75 : 1) * dt);
         const prevY = me.y;
         me.x += me.vx * dt;
         me.y += me.vy * dt;

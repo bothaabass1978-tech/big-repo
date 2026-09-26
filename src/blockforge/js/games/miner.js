@@ -89,6 +89,7 @@
   }
 
   BF.GameModules.register('miner', {
+    orders: ['follow', 'come', 'stay', 'leave', 'help', 'gather'],
     three: true,
     maxBots: 6,
     feedTop: 0.2,
@@ -162,7 +163,7 @@
       }
       function sell() {
         if (!bagCount) { ctx.toast('Your backpack is empty', 'info'); return; }
-        const value = bagValue;
+        const value = Math.round(bagValue * (ctx.hasPass('appraiser') ? 1.3 : 1));
         d.cash += value;
         sold += value;
         for (const k of Object.keys(bag)) delete bag[k];
@@ -219,6 +220,22 @@
         bt.t += dt;
         const row = Math.floor(bt.y / TS);
         if (bt.up) { bt.y -= 220 * dt; if (bt.y <= SURF * TS) { bt.y = SURF * TS; bt.up = false; if (Math.random() < 0.4) ctx.feed(bt.bot.displayName + ' sold a haul of ore.', 'coin', '#ffd66b'); } return; }
+        // orders from chat: stay (stop digging), follow / help / come (tunnel over to dig beside you), go away
+        const ord = ctx.botOrder(bt.bot.id);
+        if (ord && ord.verb === 'stay') return;
+        if (ord && ord.verb === 'leave') { bt.up = true; ctx.clearOrder(bt.bot.id); return; }
+        if (ord && ['follow', 'help', 'come', 'gather'].includes(ord.verb) && bt.t > 0.45) {
+          const want = U.clamp(Math.floor(me.x / TS) + (U.hash(bt.bot.id) % 2 ? 1 : -1), 1, COLS - 2);
+          const myRow = Math.floor((me.y - 1) / TS);
+          if (bt.col !== want) {
+            bt.t = 0;
+            const nc = bt.col + Math.sign(want - bt.col);
+            for (const r2 of [row - 1, row - 2]) if (r2 > SURF && solid(tileAt(nc, r2)) && tileAt(nc, r2) !== BEDROCK && tileAt(nc, r2) !== COREROCK) { map[r2 * COLS + nc] = AIR; mapVer++; }
+            bt.col = nc;
+            return;
+          }
+          if (row >= myRow + 1) { if (ord.verb === 'come') ctx.clearOrder(bt.bot.id); return; }
+        }
         if (bt.t > 0.7) {
           bt.t = 0;
           const below = tileAt(bt.col, row);

@@ -25,6 +25,7 @@
   const FORMATION = { gk: [0.06, 0.5], def: [0.28, 0.35], fwd: [0.42, 0.65], me: [0.38, 0.5] };
 
   BF.GameModules.register('soccer', {
+    orders: ['pass', 'follow', 'come', 'stay', 'help'],
     three: true,
     maxBots: 5,
     feedTop: 0.13,
@@ -150,6 +151,14 @@
           else if (p.role === 'def') { tx = U.lerp(ownGoalX(p.team), ball.x, 0.35); ty = U.lerp(CY, ball.y, 0.6); }
           else { tx = U.lerp(ball.x, goalX(p.team), 0.35); ty = ball.y < CY ? CY + 70 : CY - 70; }
         }
+        // orders from chat (teammates only): pass me the ball, come / follow / support me, stay
+        const ord = p.bot && p.team === me.team ? ctx.botOrder(p.bot.id) : null;
+        if (ord && ord.verb === 'pass') { tx = ball.x - dir * 10; ty = ball.y; }
+        else if (ord && p.role !== 'gk') { const og = BF.orders.goal(ctx, p.bot.id, p, me, { near: 70, bounds: { x0: 40, y0: 40, x1: 920, y1: 500 } }); if (og) { if (og.hold) { tx = p.x; ty = p.y; } else { tx = og.x; ty = og.y; } } }
+        if (ord && ord.verb === 'pass' && d2b < T.reach && p.kickCd <= 0) {
+          kick(p, Math.atan2(me.y + me.vy * 0.3 - ball.y, me.x + me.vx * 0.3 - ball.x), 460 + U.dist(me.x, me.y, ball.x, ball.y) * 0.45);
+          ctx.clearOrder(p.bot.id);
+        }
         const dx = tx - p.x, dy = ty - p.y, l = Math.hypot(dx, dy);
         const sp = T.speed * (0.8 + p.skill * 0.25);
         if (l > 4) { p.vx = (dx / l) * sp; p.vy = (dy / l) * sp; } else { p.vx = 0; p.vy = 0; }
@@ -178,7 +187,7 @@
         const drain = superSprint && p.isMe ? T.drain / 2 : T.drain;
         let mult = 1;
         if (sprinting && p.stamina > 0 && Math.hypot(p.vx, p.vy) > 10) { p.stamina = Math.max(0, p.stamina - drain * dt); mult = T.sprint; }
-        else p.stamina = Math.min(T.stamina, p.stamina + T.regen * dt);
+        else p.stamina = Math.min(T.stamina, p.stamina + T.regen * (p.isMe && ctx.hasPass('endurance') ? 1.7 : 1) * dt);
         p.x += p.vx * mult * dt; p.y += p.vy * mult * dt;
         p.x = U.clamp(p.x, X0 + T.pr, X1 - T.pr); p.y = U.clamp(p.y, Y0 + T.pr, Y1 - T.pr);
         if (Math.hypot(p.vx, p.vy) > 10) { p.walk += dt * 12 * mult; if (!p.isMe || !p.aimMouse) p.a = Math.atan2(p.vy, p.vx); }

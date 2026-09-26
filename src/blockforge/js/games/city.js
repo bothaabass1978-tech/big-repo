@@ -136,6 +136,7 @@
   }
 
   BF.GameModules.register('city', {
+    orders: ['follow', 'come', 'stay', 'leave', 'help'],
     three: true,
     maxBots: 9,
     feedTop: 0.2,
@@ -157,7 +158,7 @@
       const vip = ctx.hasPass('vip_pay');
 
       let phase = 'play';
-      let shift = T.shift;
+      let shift = T.shift + (ctx.hasPass('overtime') ? 90 : 0);
       let jobsDone = 0, earned = 0, goalHit = false;
       let job = null;
       let panel = null;
@@ -684,7 +685,7 @@
             const rig = V.actor(bt.bot.id, bt.bot.avatar, { scale: 8 });
             rig.setPos(bt.x, 3, bt.y);
             rig.faceAngle(bt.a);
-            rig.set({ move: Math.abs(bt.v) / 90 });
+            rig.set({ move: bt.free ? (bt.moving ? 1.2 : 0) : Math.abs(bt.v) / 90 });
             V.label(bt.x, 58, bt.y, { name: bt.bot.displayName, color: '#ffffff', bubble: ctx.bubbleText(bt.bot.id) });
           }
           carPool.sweep();
@@ -746,6 +747,19 @@
           }
           for (const p of peds) { p.t += p.v * dt; p.walk += dt * 8; }
           for (const bt of bots) {
+            // a bot given an order in chat leaves its route (parking if it was driving) and walks freely
+            const og = BF.orders.goal(ctx, bt.bot.id, bt, me, { near: 40 });
+            if (og || bt.free) {
+              bt.free = true; bt.drive = false;
+              if (og && !og.hold) {
+                const dx = og.x - bt.x, dy = og.y - bt.y, l = Math.hypot(dx, dy) || 1, sp = T.walk * 1.15 * dt;
+                const nx = bt.x + (dx / l) * sp, ny = bt.y + (dy / l) * sp;
+                if (!blockedAt(nx, bt.y, T.radius)) bt.x = nx;
+                if (!blockedAt(bt.x, ny, T.radius)) bt.y = ny;
+                bt.a = Math.atan2(dy, dx); bt.walk += dt * 9; bt.moving = true;
+              } else bt.moving = false;
+              continue;
+            }
             if (bt.drive) { if (bt.stop > 0) bt.stop -= dt; else { const len = bt.lane.axis === 'x' ? MW * TS : MH * TS; bt.along = (bt.along + bt.lane.dir * bt.v * dt + len) % len; } const pp = carPos(bt); bt.x = pp.x; bt.y = pp.y; bt.a = pp.a; }
             else { bt.t += bt.v * dt; bt.walk += dt * 9; const pp = ringPoint(bt.block, bt.t); bt.x = pp.x; bt.y = pp.y; bt.a = pp.a + (bt.v < 0 ? Math.PI : 0); }
             bt.jobT -= dt;

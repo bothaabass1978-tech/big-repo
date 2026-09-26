@@ -648,3 +648,46 @@ label.setting-row { cursor: pointer; }
 .ad-est { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 8px; padding: 10px; border-radius: 12px; background: var(--surface-2); }
 .notice-inline { display: flex; gap: 8px; align-items: center; font-size: 12.5px; color: var(--text-2); padding: 8px 10px; border-radius: 10px; background: var(--surface-2); }
 @media (max-width: 900px) { .ads-grid { grid-template-columns: 1fr; } .ad-form { position: static; } .cp-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); } .tier-pick { grid-template-columns: 1fr; } .ad-totals { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* followers */
+.follow-stats { display: flex; flex-wrap: wrap; gap: 18px 28px; align-items: center; margin-bottom: 16px; }
+.follow-stats > div:not(.fs-mile) { display: flex; flex-direction: column; }
+.follow-stats b { font-size: 26px; font-family: var(--font-display, inherit); }
+.follow-stats span { color: var(--text-2, #9aa3b2); font-size: 12.5px; }
+.follow-stats .fs-mile { flex: 1 1 260px; display: flex; flex-direction: column; gap: 6px; }
+.follow-stats .fs-mile .bar { height: 8px; border-radius: 99px; background: rgba(255,255,255,.08); overflow: hidden; }
+.follow-stats .fs-mile .bar i { display: block; height: 100%; background: linear-gradient(90deg, var(--accent, #ff7a2e), #ffd66b); border-radius: inherit; }
+.follow-stats p { flex-basis: 100%; margin: 0; font-size: 12.5px; }
+
+.server-summary { display: flex; align-items: center; gap: 6px; padding: 8px 4px; font-size: 13px; color: var(--text-2, #9aa3b2); }
+.server-summary b { color: var(--text, #fff); }
+.server-row.public .sr-id .faint { font-size: 12px; }
+
+/* limited drops */
+.ltd-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; }
+.ltd-card { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px; border-radius: 14px; background: var(--surface-2); border: 1px solid color-mix(in srgb, var(--rc, #fff) 40%, var(--line)); color: inherit; font: inherit; cursor: pointer; text-align: center; box-shadow: 0 6px 22px color-mix(in srgb, var(--rc, #fff) 12%, transparent); transition: transform var(--t), border-color var(--t); }
+.ltd-card:hover { transform: translateY(-2px); border-color: var(--rc); }
+.ltd-card .ltd-art { position: relative; display: grid; place-items: center; width: 100%; }
+.ltd-card .ltd-art .rarity-tag { position: absolute; left: 0; top: 0; }
+.ltd-card .bar { width: 100%; }
+.ltd-left { font-size: 11.5px; }
+.ltd-box { margin: 10px 0; padding: 10px 12px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--line); display: flex; flex-direction: column; gap: 6px; }
+.ltd-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.ltd-serials { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; font-size: 12.5px; }
+.ltd-offer { display: grid; grid-template-columns: auto 1fr auto auto; gap: 8px; align-items: center; padding: 4px 0; font-size: 13px; }
+
+.studio-rules { margin-top: 14px; }
+.rules-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; }
+.rules-grid label { display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; color: var(--text-2, #9aa3b2); }
+.rules-grid .check-row { flex-direction: row; align-items: center; gap: 8px; grid-column: 1 / -1; color: var(--text, #fff); }
+
+/* ---- Developer update banner (home + game page) */
+.update-banner { display: flex; align-items: center; gap: 16px; margin: 14px 0; padding: 16px 18px; border-radius: 14px; border: 1px solid color-mix(in srgb, var(--accent, #ff8a3d) 45%, transparent); background: linear-gradient(120deg, color-mix(in srgb, var(--accent, #ff8a3d) 16%, transparent), transparent 70%); }
+.update-banner .ub-icon { flex: none; width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; background: color-mix(in srgb, var(--accent, #ff8a3d) 22%, transparent); color: var(--accent, #ff8a3d); }
+.update-banner .ub-main { flex: 1; min-width: 0; }
+.update-banner .ub-title { margin: 2px 0 4px; font-size: 18px; }
+.update-banner .ub-notes { margin: 0 0 8px; color: var(--muted, #a1abbb); font-size: 13.5px; max-width: 72ch; }
+.update-banner .ub-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.update-banner .ub-chips button.pill { cursor: pointer; border: 0; font: inherit; }
+.pc-sale { display: inline-flex; align-items: center; gap: 6px; }
+@media (max-width: 640px) { .update-banner { flex-wrap: wrap; } }

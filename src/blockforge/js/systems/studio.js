@@ -31,12 +31,48 @@
   };
   const TD = { cols: 20, rows: 9, tiles: { road: { label: 'Road', color: '#d8b878', icon: 'grid' } } };
   const ARENA = { cols: 24, rows: 13, cell: 40, y0: 10, tiles: { wall: { label: 'Cover block', color: '#39465f', icon: 'grid' } } };
-  const SPEC = { obby: OBBY, towerdefense: TD, arena: ARENA };
-  const MAX_CELLS = { obby: 1600, towerdefense: 180, arena: 90 };
+  /** Custom games: a top-down world built from scratch, with rules chosen by the creator. */
+  const CUSTOM = {
+    cols: 30, rows: 18, cell: 40,
+    tiles: {
+      start: { label: 'Spawn', color: '#ffffff', icon: 'flag' },
+      wall: { label: 'Wall', color: '#6a7383', icon: 'grid' },
+      coin: { label: 'Coin', color: '#ffd23f', icon: 'star' },
+      gem: { label: 'Gem (+5)', color: '#7fe7ff', icon: 'gem' },
+      goal: { label: 'Goal flag', color: '#3fd08a', icon: 'flag' },
+      lava: { label: 'Lava', color: '#ff3d1f', icon: 'fire' },
+      spikes: { label: 'Spike trap', color: '#b9b3a6', icon: 'warning' },
+      enemy: { label: 'Enemy', color: '#8fbf6a', icon: 'skull' },
+      key: { label: 'Key', color: '#ffc940', icon: 'key' },
+      door: { label: 'Locked door', color: '#8b5a2b', icon: 'lock' },
+      speed: { label: 'Speed pad', color: '#39f3ff', icon: 'bolt' },
+      bounce: { label: 'Jump pad', color: '#4ad17f', icon: 'chevronUp' },
+      heal: { label: 'Extra life', color: '#ff5a8a', icon: 'heart' },
+      check: { label: 'Checkpoint', color: '#b67cff', icon: 'flag' },
+    },
+    goals: {
+      collect: 'Collect every coin',
+      reach: 'Reach the goal flag',
+      survive: 'Survive until the timer ends',
+      score: 'Grab the most coins before time runs out',
+    },
+    themes: {
+      grass: { label: 'Meadow', floor: '#5aab52', wall: '#8a909c', preset: 'day' },
+      desert: { label: 'Desert', floor: '#e2c27a', wall: '#b07a45', preset: 'sunset' },
+      snow: { label: 'Snowfield', floor: '#e8f4ff', wall: '#9aa5b5', preset: 'day' },
+      space: { label: 'Space station', floor: '#1b1f3a', wall: '#5a5f8a', preset: 'space' },
+      lava: { label: 'Volcano', floor: '#3a2a2a', wall: '#6a3a2a', preset: 'dusk' },
+      neon: { label: 'Neon grid', floor: '#101426', wall: '#39f3ff', preset: 'night' },
+    },
+  };
+  /** Default rules for a new custom game (all tunable in the Studio). */
+  const DEFAULT_RULES = { goal: 'collect', time: 180, lives: 3, speed: 'normal', enemySpeed: 'normal', theme: 'grass', bots: true };
+  const SPEC = { obby: OBBY, towerdefense: TD, arena: ARENA, custom: CUSTOM };
+  const MAX_CELLS = { obby: 1600, towerdefense: 180, arena: 90, custom: 540 };
 
   const key = (c, r) => c + ',' + r;
   /** Cells as a Map "c,r" -> type from the compact [[c, r, type], ...] form. */
-  const DEFAULT_TILE = { obby: 'ground', towerdefense: 'road', arena: 'wall' };
+  const DEFAULT_TILE = { obby: 'ground', towerdefense: 'road', arena: 'wall', custom: 'wall' };
   function cellMap(layout) {
     const m = new Map();
     const def = DEFAULT_TILE[layout && layout.kind] || 'ground';
@@ -48,7 +84,7 @@
   }
   function pack(kind, m) {
     const cells = [];
-    for (const [k, t] of m) { const [c, r] = k.split(',').map(Number); cells.push(kind === 'obby' ? [c, r, t] : [c, r]); }
+    for (const [k, t] of m) { const [c, r] = k.split(',').map(Number); cells.push(kind === 'obby' || kind === 'custom' ? [c, r, t] : [c, r]); }
     cells.sort((a, b) => a[1] - b[1] || a[0] - b[0]);
     return { kind, cells, v: 1 };
   }
@@ -203,6 +239,18 @@
     return pack('arena', m);
   }
 
+  /** A small ready-to-play sample world (so a new custom game is fun before any editing). */
+  function customSample(seed) {
+    const r = U.rng('custom:' + seed);
+    const m = BF.studio.cellMap(BF.studio.blank('custom'));
+    for (let i = 0; i < 5; i++) { const x = 5 + i * 5, y0 = 2 + Math.floor(r() * 4); for (let y = y0; y < y0 + 7; y++) if (y > 0 && y < CUSTOM.rows - 1) m.set(key(x, y), 'wall'); }
+    for (let i = 0; i < 14; i++) { const c = 2 + Math.floor(r() * 26), rr = 1 + Math.floor(r() * 16); if (!m.has(key(c, rr))) m.set(key(c, rr), 'coin'); }
+    for (const [c, rr, t] of [[9, 14, 'gem'], [19, 3, 'gem'], [14, 12, 'enemy'], [22, 7, 'enemy'], [12, 5, 'lava'], [13, 5, 'lava'], [17, 13, 'speed'], [7, 12, 'heal'], [24, 12, 'spikes']]) m.set(key(c, rr), t);
+    const out = pack('custom', m);
+    out.rules = Object.assign({}, DEFAULT_RULES);
+    return out;
+  }
+
   // ------------------------------------------------------------------- API
 
   BF.studio = {
@@ -219,6 +267,7 @@
       const m = new Map();
       if (template === 'obby') { for (let c = 2; c < 7; c++) m.set(key(c, 14), 'start'); for (let c = 20; c < 25; c++) m.set(key(c, 14), 'finish'); }
       if (template === 'towerdefense') for (let c = 0; c < TD.cols; c++) m.set(key(c, 4), 'road');
+      if (template === 'custom') { m.set(key(2, 9), 'start'); m.set(key(27, 9), 'goal'); for (let c = 0; c < CUSTOM.cols; c++) { m.set(key(c, 0), 'wall'); m.set(key(c, CUSTOM.rows - 1), 'wall'); } for (let r = 0; r < CUSTOM.rows; r++) { m.set(key(0, r), 'wall'); m.set(key(CUSTOM.cols - 1, r), 'wall'); } }
       return pack(template, m);
     },
 
@@ -230,6 +279,7 @@
       }
       if (template === 'towerdefense' && BF.tdGenPath) return tdFromPath(BF.tdGenPath(seed || 7));
       if (template === 'arena' && BF.arenaGenMap) return arenaFromRects(BF.arenaGenMap(seed || 7));
+      if (template === 'custom') return customSample(seed || 7);
       return BF.studio.blank(template);
     },
 
@@ -264,10 +314,34 @@
       } else if (template === 'arena') {
         const rects = arenaRects(layout);
         info = rects.length + ' cover walls · the centre stays clear for spawns';
+      } else if (template === 'custom') {
+        const n = (t) => Array.from(m.values()).filter((x) => x === t).length;
+        const rules = Object.assign({}, DEFAULT_RULES, (layout && layout.rules) || {});
+        if (n('start') !== 1) errors.push(n('start') ? 'Only one Spawn tile.' : 'Place a Spawn tile.');
+        if (rules.goal === 'collect' && !n('coin')) errors.push('Collect-every-coin games need at least one coin.');
+        if (rules.goal === 'reach' && !n('goal')) errors.push('Place a Goal flag.');
+        if (rules.goal === 'score' && n('coin') + n('gem') < 3) errors.push('Score games need at least 3 coins or gems.');
+        if (n('door') && !n('key')) errors.push('Locked doors need a key somewhere.');
+        info = CUSTOM.goals[rules.goal] + ' · ' + n('coin') + ' coins · ' + n('enemy') + ' enemies · ' + U.fmtClock(rules.time) + ' · ' + rules.lives + ' lives';
       }
       return { ok: !errors.length, errors, info };
     },
 
+    CUSTOM,
+    DEFAULT_RULES,
+    /** Rules of a custom layout with defaults filled in and values clamped. */
+    rules(layout) {
+      const r = Object.assign({}, DEFAULT_RULES, (layout && layout.rules) || {});
+      if (!CUSTOM.goals[r.goal]) r.goal = 'collect';
+      if (!CUSTOM.themes[r.theme]) r.theme = 'grass';
+      const num = (v, d) => (Number.isFinite(Number(v)) && v !== '' && v != null ? Number(v) : d);
+      r.time = U.clamp(Math.round(num(r.time, 180)), 30, 900);
+      r.lives = U.clamp(Math.round(num(r.lives, 3)), 1, 9);
+      if (!['slow', 'normal', 'fast'].includes(r.speed)) r.speed = 'normal';
+      if (!['slow', 'normal', 'fast'].includes(r.enemySpeed)) r.enemySpeed = 'normal';
+      r.bots = r.bots !== false;
+      return r;
+    },
     obbyCourse,
     tdPath(layout) { const tr = tdTrace(layout); return tr.ok ? tr.path : null; },
     tdTrace,

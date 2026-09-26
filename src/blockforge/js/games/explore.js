@@ -91,6 +91,7 @@
   ];
 
   BF.GameModules.register('explore', {
+    orders: ['follow', 'come', 'stay', 'leave', 'help'],
     three: true,
     maxBots: 6,
     actions: { use: ['KeyE', 'Space', 'Enter'], sprint: ['ShiftLeft', 'ShiftRight'], map: ['KeyM'] },
@@ -107,7 +108,7 @@
       d.marlow = d.marlow || { stage: 0, found: [] };
       d.shells = d.shells || 0;
       let phase = 'play';
-      let tide = T.tide;
+      let tide = T.tide + (ctx.hasPass('tide_charm') ? 60 : 0);
       let treasures = 0;
       let dig = null;
       let showMap = false;
@@ -428,8 +429,12 @@
               if (U.dist(p.x, p.y, b.x, b.y) < 600) { b.tx = p.x; b.ty = p.y; }
               if (Math.random() < 0.08) ctx.feed(b.bot.displayName + ' dug up a treasure!', 'star', '#ffd66b');
             }
+            // orders from chat: follow, come, stay, go away, help
+            const og = BF.orders.goal(ctx, b.bot.id, b, me, { near: 42 });
+            if (og) { if (og.hold) { b.tx = b.x; b.ty = b.y; } else { b.tx = og.x; b.ty = og.y; } }
             const dx = b.tx - b.x, dy = b.ty - b.y, l = Math.hypot(dx, dy);
-            if (l > 6) { moveEnt(b, (dx / l) * 110, (dy / l) * 110, dt); b.a = Math.atan2(dy, dx); b.walk += dt * 10; }
+            const spd = og && !og.hold ? T.speed * 1.05 : 110;
+            if (l > 6) { moveEnt(b, (dx / l) * spd, (dy / l) * spd, dt); b.a = Math.atan2(dy, dx); b.walk += dt * 10; }
           }
           if (tide < 30 && Math.floor(tide) !== Math.floor(tide + dt) && Math.floor(tide) % 10 === 0) ctx.banner('Tide rising!', Math.floor(tide) + ' seconds left', 1200);
           cam.follow(me.x, me.y, dt, 0.15);

@@ -119,6 +119,7 @@
   const FOE_SCALE = { skeleton: 7.5, archer: 7.5, knight: 8.6, warden: 17 };
 
   BF.GameModules.register('dungeon', {
+    orders: ['follow', 'come', 'stay', 'leave', 'attack', 'help'],
     three: true,
     maxBots: 1,
     feedTop: 0.16,
@@ -145,7 +146,7 @@
       let winT = 0;
       const me = {
         x: PW / 2, y: PH / 2, r: 12, a: 0, walk: 0,
-        hp: T.hp, maxHp: T.hp, sword: kit ? 2 : 0, armor: 0, potions: T.potions + (kit ? 2 : 0),
+        hp: T.hp, maxHp: T.hp, sword: kit ? 2 : 0, armor: 0, potions: T.potions + (kit ? 2 : 0) + (ctx.hasPass('potion_belt') ? 2 : 0),
         lvl: 1, xp: 0, dmgMul: 1, swingT: 0, swingCd: 0, dashT: 0, dashCd: 0, inv: 0, dx: 1, dy: 0, flash: 0,
       };
       const ally = ctx.bots[0] ? makeAlly(ctx.bots[0]) : null;
@@ -432,9 +433,14 @@
         if (al.inv > 0) al.inv -= dt;
         if (al.swingCd > 0) al.swingCd -= dt;
         if (al.swingT > 0) al.swingT -= dt;
-        let tgt = null, bd = 220;
-        for (const e of room.enemies) { const dd = U.dist(e.x, e.y, al.x, al.y); if (dd < bd) { bd = dd; tgt = e; } }
+        // orders from chat: stay (hold and defend), follow (stick close), come, attack (charge in), leave (hang back)
+        const ord = ctx.botOrder(al.bot.id);
+        const reach = !ord ? 220 : ord.verb === 'attack' ? 520 : ord.verb === 'follow' || ord.verb === 'come' ? 120 : ord.verb === 'stay' || ord.verb === 'leave' ? 70 : 260;
+        let tgt = null, bd = reach;
+        for (const e of room.enemies) { const dd = U.dist(e.x, e.y, ord && (ord.verb === 'follow' || ord.verb === 'come') ? me.x : al.x, ord && (ord.verb === 'follow' || ord.verb === 'come') ? me.y : al.y); if (dd < bd) { bd = dd; tgt = e; } }
         let tx = me.x - me.dx * 44, ty = me.y - me.dy * 44;
+        if (ord && (ord.verb === 'stay' || ord.verb === 'leave') && !tgt) { tx = al.x; ty = al.y; }
+        if (ord && ord.verb === 'come' && U.dist(al.x, al.y, me.x, me.y) < 60) ctx.clearOrder(al.bot.id);
         if (tgt) { tx = tgt.x; ty = tgt.y; }
         const dd = U.dist(tx, ty, al.x, al.y);
         if (dd > (tgt ? tgt.r + 26 : 20)) { const a = U.angleTo(al.x, al.y, tx, ty); moveEnt(al, Math.cos(a) * 160, Math.sin(a) * 160, dt, 12); al.a = a; al.walk += dt * 10; }
