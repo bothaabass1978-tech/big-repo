@@ -127,7 +127,12 @@
         function mountMesh(kind, col) {
           const g = V.group();
           if (kind === 'dragon') { g.scale.setScalar(0.6); V.shape('sphere', 0, 0, 0, 40, 30, 110, col || '#3a8a4a', { parent: g }); V.shape('cone', 0, 8, -70, 18, 40, 18, col || '#3a8a4a', { parent: g }).rotation.x = -Math.PI / 2; for (const s of [-1, 1]) { const w = V.box(s * 60, 0, 0, 100, 4, 60, U.shade(col || '#3a8a4a', -0.15), { parent: g }); w.rotation.z = s * 0.25; } V.shape('cone', 0, 0, 70, 14, 50, 14, col || '#3a8a4a', { parent: g }).rotation.x = Math.PI / 2; }
-          else if (kind === 'glider') { const w = V.shape('cone4', 0, 26, 0, 130, 10, 60, col || '#ffd23f', { parent: g }); w.rotation.x = Math.PI / 2; w.rotation.z = Math.PI / 4; }
+          else if (kind === 'glider') {
+            // a flat delta wing over the rider, with a strut and control bar
+            V.shape('cone4', 0, 26, 0, 130, 8, 60, col || '#ffd23f', { parent: g });
+            V.box(0, -6, 0, 2, 28, 2, '#3a3f4a', { parent: g });
+            V.box(0, -6, 6, 36, 2, 2, '#3a3f4a', { parent: g });
+          }
           else if (kind === 'jet') { V.box(0, 20, 8, 20, 26, 10, '#8a909c', { parent: g }); V.shape('cone', -6, 4, 10, 6, 16, 6, '#ff8a2e', { parent: g, glow: 1.4 }).rotation.x = Math.PI; V.shape('cone', 6, 4, 10, 6, 16, 6, '#ff8a2e', { parent: g, glow: 1.4 }).rotation.x = Math.PI; }
           else if (kind === 'paper') { const p = V.shape('cone4', 0, 0, 0, 70, 90, 12, '#f8f8f4', { parent: g }); p.rotation.x = -Math.PI / 2; p.rotation.y = Math.PI / 4; }
           else { V.box(0, 20, 0, 70, 3, 20, col || '#ff8a2e', { parent: g }); }
