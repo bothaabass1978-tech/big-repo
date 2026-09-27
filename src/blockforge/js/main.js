@@ -98,7 +98,13 @@
       BF.ui.banner({ kind: 'level', kicker: 'Level up', title: 'You reached level ' + level + '!', desc: '+' + U.fmt(reward) + ' ForgeCoins level reward', icon: 'star' });
     });
 
-    const EVAL_KEYS = ['player', 'wallet', 'inventory', 'avatar', 'passes', 'social', 'daily', 'badges', 'progress', 'secrets', 'created', 'quests'];
+    // weak devices and reduced motion: skip costly page effects (BF.perf)
+    const applyLite = () => { if (BF.perf && document.body) document.body.classList.toggle('perf-lite', BF.perf.lite()); };
+    applyLite();
+    BF.bus.on('store:change', (keys) => { if (keys.has('settings')) applyLite(); });
+    BF.bus.on('store:loaded', applyLite);
+
+    const EVAL_KEYS = ['player', 'wallet', 'inventory', 'avatar', 'passes', 'social', 'daily', 'badges', 'progress', 'secrets', 'created', 'creatorStats', 'quests'];
     BF.bus.on('store:change', (keys) => {
       if (EVAL_KEYS.some((k) => keys.has(k))) BF.achievements.scheduleEvaluate();
     });

@@ -787,7 +787,46 @@
       dead.forEach((key) => localStorage.removeItem(key));
     } catch (e) { /* no storage */ }
   }
+  // ------------------------------------------------------------ IndexedDB cache
+  // Renders are kept in IndexedDB (plenty of room) so each game renders once per
+  // device, not on every visit. localStorage (28 renders) is the fallback.
+  const IDB = { db: null, ready: null };
+  function idbOpen() {
+    if (IDB.ready) return IDB.ready;
+    IDB.ready = new Promise((resolve) => {
+      let done = false;
+      const finish = () => { if (!done) { done = true; resolve(); } };
+      setTimeout(finish, 2000);
+      try {
+        if (typeof indexedDB === 'undefined') return finish();
+        const req = indexedDB.open('blockforge-thumbs', 1);
+        req.onupgradeneeded = () => { req.result.createObjectStore('r'); };
+        req.onerror = finish;
+        req.onsuccess = () => {
+          IDB.db = req.result;
+          try {
+            const st = IDB.db.transaction('r', 'readwrite').objectStore('r');
+            const cur = st.openCursor();
+            cur.onsuccess = () => {
+              const c = cur.result;
+              if (!c) return finish();
+              if (String(c.key).indexOf(VERSION + ':') === 0) mem.set(c.key, c.value); else c.delete();
+              c.continue();
+            };
+            cur.onerror = finish;
+          } catch (e) { finish(); }
+        };
+      } catch (e) { finish(); }
+    });
+    return IDB.ready;
+  }
+  function idbPut(k, url) {
+    if (!IDB.db) return false;
+    try { IDB.db.transaction('r', 'readwrite').objectStore('r').put(url, k); return true; } catch (e) { return false; }
+  }
+
   function persist(k, url) {
+    if (idbPut(k, url)) return;
     sweepOld();
     try {
       const idx = JSON.parse(localStorage.getItem('bf.thumb3d.index') || '[]').filter((x) => x !== k);
@@ -800,15 +839,20 @@
 
   function render(game) {
     const { fn, color } = sceneFor(game);
+    // weak devices draw the 3D at 75% size without shadows; the title is still lettered full size
+    const lite = BF.perf && BF.perf.tier() === 'low';
+    const rw = lite ? Math.round(PX_W * 0.75) : PX_W, rh = lite ? Math.round(PX_H * 0.75) : PX_H;
     const W = BF.g3d.world({ renderer, W: PX_W, H: PX_H, fov: 45 });
     W.camera.aspect = PX_W / PX_H; W.camera.updateProjectionMatrix();
+    renderer.shadowMap.enabled = !lite;
+    W.sun.castShadow = !lite;
     try {
       fn(kit(W, game.id), color);
-      renderer.setSize(PX_W, PX_H, false);
+      renderer.setSize(rw, rh, false);
       renderer.render(W.scene, W.camera);
       const c = document.createElement('canvas');
       c.width = PX_W; c.height = PX_H;
-      c.getContext('2d').drawImage(renderer.domElement, 0, 0);
+      c.getContext('2d').drawImage(renderer.domElement, 0, 0, rw, rh, 0, 0, PX_W, PX_H);
       letter(c, game.name || '', color || game.accent || '#ff7a2e');
       return c.toDataURL('image/jpeg', 0.8);
     } finally {
@@ -822,13 +866,20 @@
     document.querySelectorAll('img').forEach((img) => { if (img.getAttribute('src') === from) img.setAttribute('src', to); });
   }
 
+  /** Jobs whose render is already cached (loaded from IndexedDB) swap in without rendering. */
+  function drainCached() {
+    for (const [k, job] of queue) if (mem.has(k)) { queue.delete(k); job.from.forEach((f) => swap(f, mem.get(k))); }
+  }
   function pump() {
     pumping = false;
     if (!queue.size) return;
     if (!fontsReady && document.fonts && document.fonts.ready) {
-      Promise.race([document.fonts.ready, new Promise((r) => setTimeout(r, 1500))]).then(() => { fontsReady = true; schedule(); });
+      Promise.race([document.fonts.ready, new Promise((r) => setTimeout(r, 1500)), idbOpen()]).then(() => idbOpen()).then(() => { fontsReady = true; drainCached(); schedule(); });
       return;
     }
+    drainCached();
+    if (!queue.size) return;
+    if (!setup()) return;
     const [k, job] = queue.entries().next().value;
     queue.delete(k);
     let url = null;
@@ -841,7 +892,12 @@
     }
     schedule();
   }
-  function schedule() { if (!pumping && queue.size) { pumping = true; setTimeout(() => requestAnimationFrame(pump), 16); } }
+  /** One render at a time, when the page is idle and no game is running (BF.perf.idle). */
+  function schedule() {
+    if (pumping || !queue.size) return;
+    pumping = true;
+    if (BF.perf) BF.perf.idle(pump); else setTimeout(() => requestAnimationFrame(pump), 16);
+  }
 
   BF.thumb3d = {
     /** GPU memory held by the thumbnail renderer (debugging and tests). */
@@ -856,7 +912,8 @@
     },
     /** Queue a render; any <img> currently showing `from` is swapped when it is ready. */
     request(game, from) {
-      if (!game || !game.name || !setup()) return;
+      if (!game || !game.name || !BF.g3d || !BF.g3d.supported()) return;
+      idbOpen();
       const k = keyOf(game);
       const job = queue.get(k) || { game, from: new Set() };
       if (from) job.from.add(from);
@@ -867,4 +924,6 @@
     renderNow(game) { return setup() ? render(game) : null; },
     scenes: Object.keys(SCENES),
   };
+  // start reading cached renders right away so the first page can use them
+  if (typeof indexedDB !== 'undefined') idbOpen();
 })((window.BF = window.BF || {}));

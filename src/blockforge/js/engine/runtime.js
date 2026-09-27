@@ -192,6 +192,7 @@
     if (s.use3d) {
       try {
         s.g3 = BF.g3d.world({ W, H });
+        s.gov = BF.perf ? BF.perf.governor(s.g3) : null;
         s.canvas.classList.add('hud');
         s.canvas.parentNode.insertBefore(s.g3.canvas, s.canvas);
       } catch (e) {
@@ -343,6 +344,7 @@
       if (s.g3 && s.g3.used) {
         s.g3.dispose();
         s.g3 = BF.g3d.world({ W, H });
+        s.gov = BF.perf ? BF.perf.governor(s.g3) : null;
         resize();
       }
       s.g3.used = true;
@@ -376,6 +378,8 @@
     let dt = (t - s.lastT) / 1000;
     s.lastT = t;
     if (!(dt > 0)) return;
+    // the governor sees real frame times; the game sees at most 50 ms steps
+    if (s.gov && s.g3 && !s.paused) s.gov.frame(dt);
     if (dt > 0.05) dt = 0.05;
     const inst = s.instance;
     if (!inst) return;

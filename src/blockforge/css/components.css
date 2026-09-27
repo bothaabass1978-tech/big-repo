@@ -673,3 +673,10 @@ kbd { display: inline-grid; place-items: center; min-width: 22px; height: 22px; 
 /* do-not-disturb bell */
 #notif-btn.dnd { opacity: 0.75; }
 #notif-btn.dnd::after { content: ''; position: absolute; right: 6px; bottom: 6px; width: 8px; height: 8px; border-radius: 50%; background: var(--muted, #8a93a5); box-shadow: 0 0 0 2px var(--bg, #0d1117); }
+
+/* ---- performance: weak devices (BF.perf.lite) skip effects that cost GPU time every frame */
+body.perf-lite *, body.perf-lite *::before, body.perf-lite *::after { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+body.perf-lite .avatar-svg * { animation: none !important; }
+body.perf-lite .skel { animation: none !important; }
+body.perf-lite .icard.rar-mythic .icard-thumb::after, body.perf-lite .ach-banner::after { display: none; }
+body.perf-lite .modal-scrim { background: rgba(6, 8, 12, 0.78); }

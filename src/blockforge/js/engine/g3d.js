@@ -79,9 +79,19 @@
   /**
    * Cached material. opts: {emissive, glow(0-1), opacity, basic, rough, metal, flat, side, map, wire}
    */
+  /**
+   * Weak devices (BF.perf) and Low graphics use Lambert shading: much cheaper
+   * per pixel than physically based shading, and nearly identical on flat blocks.
+   */
+  function liteShading() {
+    const s = BF.store && BF.store.state;
+    return (s && s.settings.gameplay.graphics === 'low') || !!(BF.perf && BF.perf.tier() === 'low');
+  }
+
   function mat(color, opts) {
     opts = opts || {};
-    const key = [color, opts.emissive || '', opts.glow || 0, opts.opacity == null ? 1 : opts.opacity, opts.basic ? 1 : 0, opts.rough == null ? '' : opts.rough, opts.metal || 0, opts.side || 0, opts.map ? opts.map.uuid : '', opts.flat ? 1 : 0, opts.depthWrite === false ? 0 : 1].join('|');
+    const lite = !opts.basic && liteShading();
+    const key = [lite ? 'L' : 'S', color, opts.emissive || '', opts.glow || 0, opts.opacity == null ? 1 : opts.opacity, opts.basic ? 1 : 0, opts.rough == null ? '' : opts.rough, opts.metal || 0, opts.side || 0, opts.map ? opts.map.uuid : '', opts.flat ? 1 : 0, opts.depthWrite === false ? 0 : 1].join('|');
     let m = cache.mats.get(key);
     if (m) return m;
     const base = { color: new THREE.Color(color == null ? '#ffffff' : color) };
@@ -98,7 +108,8 @@
         base.emissive = new THREE.Color(opts.emissive || color);
         base.emissiveIntensity = opts.glow == null ? 0.6 : opts.glow;
       }
-      m = new THREE.MeshStandardMaterial(base);
+      if (lite) { delete base.roughness; delete base.metalness; m = new THREE.MeshLambertMaterial(base); }
+      else m = new THREE.MeshStandardMaterial(base);
     }
     m.userData.shared = true;
     cache.mats.set(key, m);
@@ -737,13 +748,31 @@
     // ---------------------------------------------------------- frame
 
     resize(cssW, cssH, dpr) {
-      const pr = this.q === 'low' ? Math.min(1, dpr) * 0.85 : Math.min(this.q === 'high' ? 2 : 1.5, dpr);
+      this._size = [cssW, cssH, dpr];
+      const pr = (this.q === 'low' ? Math.min(1, dpr) * 0.85 : Math.min(this.q === 'high' ? 2 : 1.5, dpr)) * (this.scale || 1);
       this.renderer.setPixelRatio(pr);
       this.renderer.setSize(cssW, cssH, false);
       this.canvas.style.width = cssW + 'px';
       this.canvas.style.height = cssH + 'px';
       this.camera.aspect = this.W / this.H;
       this.camera.updateProjectionMatrix();
+    },
+
+    /**
+     * Performance level from BF.perf: {scale, shadows}. Lower scale renders
+     * fewer pixels (the canvas is stretched to the same size on screen).
+     */
+    setLevel(lv) {
+      if (!lv) return;
+      this.scale = lv.scale;
+      const shadows = lv.shadows && this.q !== 'low';
+      if (this.renderer.shadowMap.enabled !== shadows) {
+        this.renderer.shadowMap.enabled = shadows;
+        this.sun.castShadow = shadows;
+        // materials pick up the shadow change on their next compile
+        this.scene.traverse((o) => { if (o.material && !Array.isArray(o.material)) o.material.needsUpdate = true; });
+      }
+      if (this._size) this.resize(this._size[0], this._size[1], this._size[2]);
     },
 
     update(dt) {

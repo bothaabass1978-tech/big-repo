@@ -50,6 +50,7 @@ online and fall back to system fonts when you are not.
 | **Search** | Games, items and players, with autocomplete (press `/`) |
 | **Gifts** | Gift ForgeCoins to anyone from their profile, your DMs or the Wallet, with an optional note. Players thank you in their own voice, and some follow you or send a little back. Friends gift you now and then (a level-up, returning a favour, liking your game), and you can ask a friend in chat; they might say yes. Gifts from other players are limited to 5,000 a day. Settings → Privacy → Who can gift me ForgeCoins |
 | **Pop-ups** | Settings → Notifications → Pop-ups: show all, important only (friends, invites, messages) or none; switch off banners; stay quiet while playing (the default). **Quiet** in the bell menu is Do Not Disturb. Bursts collapse into one "N more notifications" pop-up, and everything still lands in the bell |
+| **Runs on weak laptops** | Auto graphics watches the frame rate and lowers resolution and shadows when a game gets slow (and raises them again when it can), remembering what suits your device. Weak machines also get cheaper shading and lighter page effects. 3D thumbnails render only while the page is idle, never during a game, and are cached for good. Settings → Gameplay → Graphics shows the level Auto uses on this device |
 | **Settings** | Account, privacy, notifications, appearance (theme, accent, density, reduced motion, font size), gameplay (volume, touch controls, FPS counter, graphics, bot chat, bot replies), and data (autosave, save now, export or import JSON, reset). Developer tools are hidden: tap the build number 5 times |
 
 ## The 70 games
@@ -141,7 +142,7 @@ npm i -D playwright   # once, if Playwright is not installed globally
 node tests/blockforge/e2e/platform_smoke_e2e_test.js --shots /tmp/blockforge-shots
 ```
 
-Current status: 140 unit tests and 143 end-to-end checks, all passing.
+Current status: 145 unit tests and 143 end-to-end checks, all passing.
 
 ## Code layout
 
@@ -161,7 +162,8 @@ src/blockforge/
     │                   updates (developer updates), orders (bot orders)
     ├── ui/             components, router, shell, actions, terminal
     ├── pages/          one file per area (home, discover, game, items, social, create, studio, profile, settings, progress)
-    ├── engine/         input, gfx (particles, camera), g3d (3D world kit), avatar3d (rigs + thumbnails), thumbs3d (3D game thumbnails),
+    ├── engine/         input, gfx (particles, camera), g3d (3D world kit), perf (device tier, frame-rate governor, idle work),
+    │                   avatar3d (rigs + thumbnails), thumbs3d (3D game thumbnails),
     │                   props3d (merged pets, cars, zombies, ships), phys, runtime (game sessions)
     ├── games/          the 20 original game modules, the Custom template, and arcadekit (shared bots, orders,
     │                   rewards, HUD) with the ten arcade engines (runner, party, tag, fishing, farm,
@@ -183,6 +185,7 @@ Design decisions are recorded in `docs/architecture/`:
 - [ADR-0010 Creator economy, community games and player controls](../../docs/architecture/adr-0010-blockforge-creator-economy-and-community-games.md)
 - [ADR-0011 Arcade engines (50 games) and human bot voices](../../docs/architecture/adr-0011-blockforge-arcade-engines-and-bot-voices.md)
 - [ADR-0012 ForgeCoin gifts](../../docs/architecture/adr-0012-blockforge-forgecoin-gifts.md)
+- [ADR-0013 Performance on weak devices](../../docs/architecture/adr-0013-blockforge-performance-on-weak-devices.md)
 
 To **add a game**, register a module with `BF.GameModules.register(type, {...})`
 in a new `js/games/*.js` file (see ADR-0003). Add `three: true` with a

@@ -868,8 +868,12 @@
   function pump() {
     pumping = true;
     const t0 = performance.now();
+    // during a game: one avatar every 250 ms; otherwise a small slice of each frame
+    const inGame = BF.runtime && BF.runtime.active;
+    const budget = inGame ? 0 : BF.perf && BF.perf.tier() === 'low' ? 6 : 12;
+    let n = 0;
     for (const [k, job] of queue) {
-      if (performance.now() - t0 > 12) break;
+      if (n++ > 0 && performance.now() - t0 > budget) break;
       queue.delete(k);
       let url;
       try { url = renderThumb(job.av, job.o); } catch (e) { console.warn('[avatar3d] thumbnail failed', e); url = null; }
@@ -879,7 +883,7 @@
         document.querySelectorAll('img[data-avk="' + job.h + '"]').forEach((img) => { img.src = url; img.classList.remove('pending'); });
       }
     }
-    if (queue.size) requestAnimationFrame(pump);
+    if (queue.size) { if (inGame) setTimeout(() => requestAnimationFrame(pump), 250); else requestAnimationFrame(pump); }
     else pumping = false;
   }
 

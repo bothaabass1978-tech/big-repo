@@ -48,7 +48,7 @@
     },
     mount(root) {
       this._off = BF.bus.on('creator:changed', () => BF.router.refresh());
-      this._earn = BF.bus.on('store:change', (keys) => { if (!keys.has('created') && !keys.has('ads')) return; const h = root.querySelector('#earn-host'); if (h) h.innerHTML = BF.creatorTabs.earnings(null); });
+      this._earn = BF.bus.on('store:change', (keys) => { if (!keys.has('created') && !keys.has('creatorStats') && !keys.has('ads')) return; const h = root.querySelector('#earn-host'); if (h) h.innerHTML = BF.creatorTabs.earnings(null); });
       root.addEventListener('click', async (e) => {
         const all = e.target.closest('[data-collect-all]');
         if (all) {
@@ -157,7 +157,7 @@
   BF.pages.register('creategame', {
     title: (p) => { const g = BF.creator.get(p.id); return g ? 'Manage ' + g.name : 'Manage'; },
     nav: 'create',
-    watch: (p) => (p.tab === 'settings' || p.tab === 'passes' || p.tab === 'studio' || p.tab === 'ads' ? [] : ['created']),
+    watch: (p) => (p.tab === 'settings' || p.tab === 'passes' || p.tab === 'studio' || p.tab === 'ads' ? [] : ['created', 'creatorStats']),
     render(params) {
       const ug = BF.creator.get(params.id);
       if (!ug) return BF.ui.empty({ icon: 'anvil', title: 'Game not found', action: { label: 'My Creations', href: '#/create' } });

@@ -418,7 +418,8 @@
         if (back) creator.receiveVisits(ug, back, 'returning');
       }
       if (BF.ads && BF.ads.simulate(4)) touched = true;
-      if (touched) BF.store.touch('created');
+      // live numbers only: pages that list games watch 'created', which a tick must not rebuild
+      if (touched) BF.store.touch('creatorStats');
     },
   });
 })((window.BF = window.BF || {}));
