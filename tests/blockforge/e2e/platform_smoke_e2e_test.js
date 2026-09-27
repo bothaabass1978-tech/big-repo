@@ -81,7 +81,8 @@ async function signIn(page) {
 
   // ------------------------------------------------------------ shop
   await page.evaluate(() => { location.hash = '#/shop/accessories'; });
-  await page.waitForTimeout(400);
+  await page.waitForSelector('[data-act="buy-item"]', { timeout: 5000 }).catch(() => {});
+  const shopState = await page.evaluate(() => ({ hash: location.hash, balance: BF.economy.balance(), buttons: document.querySelectorAll('[data-act="buy-item"]').length }));
   const target = await page.evaluate(() => {
     const btns = Array.from(document.querySelectorAll('[data-act="buy-item"]'));
     const b = btns.map((x) => ({ x, item: BF.ITEMS[x.dataset.item] })).filter((o) => o.item && o.item.price <= BF.economy.balance()).sort((a, b2) => a.item.price - b2.item.price)[0];
@@ -100,7 +101,7 @@ async function signIn(page) {
     check('bought item is in the inventory', await page.evaluate((id) => BF.inventory.owns(id), target));
     await shot(page, '03-purchase');
     await page.keyboard.press('Escape');
-  } else check('found an affordable accessory to buy', false);
+  } else check('found an affordable accessory to buy', false, JSON.stringify(shopState));
   await page.evaluate(() => { BF.economy.spend(BF.economy.balance() - 5, 'e2e: drain wallet', 'debug'); location.hash = '#/shop/bundles'; });
   await page.waitForTimeout(400);
   const pricey = await page.$('[data-act="buy-item"]');
