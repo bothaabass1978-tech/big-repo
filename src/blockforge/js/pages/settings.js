@@ -59,7 +59,8 @@
     return '<div class="settings-card"><h3>Communication</h3>' +
       seg('privacy.messages', pv.messages, [['everyone', 'Everyone'], ['friends', 'Friends'], ['none', 'No one']], 'Who can message me', 'Controls unsolicited private messages from other players.') +
       seg('privacy.friendRequests', pv.friendRequests, [['everyone', 'Everyone'], ['none', 'No one']], 'Who can send friend requests') +
-      toggle('privacy.invites', pv.invites, 'Allow game invites', 'Friends can invite you to their servers.') + '</div>' +
+      toggle('privacy.invites', pv.invites, 'Allow game invites', 'Friends can invite you to their servers.') +
+      seg('privacy.gifts', pv.gifts || 'friends', [['everyone', 'Everyone'], ['friends', 'Friends'], ['none', 'No one']], 'Who can gift me ForgeCoins', 'Everyone also lets your followers send tips. You can always gift others.') + '</div>' +
       '<div class="settings-card"><h3>Visibility</h3>' + toggle('privacy.showOnline', pv.showOnline, 'Show when I am online', 'Friends see your online and in-game status.') + toggle('privacy.inventoryPublic', pv.inventoryPublic, 'Show my inventory on my profile') + '</div>' +
       '<div class="settings-card"><h3>Blocked players</h3><p class="muted">' + U.plural(s.social.blocked.length, 'player') + ' blocked.</p><div class="btn-row"><a class="btn btn-outline" href="#/friends/blocked">Manage blocked players</a></div></div>';
   }

@@ -489,6 +489,7 @@
       if (BF.followers) BF.followers.worldTick();
       if (BF.limiteds) BF.limiteds.worldTick();
       if (BF.updates) BF.updates.worldTick();
+      if (BF.gifts) BF.gifts.tick();
       BF.bus.emit('world:tick');
     },
 

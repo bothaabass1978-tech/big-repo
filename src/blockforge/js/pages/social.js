@@ -106,14 +106,15 @@
       const sep = day !== lastDay ? '<div class="msg-day">' + day + '</div>' : '';
       lastDay = day;
       const invite = m.invite ? BF.catalog.get(m.invite) : null;
-      return sep + '<div class="msg ' + (m.from === 'me' ? 'me' : 'them') + '" data-mid="' + m.id + '"><div class="bubble">' + esc(m.text) +
+      const gift = m.gift ? '<div class="msg-gift ' + m.gift.dir + '">' + BF.icon('gift', 20) + '<div><b class="num">' + BF.coinIcon(14) + U.fmt(m.gift.amount) + '</b><span>' + (m.gift.dir === 'out' ? 'You sent a gift' : esc(who.displayName) + ' sent you a gift') + '</span></div></div>' : '';
+      return sep + '<div class="msg ' + (m.from === 'me' ? 'me' : 'them') + (m.gift ? ' has-gift' : '') + '" data-mid="' + m.id + '"><div class="bubble">' + gift + (m.text ? '<span class="msg-text">' + esc(m.text) + '</span>' : '') +
         (invite ? '<div class="msg-invite"><img src="' + BF.thumbs.url(invite) + '" alt=""><div><b>' + esc(invite.name) + '</b><span class="faint">Game invite</span></div><button class="btn btn-xs btn-play" data-act="play" data-game="' + invite.id + '">Join</button></div>' : '') +
         '</div><div class="msg-meta"><span>' + U.fmtClockTime(m.ts) + '</span><button class="msg-del" data-del="' + m.id + '" aria-label="Delete message" data-tip="Delete">' + BF.icon('trash', 12) + '</button></div></div>';
     }).join('');
     return '<div class="thread-head"><a class="icon-btn mobile-only" href="#/messages" aria-label="Back">' + BF.icon('arrowLeft', 18) + '</a>' +
       (isSystem ? '<span class="avatar-chip sys">' + BF.logoMark(26) + '</span>' : '<a href="#/user/' + withId + '">' + BF.ui.avatarChip(who.avatar, { status: st.state, id: withId }) + '</a>') +
       '<div class="row-main"><div class="row-title">' + esc(who.displayName) + (isSystem ? ' <span class="pill accent">Official</span>' : '') + '</div><div class="row-sub">' + (isSystem ? 'System messages' : '@' + esc(who.username) + ' · <span data-live="status:' + withId + '">' + BF.ui.statusText(st) + '</span>') + '</div></div>' +
-      '<div class="row-actions"><button class="btn btn-xs btn-ghost" data-mark-unread>' + BF.icon('mail', 13) + 'Mark unread</button>' + (isSystem ? '' : '<button class="icon-btn sm" data-act="user-menu" data-bot="' + withId + '" aria-label="More">' + BF.icon('dots', 16) + '</button>') + '<button class="icon-btn sm" data-del-conv aria-label="Delete conversation" data-tip="Delete conversation">' + BF.icon('trash', 16) + '</button></div></div>' +
+      '<div class="row-actions">' + (isSystem || blocked ? '' : '<button class="btn btn-xs btn-gold" data-act="gift" data-bot="' + withId + '">' + BF.icon('gift', 13) + '<span class="hide-phone">Gift</span></button>') + '<button class="btn btn-xs btn-ghost" data-mark-unread>' + BF.icon('mail', 13) + '<span class="hide-phone">Mark unread</span></button>' + (isSystem ? '' : '<button class="icon-btn sm" data-act="user-menu" data-bot="' + withId + '" aria-label="More">' + BF.icon('dots', 16) + '</button>') + '<button class="icon-btn sm" data-del-conv aria-label="Delete conversation" data-tip="Delete conversation">' + BF.icon('trash', 16) + '</button></div></div>' +
       '<div class="thread-body" id="thread-body">' + (msgs || '<div class="faint" style="text-align:center;padding:30px">Say hi to ' + esc(who.displayName) + '!</div>') + (BF.messages.isTyping(withId) ? '<div class="msg them typing"><div class="bubble"><i></i><i></i><i></i></div></div>' : '') + '</div>' +
       (isSystem ? '<div class="thread-foot faint" style="justify-content:center">You cannot reply to system messages.</div>' : blocked ? '<div class="thread-foot faint" style="justify-content:center">You blocked this player. <button class="btn btn-xs btn-outline" data-act="unblock" data-bot="' + withId + '">Unblock</button></div>' :
         '<form class="thread-foot" id="compose"><textarea class="textarea" id="compose-text" rows="1" maxlength="500" placeholder="Message ' + esc(who.displayName) + '…" aria-label="Message">' + esc(drafts[withId] || '') + '</textarea><button class="btn btn-primary" type="submit" aria-label="Send">' + BF.icon('send', 16) + '<span class="hide-phone">Send</span></button></form>');
@@ -130,7 +131,7 @@
       const list = convs.filter((c) => !q || c.who.displayName.toLowerCase().includes(q) || (c.who.username || '').toLowerCase().includes(q));
       const listHtml = list.length ? list.map((c) => '<a class="conv' + (c.with === active ? ' on' : '') + (c.unread ? ' unread' : '') + '" href="#/messages/' + c.with + '">' +
         (c.with === 'system' ? '<span class="avatar-chip sys">' + BF.logoMark(24) + '</span>' : BF.ui.avatarChip(c.who.avatar, { status: BF.world.botStatus(c.with).state, id: c.with })) +
-        '<span class="conv-main"><span class="conv-top"><b>' + esc(c.who.displayName) + '</b><span class="faint">' + U.timeAgo(c.last.ts, BF.clock.now()) + '</span></span><span class="conv-last">' + (c.last.from === 'me' ? 'You: ' : '') + esc(c.last.text) + '</span></span>' + (c.unread ? '<span class="count-badge">' + c.unread + '</span>' : '') + '</a>').join('')
+        '<span class="conv-main"><span class="conv-top"><b>' + esc(c.who.displayName) + '</b><span class="faint">' + U.timeAgo(c.last.ts, BF.clock.now()) + '</span></span><span class="conv-last">' + (c.last.from === 'me' ? 'You: ' : '') + esc(c.last.text || (c.last.gift ? 'Gift: ' + U.fmt(c.last.gift.amount) + ' ForgeCoins' : '')) + '</span></span>' + (c.unread ? '<span class="count-badge">' + c.unread + '</span>' : '') + '</a>').join('')
         : '<div class="faint" style="padding:20px;text-align:center">No conversations' + (q ? ' match' : ' yet') + '.</div>';
       return '<div class="page-head"><div><h1 class="page-title">Messages</h1><p class="page-sub">Private chats with players. Bots reply on their own time.</p></div><button class="btn btn-primary" data-new-msg>' + BF.icon('edit', 15) + 'New message</button></div>' +
         '<div class="messenger' + (active ? ' has-active' : '') + '"><aside class="conv-list"><div class="search-box inline"><input class="input" id="conv-q" type="search" placeholder="Search conversations" value="' + esc(convFilter) + '">' + BF.icon('search', 16) + '</div><div class="conv-scroll">' + listHtml + '</div></aside>' +
@@ -192,7 +193,7 @@
 
   // ---------------------------------------------------------- notifications
 
-  const NOTIF_TYPES = [['all', 'All'], ['unread', 'Unread'], ['friend', 'Friends'], ['achievement', 'Achievements'], ['invite', 'Invites'], ['purchase', 'Purchases'], ['daily', 'Rewards'], ['quest', 'Quests'], ['bot', 'Messages'], ['level', 'Level ups'], ['update', 'Game updates'], ['system', 'System']];
+  const NOTIF_TYPES = [['all', 'All'], ['unread', 'Unread'], ['friend', 'Friends'], ['achievement', 'Achievements'], ['invite', 'Invites'], ['gift', 'Gifts'], ['purchase', 'Purchases'], ['daily', 'Rewards'], ['quest', 'Quests'], ['bot', 'Messages'], ['level', 'Level ups'], ['update', 'Game updates'], ['system', 'System']];
   let notifFilter = 'all';
 
   BF.pages.register('notifications', {

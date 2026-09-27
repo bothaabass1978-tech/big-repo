@@ -28,7 +28,7 @@
       return item;
     },
     /** Notification types that still pop up in "Important only" mode. */
-    IMPORTANT: { friend: true, invite: true, bot: true },
+    IMPORTANT: { friend: true, invite: true, bot: true, gift: true },
 
     /**
      * Should this notification show as a pop-up? Pure check of the player's

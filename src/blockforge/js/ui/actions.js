@@ -357,6 +357,7 @@
     const F = BF.friends;
     const items = [{ html: '<b>' + esc(bot.displayName) + '</b><div class="faint" style="font-size:12px">@' + esc(bot.username) + '</div>' }, { label: 'View profile', icon: 'user', href: '#/user/' + botId }];
     if (!F.isBlocked(botId)) items.push({ label: 'Send message', icon: 'chat', href: '#/messages/' + botId });
+    if (!F.isBlocked(botId) && BF.gifts) items.push({ label: 'Send a gift', icon: 'gift', onClick: () => A.gift({ bot: botId }) });
     const st = BF.world.botStatus(botId);
     if (st.state === 'ingame' && !F.isBlocked(botId)) items.push({ label: 'Join game', icon: 'play', onClick: () => BF.play(st.gameId, st.serverId) });
     items.push({ sep: true });
@@ -369,6 +370,79 @@
     BF.ui.menu(anchor, items);
   }
   A['user-menu'] = (p, el) => userMenu(el, p.bot);
+
+  // ------------------------------------------------------------------ gifts
+
+  const GIFT_CHIPS = [25, 100, 500, 1000, 10000];
+
+  /** Gift ForgeCoins to a player: amount, optional note, confirm big gifts. */
+  A.gift = (p) => {
+    const bot = BF.bots.get(p.bot);
+    if (!bot) return;
+    if (BF.friends.isBlocked(bot.id)) return BF.ui.toast({ title: 'Unblock ' + bot.displayName + ' to send a gift.', kind: 'info' });
+    const G = BF.gifts;
+    const had = G.withBot(bot.id);
+    let armed = false;
+    const h = BF.ui.modal({
+      title: 'Send a gift',
+      icon: 'gift',
+      cls: 'gift-modal',
+      body: '<div class="gift-to">' + BF.ui.avatarChip(bot.avatar, { id: bot.id }) + '<div class="row-main"><div class="row-title">' + esc(bot.displayName) + '</div><div class="row-sub">@' + esc(bot.username) + (had.n ? ' · you have gifted ' + U.fmt(had.out) + ', received ' + U.fmt(had.in) : '') + '</div></div></div>' +
+        '<label class="field"><span class="label">Amount</span><div class="gift-amount">' + BF.coinIcon(20) + '<input class="input num" id="gift-amt" type="number" inputmode="numeric" min="' + G.T.min + '" max="' + G.T.maxPerGift + '" step="1" value="100" aria-label="Amount in ForgeCoins"></div></label>' +
+        '<div class="chips gift-chips">' + GIFT_CHIPS.map((a) => '<button class="chip" type="button" data-amt="' + a + '">' + U.fmt(a) + '</button>').join('') + '<button class="chip" type="button" data-amt="half">Half</button></div>' +
+        '<label class="field"><span class="label">Note <span class="faint">(optional)</span></span><input class="input" id="gift-note" maxlength="' + G.T.noteMax + '" placeholder="gg earlier!"></label>' +
+        '<div class="gift-foot faint" id="gift-info"></div>',
+      actions: [
+        { label: 'Cancel', kind: 'ghost' },
+        { label: 'Send gift', kind: 'gold', icon: 'gift', id: 'gift-send', onClick: () => {
+          const amt = Math.floor(Number(input.value));
+          const v = G.validate(bot.id, amt);
+          if (!v.ok) { info.textContent = v.error; info.classList.add('err'); BF.sfx.play('error'); return false; }
+          if ((amt >= G.T.confirmAt || amt > BF.economy.balance() / 2) && !armed) {
+            armed = true;
+            send.lastChild.textContent = 'Confirm: send ' + U.fmt(amt);
+            info.textContent = 'Gifts cannot be undone. Press again to send ' + U.fmt(amt) + ' ForgeCoins to ' + bot.displayName + '.';
+            info.classList.remove('err');
+            return false;
+          }
+          const r = G.send(bot.id, amt, note.value);
+          if (!r.ok) { info.textContent = r.error; info.classList.add('err'); return false; }
+          BF.sfx.play('purchase');
+          BF.ui.toast({ title: 'Gift sent', text: U.fmt(amt) + ' ForgeCoins to ' + bot.displayName + '.', kind: 'success', icon: 'gift', action: { label: 'Open chat', onClick: () => BF.router.go('#/messages/' + bot.id) } });
+          return true;
+        } },
+      ],
+    });
+    const input = h.el.querySelector('#gift-amt'), note = h.el.querySelector('#gift-note'), info = h.el.querySelector('#gift-info'), send = h.el.querySelector('#gift-send');
+    const refresh = () => {
+      armed = false;
+      send.lastChild.textContent = 'Send gift';
+      const amt = Math.floor(Number(input.value)) || 0;
+      info.classList.remove('err');
+      info.textContent = 'Balance ' + U.fmt(BF.economy.balance()) + ' · after gift ' + U.fmt(Math.max(0, BF.economy.balance() - amt));
+    };
+    h.el.querySelectorAll('[data-amt]').forEach((b) => b.addEventListener('click', () => {
+      input.value = b.dataset.amt === 'half' ? Math.max(G.T.min, Math.floor(BF.economy.balance() / 2)) : b.dataset.amt;
+      refresh();
+    }));
+    input.addEventListener('input', refresh);
+    refresh();
+    setTimeout(() => { input.focus(); input.select(); }, 40);
+  };
+
+  /** Pick who to gift (friends first), then open the gift form. */
+  A['gift-pick'] = () => {
+    const pool = BF.friends.list().concat((BF.store.state.social.recent || []).map((r) => BF.bots.get(r.id)).filter((b) => b && !BF.friends.isFriend(b.id))).filter((b) => !BF.friends.isBlocked(b.id)).slice(0, 60);
+    const h = BF.ui.modal({
+      title: 'Who gets the gift?',
+      icon: 'gift',
+      body: pool.length ? '<div class="search-box inline" style="margin-bottom:10px"><input class="input" id="gp-q" type="search" placeholder="Search friends and recent players">' + BF.icon('search', 16) + '</div><div class="list nm-list">' + pool.map((b) => '<button class="list-row nm-row" data-to="' + b.id + '" data-name="' + esc(b.displayName.toLowerCase() + ' ' + b.username.toLowerCase()) + '">' + BF.ui.avatarChip(b.avatar, { size: 'sm' }) + '<span class="row-main" style="text-align:left"><span class="row-title">' + esc(b.displayName) + '</span><span class="row-sub">@' + esc(b.username) + (BF.friends.isFriend(b.id) ? ' · Friend' : ' · Played together') + '</span></span></button>').join('') + '</div>'
+        : BF.ui.empty({ icon: 'users', title: 'Add friends first', text: 'You can also gift anyone from their profile.', action: { label: 'Find players', href: '#/friends/find' } }),
+    });
+    const q = h.el.querySelector('#gp-q');
+    if (q) q.addEventListener('input', () => h.el.querySelectorAll('.nm-row').forEach((r) => { r.hidden = !r.dataset.name.includes(q.value.toLowerCase()); }));
+    h.el.querySelectorAll('[data-to]').forEach((b) => b.addEventListener('click', () => { h.close(); A.gift({ bot: b.dataset.to }); }));
+  };
 
   A['add-friend'] = (p) => {
     const bot = BF.bots.get(p.bot);

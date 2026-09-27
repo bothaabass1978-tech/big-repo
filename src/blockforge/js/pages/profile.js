@@ -129,6 +129,7 @@
       else if (F.hasOutgoing(bot.id)) actions += '<button class="btn btn-outline" data-act="cancel-request" data-bot="' + bot.id + '">Request sent · Cancel</button>';
       else actions += '<button class="btn btn-primary" data-act="add-friend" data-bot="' + bot.id + '">' + BF.icon('userPlus', 15) + 'Add friend</button>';
       actions += '<a class="btn btn-outline" href="#/messages/' + bot.id + '">' + BF.icon('chat', 15) + 'Message</a>';
+      actions += '<button class="btn btn-outline" data-act="gift" data-bot="' + bot.id + '">' + BF.icon('gift', 15) + 'Gift</button>';
       actions += F.isFollowing(bot.id) ? '<button class="btn btn-ghost" data-act="unfollow" data-bot="' + bot.id + '">Following</button>' : '<button class="btn btn-ghost" data-act="follow" data-bot="' + bot.id + '">' + BF.icon('plus', 14) + 'Follow</button>';
       if (status.state === 'ingame') actions += '<button class="btn btn-play" data-act="join-friend" data-bot="' + bot.id + '">' + BF.icon('play', 13) + 'Join game</button>';
     }

@@ -522,8 +522,32 @@
       any: ['cant trade here sadly. id trade my {best} for a halo in a heartbeat tho', 'no trading on here, only the shop. kinda annoying ngl', 'i wish lol. u can sell stuff back from ur inventory at least'],
     },
     scam: {
-      any: ['nobody can give you free ForgeCoins, watch out for scams!', 'free coins? thats a scam if anyone offers. daily rewards and quests are the real way', 'i cant give coins, but daily rewards and quests pay out'],
-      helper: ['careful! anyone offering free ForgeCoins is scamming. use daily rewards, quests and games instead'],
+      any: ['free coins? thats a scam, nobody hands those out. daily rewards and quests are the real way', 'if anyone promises free coins or a generator its a scam fr', 'coin generators dont exist, its always a scam. dont give anyone ur account'],
+      helper: ['careful! anyone promising free ForgeCoins or a generator is scamming. use daily rewards, quests and games instead'],
+    },
+    ask_gift: {
+      yes: ['ok fine lol, sending {amt}', 'sure, {amt} coming ur way', 'yeah ok, heres {amt}', 'hmm ok, {amt} dont spend it all at once'],
+      stranger: ['lol we literally just met', 'i dont even know u yet haha', 'maybe once were friends lol', 'nah i dont gift randoms sorry'],
+      again: ['i just told u lol', 'bro u asked me like 5 min ago', 'ask me again tomorrow maybe', 'not again lol'],
+      cap: ['im out of gifting for today lol, maybe tomorrow', 'i already gave away a bunch today sorry'],
+      broke: ['i barely have any myself lol', 'i have like 40 coins bro', 'im broke rn sorry'],
+      blocked: ['ur settings wont let me send gifts, change it in privacy if u want'],
+      no: ['nah im saving up rn sorry', 'hmm not today, saving for a limited', 'lol no, earn ur own', 'maybe later, im saving', 'im good lol, the daily reward is free tho'],
+    },
+    gift_got: {
+      any: ['yes!! thank u so much for the {amt}', 'yeah i got it, ur the best', 'yep got it, still cant believe it lol'],
+    },
+    gift_what: {
+      any: ['what gift? i didnt get anything', 'hmm nothing on my end', 'i dont see anything, did u send it to the right person?'],
+    },
+    gift_thanks: {
+      any: ['np!!', 'ofc :)', 'anytime', 'u deserve it', 'np, pay it forward lol'],
+    },
+    gift_offer: {
+      any: ['wait fr? u dont have to but i wont say no lol. theres a gift button on my profile', 'omg yes pls. u can use the gift button in dms', 'haha only if u want to, theres a gift button on my profile'],
+      competitive: ['lol u trying to bribe me? use the gift button, i accept bribes'],
+      collector: ['yes pls, im saving for a limited. gift button is on my profile'],
+      helper: ['thats sweet! keep it for yourself tho, or gift a new player. the button is on any profile'],
     },
     personal: {
       any: ['careful! do not share personal info online, even with bots :)', 'hey, keep stuff like that private, ok?', 'you should not share that here. stay safe!'],
@@ -787,7 +811,11 @@
     phone: /(\+?\d[\d\s().-]{8,}\d)/,
     personal: /\b(my (home )?address( is)?|i live (at|on) \d|my (real|full) name is|my password|my pass is|my school is|i go to .* school|my phone( number)? is|my email is)\b/,
     askPersonal: /\b(where do you live exactly|what is your (address|phone|password|real name|school|email)|your (address|phone number|password))\b/,
-    scam: /\b(free (robux|coins|forgecoins|fc|money|items)|give me (some |your )?(coins|forgecoins|fc|money|robux|items)|coin (generator|hack)|can i have (some )?(coins|forgecoins)|send me (coins|forgecoins|fc))\b/,
+    scam: /\b(free (robux|coins|forgecoins|fc|money|items)|coin (generator|hack|glitch|dupe)|infinite (coins|forgecoins|fc)|(robux|coins|fc) generator)\b/,
+    askGift: /\b(gift|give|send|spare|lend|donate|toss|pass) me\b.*\b(coins?|forgecoins|fc|money|robux|gift)\b|\bgift me\b|\b(can|could|may) i (have|get|borrow)\b.*\b(coins?|forgecoins|fc|money)\b|\b(any|some) (coins?|forgecoins|fc) (to spare|for me)\b/,
+    giftOffer: /\b(can|should|could) i (gift|send|give) you\b|\b(want|let) me (to )?(gift|send|give) you\b|\bwant (some )?(coins|fc|forgecoins)\b|\bi will (gift|send|give) you\b/,
+    giftCheck: /\b(did|do) you (get|receive|see) (my|the) (gift|coins?|fc|forgecoins)\b|\bi (sent|gave|gifted) you\b/,
+    giftThanks: /\b(thanks|thank you)\b.*\b(gift|coins?|forgecoins|fc)\b|\b(gift|coins)\b.*\b(thanks|thank you)\b/,
     rude: /\b(idiot|stupid|dumb|loser|shut up|trash|noob|you suck|suck at|ugly|hate you|go away|annoying|bad at this|garbage|clown|cringe)\b/,
     sorry: /\b(sorry|my bad|apologi[sz]e)\b/,
     identity: /\b(are you|r you|you are|is this|you a) (a |an )?(bot|ai|robot|real|human|real person|person|npc|computer)\b|\bare you real\b|\bbot\?/,
@@ -885,6 +913,32 @@
     return { text: out, parts, plain, intent: d.intent, facts: d.facts || [], goal: d.goal || '', ask, invite: d.invite || null, after: d.after || null };
   }
 
+  /** Asking for, offering, checking on or thanking for ForgeCoin gifts (BF.gifts). */
+  function giftIntent(bot, n) {
+    const G = BF.gifts;
+    if (RX.askGift.test(n)) {
+      const c = G.consider(bot);
+      if (c.yes) {
+        const amount = c.amount;
+        return { intent: 'ask_gift', key: 'ask_gift', sub: 'yes', vars: { amt: U.fmt(amount) }, facts: ['You agreed to gift the player ' + amount + ' ForgeCoins; it arrives right after your message.'], goal: 'Say yes casually and that you are sending ' + amount + ' ForgeCoins.', after: () => G.give(bot, amount) };
+      }
+      const why = { stranger: 'You do not know them well enough to gift coins.', again: 'They asked recently; you already answered.', cap: 'You already gave out enough today.', broke: 'You barely have any coins yourself.', blocked: 'Their settings do not accept gifts.', no: 'You do not feel like gifting right now.' }[c.why];
+      return { intent: 'ask_gift', key: 'ask_gift', sub: c.why, facts: [why], goal: 'Say no to gifting coins, kindly and like a real player. Reason: ' + why };
+    }
+    if (RX.giftCheck.test(n)) {
+      const last = G.recent(40).find((g) => g.botId === bot.id && g.dir === 'out');
+      return last && BF.clock.now() - last.ts < 86400000
+        ? { intent: 'gift_got', key: 'gift_got', vars: { amt: U.fmt(last.amount) }, facts: ['The player gifted you ' + last.amount + ' ForgeCoins.'], goal: 'Say yes you got it and thank them.' }
+        : { intent: 'gift_what', key: 'gift_what', goal: 'Say you have not received a gift from them.' };
+    }
+    if (RX.giftThanks.test(n)) {
+      const last = G.recent(40).find((g) => g.botId === bot.id && g.dir === 'in');
+      if (last && BF.clock.now() - last.ts < 86400000) return { intent: 'gift_thanks', key: 'gift_thanks', goal: 'Say you are welcome for the gift.' };
+    }
+    if (RX.giftOffer.test(n)) return { intent: 'gift_offer', key: 'gift_offer', facts: ['Players gift ForgeCoins with the Gift button on a profile or in a DM.'], goal: 'React to their offer to gift you coins and mention the Gift button.' };
+    return null;
+  }
+
   /** Core intent routing. Returns {intent, key, sub?, vars?, facts?, goal?, after?, ask?, mem?} */
   function decide(bot, m, mem, ctx) {
     const n = m.n;
@@ -898,7 +952,9 @@
       return { intent: 'personal', key: 'personal', goal: 'Gently tell the player not to share personal information online. Do not repeat what they shared.' };
     }
     if (RX.askPersonal.test(n)) return { intent: 'ask_personal', key: 'ask_personal', goal: 'Decline to share personal details; you are a bot. Remind them to keep theirs private too.' };
-    if (RX.scam.test(n)) return { intent: 'scam', key: 'scam', goal: 'Say you cannot give ForgeCoins and warn that anyone offering free coins is scamming. Point to daily rewards, quests and games.' };
+    if (RX.scam.test(n)) return { intent: 'scam', key: 'scam', goal: 'Warn that anyone promising free coins, generators or hacks is scamming. Point to daily rewards, quests and games.' };
+    const giftTalk = BF.gifts && !ctx.banter ? giftIntent(bot, n) : null;
+    if (giftTalk) return giftTalk;
     if (RX.rude.test(n) && !/\b(not|no) (a )?(noob|trash|stupid)\b/.test(n)) {
       const last = mem.rude >= 2;
       return {

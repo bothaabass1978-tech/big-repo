@@ -23,10 +23,27 @@
       '</tbody></table></div>' + (list.length > txLimit ? '<div style="text-align:center;margin-top:12px"><button class="btn btn-outline btn-sm" data-more-tx>Show more (' + (list.length - txLimit) + ' older)</button></div>' : '');
   }
 
+  /** Wallet: gift totals, recent gifts and a Send a gift button. */
+  function giftsHtml() {
+    if (!BF.gifts) return '';
+    const sum = BF.gifts.summary();
+    const recent = BF.gifts.recent(8);
+    const mode = BF.store.state.settings.privacy.gifts || 'friends';
+    const row = (g) => {
+      const bot = BF.bots.get(g.botId);
+      if (!bot) return '';
+      return '<div class="gift-row ' + g.dir + '">' + BF.ui.avatarChip(bot.avatar, { size: 'sm', id: bot.id }) + '<div class="row-main"><div class="row-title">' + (g.dir === 'out' ? 'To ' : 'From ') + '<a href="#/user/' + bot.id + '">' + esc(bot.displayName) + '</a></div><div class="row-sub">' + (g.note ? '“' + esc(g.note) + '” · ' : '') + U.timeAgo(g.ts, BF.clock.now()) + '</div></div><b class="num ' + (g.dir === 'out' ? 'delta-neg' : 'delta-pos') + '">' + (g.dir === 'out' ? '−' : '+') + U.fmt(g.amount) + '</b></div>';
+    };
+    return '<section class="section"><div class="section-head"><h2 class="section-title">' + BF.icon('gift', 18) + 'Gifts</h2><button class="btn btn-sm btn-gold" data-act="gift-pick">' + BF.icon('gift', 14) + 'Send a gift</button></div>' +
+      '<div class="gift-grid"><div class="panel gift-stats"><div><span class="faint">Given</span><b class="num">' + U.fmt(sum.sent) + '</b><span class="faint">' + U.plural(sum.sentCount, 'gift') + '</span></div><div><span class="faint">Received</span><b class="num">' + U.fmt(sum.received) + '</b><span class="faint">' + U.plural(sum.receivedCount, 'gift') + '</span></div>' +
+      '<p class="faint">Gift anyone from their profile or your DMs. ' + (mode === 'none' ? 'You are not accepting gifts (Settings → Privacy).' : (mode === 'everyone' ? 'Friends and followers' : 'Friends') + ' can gift you up to ' + U.fmt(BF.gifts.T.bot.dailyCap) + ' a day; ' + U.fmt(BF.gifts.remainingToday()) + ' left today.') + '</p></div>' +
+      '<div class="panel tight gift-list">' + (recent.length ? recent.map(row).join('') : BF.ui.empty({ icon: 'gift', title: 'No gifts yet', text: 'Gifts you send and receive show up here.' })) + '</div></div></section>';
+  }
+
   BF.pages.register('wallet', {
     title: 'Wallet',
     nav: 'wallet',
-    watch: ['wallet', 'transactions', 'daily', 'quests'],
+    watch: ['wallet', 'transactions', 'daily', 'quests', 'gifts'],
     render() {
       const s = BF.store.state;
       const w = s.wallet;
@@ -53,6 +70,7 @@
         '<div class="about-grid" style="margin-top:18px"><div class="panel"><h3 class="panel-title">' + BF.icon('plus', 17) + 'Ways to earn</h3><div class="earn-list">' + earn.map((e) => '<div class="earn-row"><span class="er-icon">' + BF.icon(e[0], 17) + '</span><div class="row-main"><div class="row-title">' + e[1] + '</div><div class="row-sub">' + esc(e[2]) + '</div></div>' + e[3] + '</div>').join('') + '</div></div>' +
         '<div class="panel"><h3 class="panel-title">' + BF.icon('bag', 17) + 'Ways to spend</h3><div class="spend-grid">' +
         [['bag', 'Avatar items', '#/shop'], ['ticket', 'Game passes', '#/games/passes'], ['paw', 'Pets', '#/shop/accessories'], ['wrench', 'Game tools', '#/game/mega-miners/store'], ['emote', 'Emotes', '#/shop/emotes'], ['gift', 'Bundles', '#/shop/bundles'], ['run', 'Animations', '#/shop/animations'], ['gem', 'Collectibles', '#/shop']].map((x) => '<a class="spend-tile" href="' + x[2] + '">' + BF.icon(x[0], 20) + '<span>' + x[1] + '</span></a>').join('') + '</div></div></div>' +
+        giftsHtml() +
         '<section class="section"><div class="section-head"><h2 class="section-title">' + BF.icon('history', 18) + 'Transaction history</h2><div class="tx-filters"><div class="seg" id="tx-seg">' + [['all', 'All'], ['in', 'Earned'], ['out', 'Spent']].map((x) => '<button class="' + (txFilter === x[0] ? 'on' : '') + '" data-tx="' + x[0] + '">' + x[1] + '</button>').join('') + '</div>' +
         '<select class="select" id="tx-cat" style="width:auto"><option value="all">All types</option>' + cats.map((c) => '<option value="' + c + '"' + (txCat === c ? ' selected' : '') + '>' + esc(CAT_LABEL[c] || c) + '</option>').join('') + '</select></div></div><div id="tx-list">' + txRows() + '</div></section>';
     },

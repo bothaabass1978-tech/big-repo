@@ -378,6 +378,31 @@ async function signIn(page) {
     await page.evaluate(() => { BF.notify.toggleDnd(false); });
   }
 
+  // ------------------------------------------------------------ gifts (BLOCKFORGE-016)
+  {
+    const fid = await page.evaluate(() => { BF.economy.earn(2000, 'test', 'debug'); return BF.friends.list()[0].id; });
+    await page.evaluate((id) => { location.hash = '#/user/' + id; }, fid);
+    await page.waitForTimeout(600);
+    const bal0 = await page.evaluate(() => BF.economy.balance());
+    await page.click('.profile-hero [data-act="gift"]');
+    await page.waitForSelector('#gift-amt');
+    await page.fill('#gift-amt', '300');
+    await page.fill('#gift-note', 'gg');
+    await page.click('#gift-send');
+    await page.waitForTimeout(300);
+    const sent = await page.evaluate((id) => ({ bal: BF.economy.balance(), card: (BF.store.state.messages[id].msgs.slice(-1)[0] || {}).gift }), fid);
+    check('gifting a friend from their profile moves the coins and posts a gift card', sent.bal === bal0 - 300 && sent.card && sent.card.amount === 300, JSON.stringify(sent));
+    await page.evaluate((id) => { BF.gifts.receive(BF.bots.get(id), 120, 'returning the favor', 'reciprocal'); location.hash = '#/messages/' + id; }, fid);
+    await page.waitForTimeout(600);
+    const cards = await page.evaluate(() => document.querySelectorAll('.msg-gift').length);
+    check('sent and received gifts show as cards in the DM thread', cards >= 2, String(cards));
+    await page.evaluate(() => { location.hash = '#/wallet'; });
+    await page.waitForTimeout(600);
+    const wallet = await page.evaluate(() => document.querySelectorAll('.gift-row').length);
+    check('the Wallet lists recent gifts', wallet >= 2, String(wallet));
+    await shot(page, '17-gifts-wallet');
+  }
+
   // ------------------------------------------------------------ mobile
   const phone = await newPage(browser, { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
   await signIn(phone);
