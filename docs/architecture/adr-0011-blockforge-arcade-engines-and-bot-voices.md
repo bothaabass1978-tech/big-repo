@@ -103,11 +103,10 @@ chat that sounds like people.
   `serious: true`, which leaves them whole and plain.
 - **Claude wording** gets `BF.voice.describe(bot)` in its brief, plus "sound
   like a person, not an assistant". Its output only has the case applied and
-  is split into bubbles (`light`). It must still answer honestly if sincerely
-  asked whether it is an AI.
+  is split into bubbles (`light`). Identity handling is in ADR-0012.
 - **Rewritten lines.** The canned "I'm a BlockForge bot" and system-sounding
-  lines are rewritten: identity questions get playful, in-character answers
-  from the local engine.
+  lines are rewritten. Identity questions get in-character answers: bots say
+  they are real players (ADR-0012).
 - **Small stories and banter.** Replies on some topics add a short story,
   keyed to the game's engine. Bots answer each other's idle lines in game chat
   (`chat.banter`), without touching what they remember about the player.

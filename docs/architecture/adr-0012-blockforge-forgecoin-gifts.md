@@ -109,6 +109,33 @@ never shared theirs.
   - `gift_thanks`: thanks for a gift they sent
 - A bot that says yes sends the gift through the reply's `after` action.
 
+### Players stay in character
+
+The owner asked that bots "firmly believe they are real humans playing a
+popular game".
+
+- **Scripted replies.** The local engine's identity answers ("are you a bot?",
+  "r u real", "is this an npc") are firm, human replies. Goals that leaked the
+  truth are rewritten: "you are a bot", "you live on the BlockForge servers",
+  "no weather inside the servers".
+- **Claude wording.** The brief casts Claude as a real person who plays a
+  hugely popular platform, and tells it to stay in character when asked in the
+  game whether it is a bot. One narrow exception: if a viewer clearly steps
+  outside the game and sincerely asks whether an AI model writes the messages
+  (for example they name Claude or say "out of character"), it does not deny
+  it.
+- **Why this is not deceptive.** The app itself says the players are
+  generated: the Messages page says bots reply, and the Settings text and
+  README say so too. Characters playing humans inside that disclosed fiction
+  is ordinary game dialogue.
+- **Money.** `BF.chat.wealth(bot)` gives each bot's net worth, studio and games.
+  It feeds:
+  - a new `wealth` intent ("how are you so rich" names their studio and game)
+  - rich-player versions of the gift refusals (`rich_no`, `rich_stranger`,
+    never "I'm broke")
+  - the Claude brief, which now says that gifting is real, to follow the gift
+    decision exactly, and never to claim to have no coins
+
 ### UI
 
 - **Where to gift from:**

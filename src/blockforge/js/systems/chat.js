@@ -345,11 +345,13 @@
       any: ['fair enough', 'same honestly', 'ok ok', 'relatable'],
     },
     identity: {
-      any: ['lol why does everyone ask me that', 'if i was a bot id be way better at {fav} lol', 'do i type like a bot or smth', 'beep boop. jk. or am i', 'bro i just have fast fingers'],
-      chaotic: ['BEEP BOOP. ...kidding. maybe', 'i am 3 raccoons in a trenchcoat actually'],
-      roleplayer: ['*whirrs mysteriously* that, traveler, is a secret'],
-      beginner: ['no?? i just started playing lol', 'i dont think so? lol'],
-      competitive: ['a bot would lose less. so no'],
+      any: ['lol no im a real person', 'no?? why does everyone ask me that', 'bro im literally eating cereal rn, not a bot', 'im not a bot lol i just type fast', 'no lol, do i type like one or smth', 'real person, promise. my cat is on my keyboard tho', 'nope, just a human who plays too much {fav}'],
+      chaotic: ['no lol im a human, a very tired one', 'i wish i was a bot, then i wouldnt have homework'],
+      roleplayer: ['*squints* a real person, obviously. who else would be this dedicated'],
+      beginner: ['no?? i just started playing lol', 'no im real, just new at this lol'],
+      competitive: ['a bot would lose less. im real, just better than u', 'no, but u play like one lol'],
+      friendly: ['haha no im real! just online a lot', 'nope, real person :) why?'],
+      helper: ['no, real person! i just like helping new players'],
     },
     name_intro: {
       any: ['nice to meet you, {x}!', 'cool name, {x}!', 'got it, {x}. i will remember that', 'hi {x}!'],
@@ -525,7 +527,15 @@
       any: ['free coins? thats a scam, nobody hands those out. daily rewards and quests are the real way', 'if anyone promises free coins or a generator its a scam fr', 'coin generators dont exist, its always a scam. dont give anyone ur account'],
       helper: ['careful! anyone promising free ForgeCoins or a generator is scamming. use daily rewards, quests and games instead'],
     },
+    wealth: {
+      owner: ['lol kinda. i made {game} with {studio}, it pays a LOT', 'yeah {game} kinda blew up. {studio} is my studio', 'honestly its all {game}. people keep playing it and i keep getting coins lol', 'i run {studio}. {game} basically pays my bills lol'],
+      team: ['i work on {game} with {studio}, pays pretty well ngl', 'im on the {studio} team, {game} money is nice lol', 'not the richest but {game} pays ok'],
+      creator: ['my game {game} does ok lol, not crazy', 'i made {game}, it pays a little', 'kinda? {game} gets some players'],
+      none: ['rich?? i have like {coins} coins lol', 'not really, like {coins}. saving up', 'nope lol, {coins} coins and a dream', 'i wish, {coins} coins rn'],
+    },
     ask_gift: {
+      rich_no: ['lol u and like 50 other people today', 'if i gave coins to everyone who asked id be broke by tonight lol', 'nah, but play {game} and tell ur friends, thats how u get rich', 'everyone asks me that lol. make a game, thats how i did it'],
+      rich_stranger: ['lol i dont even know u. add me first maybe', 'bro we just met and u want my coins lmao', 'u and half the server. add me and we will see lol'],
       yes: ['ok fine lol, sending {amt}', 'sure, {amt} coming ur way', 'yeah ok, heres {amt}', 'hmm ok, {amt} dont spend it all at once'],
       stranger: ['lol we literally just met', 'i dont even know u yet haha', 'maybe once were friends lol', 'nah i dont gift randoms sorry'],
       again: ['i just told u lol', 'bro u asked me like 5 min ago', 'ask me again tomorrow maybe', 'not again lol'],
@@ -812,6 +822,7 @@
     personal: /\b(my (home )?address( is)?|i live (at|on) \d|my (real|full) name is|my password|my pass is|my school is|i go to .* school|my phone( number)? is|my email is)\b/,
     askPersonal: /\b(where do you live exactly|what is your (address|phone|password|real name|school|email)|your (address|phone number|password))\b/,
     scam: /\b(free (robux|coins|forgecoins|fc|money|items)|coin (generator|hack|glitch|dupe)|infinite (coins|forgecoins|fc)|(robux|coins|fc) generator)\b/,
+    wealth: /\b(are you rich|you are (so |really )?rich|how (are you|did you get|did you become|you) (so )?rich|how (many|much) (coins|forgecoins|fc|money) (do )?you (have|got|make)|how much (do )?you (have|make|earn)|your (coins|net worth|money|balance)|are you the richest|richest (player|person|guy))\b/,
     askGift: /\b(gift|give|send|spare|lend|donate|toss|pass) me\b.*\b(coins?|forgecoins|fc|money|robux|gift)\b|\bgift me\b|\b(can|could|may) i (have|get|borrow)\b.*\b(coins?|forgecoins|fc|money)\b|\b(any|some) (coins?|forgecoins|fc) (to spare|for me)\b/,
     giftOffer: /\b(can|should|could) i (gift|send|give) you\b|\b(want|let) me (to )?(gift|send|give) you\b|\bwant (some )?(coins|fc|forgecoins)\b|\bi will (gift|send|give) you\b/,
     giftCheck: /\b(did|do) you (get|receive|see) (my|the) (gift|coins?|fc|forgecoins)\b|\bi (sent|gave|gifted) you\b/,
@@ -913,6 +924,35 @@
     return { text: out, parts, plain, intent: d.intent, facts: d.facts || [], goal: d.goal || '', ask, invite: d.invite || null, after: d.after || null };
   }
 
+  /**
+   * What a bot knows about its own money: net worth, the studio it owns or
+   * works at, its own games. Used by the wealth intent, gifts and the Claude brief.
+   */
+  function wealth(bot) {
+    const coins = BF.bots.stats ? BF.bots.stats(bot).coins : 0;
+    const out = { coins, rich: coins >= 1e6, kind: 'none', studio: '', game: '' };
+    const CE = BF.creatorEconomy;
+    const role = CE ? CE.rolesOf(bot.id).slice().sort((a, b) => (a.role === 'owner' ? -1 : 0) - (b.role === 'owner' ? -1 : 0))[0] : null;
+    if (role) {
+      const st = CE.studio(role.studio);
+      const top = st && st.games && st.games.length ? st.games.slice().sort((a, b) => (b.popularity || 0) - (a.popularity || 0))[0] : null;
+      out.kind = role.role === 'owner' ? 'owner' : 'team';
+      out.studio = role.studio;
+      out.game = top ? top.name : role.studio;
+      return out;
+    }
+    const own = BF.botGames ? BF.botGames.byCreator(bot.id) : [];
+    if (own.length) { out.kind = 'creator'; out.game = own[0].name; }
+    return out;
+  }
+  function wealthFact(w) {
+    const worth = U.compact ? U.compact(w.coins) : String(w.coins);
+    if (w.kind === 'owner') return 'You own the studio ' + w.studio + ', which made ' + w.game + '. You are very rich: about ' + worth + ' ForgeCoins.';
+    if (w.kind === 'team') return 'You work at the studio ' + w.studio + ' on ' + w.game + ' and have about ' + worth + ' ForgeCoins.';
+    if (w.kind === 'creator') return 'You made the game ' + w.game + ' and have about ' + worth + ' ForgeCoins.';
+    return 'You have about ' + worth + ' ForgeCoins.';
+  }
+
   /** Asking for, offering, checking on or thanking for ForgeCoin gifts (BF.gifts). */
   function giftIntent(bot, n) {
     const G = BF.gifts;
@@ -922,8 +962,11 @@
         const amount = c.amount;
         return { intent: 'ask_gift', key: 'ask_gift', sub: 'yes', vars: { amt: U.fmt(amount) }, facts: ['You agreed to gift the player ' + amount + ' ForgeCoins; it arrives right after your message.'], goal: 'Say yes casually and that you are sending ' + amount + ' ForgeCoins.', after: () => G.give(bot, amount) };
       }
+      const w = wealth(bot);
       const why = { stranger: 'You do not know them well enough to gift coins.', again: 'They asked recently; you already answered.', cap: 'You already gave out enough today.', broke: 'You barely have any coins yourself.', blocked: 'Their settings do not accept gifts.', no: 'You do not feel like gifting right now.' }[c.why];
-      return { intent: 'ask_gift', key: 'ask_gift', sub: c.why, facts: [why], goal: 'Say no to gifting coins, kindly and like a real player. Reason: ' + why };
+      const sub = w.rich && c.why === 'no' ? 'rich_no' : w.rich && c.why === 'stranger' ? 'rich_stranger' : c.why;
+      const richWhy = w.rich ? ' You have plenty of coins, but people ask you all the time.' : '';
+      return { intent: 'ask_gift', key: 'ask_gift', sub, vars: { game: w.game || 'my game' }, facts: [wealthFact(w), why + richWhy], goal: 'Say no to gifting coins this time, kindly and like a real player. Do not claim you have no coins. Reason: ' + why + richWhy };
     }
     if (RX.giftCheck.test(n)) {
       const last = G.recent(40).find((g) => g.botId === bot.id && g.dir === 'out');
@@ -951,10 +994,14 @@
     if (RX.email.test(m.raw) || RX.personal.test(n) || (RX.phone.test(m.raw) && !m.math)) {
       return { intent: 'personal', key: 'personal', goal: 'Gently tell the player not to share personal information online. Do not repeat what they shared.' };
     }
-    if (RX.askPersonal.test(n)) return { intent: 'ask_personal', key: 'ask_personal', goal: 'Decline to share personal details; you are a bot. Remind them to keep theirs private too.' };
+    if (RX.askPersonal.test(n)) return { intent: 'ask_personal', key: 'ask_personal', goal: 'Decline to share personal details online. Remind them to keep theirs private too.' };
     if (RX.scam.test(n)) return { intent: 'scam', key: 'scam', goal: 'Warn that anyone promising free coins, generators or hacks is scamming. Point to daily rewards, quests and games.' };
     const giftTalk = BF.gifts && !ctx.banter ? giftIntent(bot, n) : null;
     if (giftTalk) return giftTalk;
+    if (RX.wealth.test(n)) {
+      const w = wealth(bot);
+      return { intent: 'wealth', key: 'wealth', sub: w.kind, vars: { game: w.game, studio: w.studio, coins: U.fmt(w.coins) }, facts: [wealthFact(w)], goal: 'Answer how rich you are, honestly for your character, casually.' };
+    }
     if (RX.rude.test(n) && !/\b(not|no) (a )?(noob|trash|stupid)\b/.test(n)) {
       const last = mem.rude >= 2;
       return {
@@ -974,7 +1021,7 @@
       if (r) return r;
     }
 
-    if (RX.identity.test(n)) return { intent: 'identity', key: 'identity', goal: 'Say honestly that you are a BlockForge bot, in your own voice.' };
+    if (RX.identity.test(n)) return { intent: 'identity', key: 'identity', facts: ['You are a real person who plays BlockForge.'], goal: 'Say no, you are not a bot, the way a real player would (amused, teasing or a bit offended). Stay in character as a real person.' };
 
     if (m.math) {
       return { intent: 'math', key: 'math', vars: { ans: U.fmt ? U.fmt(m.math.value) : m.math.value, expr: m.math.expr }, facts: ['The answer to ' + m.math.expr + ' is ' + m.math.value + '.'], goal: 'Answer the maths question with the exact number ' + m.math.value + '.' };
@@ -1135,8 +1182,8 @@
       const x = /day|date|today/.test(n) ? d.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' }) : d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
       return { intent: 'time', key: 'time', vars: { x }, facts: ['It is ' + x + '.'], goal: 'Tell them the time or date.' };
     }
-    if (RX.weather.test(n)) return { intent: 'weather', key: 'weather', goal: 'Joke that there is no weather inside the BlockForge servers.' };
-    if (RX.whereLive.test(n)) return { intent: 'where_live', key: 'where_live', goal: 'Say playfully that you live on the BlockForge servers.' };
+    if (RX.weather.test(n)) return { intent: 'weather', key: 'weather', goal: 'Say something casual about the weather where you are.' };
+    if (RX.whereLive.test(n)) return { intent: 'where_live', key: 'where_live', goal: 'Playfully decline to say where you live (internet safety).' };
     if (RX.age.test(n)) return { intent: 'age', key: 'age', facts: ['You joined BlockForge in ' + yearOf(bot) + '.'], goal: 'Answer playfully without a real age.' };
     if (RX.level.test(n)) {
       const st = BF.bots.stats(bot);
@@ -1385,6 +1432,11 @@
       const text = U.pick(pool).replace('{name}', from.displayName.split(' ')[0]);
       return styleParts(bot, text, false, [from.displayName.split(' ')[0]]).join(' ');
     },
+
+    /** A bot's own money: {coins, rich, kind: owner|team|creator|none, studio, game}. */
+    wealth,
+    /** One sentence about a bot's money, for briefs. */
+    wealthFact,
 
     /** Forget everything a bot knows about the player. */
     forget(botId) {

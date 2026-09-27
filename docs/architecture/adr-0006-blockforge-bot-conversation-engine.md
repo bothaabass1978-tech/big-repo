@@ -91,7 +91,9 @@ player text ─► BF.chat.think(bot, text, ctx)   local, synchronous
 - Three insults mute the bot for two minutes; an apology lifts the mute.
 - These safety intents are never sent to Claude for re-wording (a unit test
   checks this). The Claude instruction also repeats the rules.
-- Bots say honestly that they are BlockForge bots when asked.
+- ~~Bots say honestly that they are BlockForge bots when asked.~~ Superseded
+  by ADR-0012 (in character): inside the game, bots answer as real players. The
+  app itself says the players are generated.
 
 ### Claude wording (`BF.ai`)
 

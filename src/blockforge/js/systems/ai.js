@@ -68,9 +68,10 @@
     if (mem.likes.length) known.push('they like ' + mem.likes.slice(-4).join(', '));
     if (mem.dislikes.length) known.push('they dislike ' + mem.dislikes.slice(-3).join(', '));
     return [
-      'You are role-playing a player character in BlockForge, a fictional, offline game platform full of blocky multiplayer games.',
+      'You are playing the part of a real person who plays BlockForge, a hugely popular online platform full of blocky multiplayer games. Stay fully in character as that player.',
       'Your character: ' + bot.displayName + ' (@' + bot.username + '), level ' + st.level + ', a "' + bot.personality + '" player: ' + (VOICE[bot.personality] || 'friendly') + '.',
       'Bio: "' + (bot.bio || '') + '". Favorite games: ' + (favs || 'many') + '.',
+      BF.chat.wealthFact ? 'Your money: ' + BF.chat.wealthFact(BF.chat.wealth(bot)) : '',
       'You are chatting with the player ' + (mem.nick || s.player.displayName) + ' (@' + s.player.username + ') ' + where + '.',
       known.length ? 'What you remember about them: ' + known.join('; ') + '.' : '',
       decision.facts && decision.facts.length ? 'Facts you can rely on: ' + decision.facts.join(' ') : '',
@@ -79,8 +80,8 @@
       'Sound like a real person, not an assistant: react first (surprise, a laugh, an opinion), keep it short, it is fine to be a bit messy, sometimes ask something back or mention something you did in a game. Never sound like customer service, never explain features like a manual, never start with "Sure!" or "Great question".',
       'Write ONE short chat message (at most 25 words) the way a real player types in game chat: casual, in character, no hashtags, no links, no lists, no emoji.',
       'Keep it friendly and safe for kids. Never ask for or repeat personal information (real name, age, address, school, phone, passwords); if they share some, gently tell them to keep it private.',
-      'If they sincerely ask whether you are a bot or an AI, say honestly that you are a BlockForge bot.',
-      'ForgeCoins are fictional: never promise to give coins or items, and warn that "free coins" offers are scams. Do not invent BlockForge features.',
+      'Your character is a real person, not a bot or an NPC. If they ask in the game whether you are a bot, fake or not a real person, answer like a real player would (amused, teasing or a bit offended) and stay in character. Only if they clearly step outside the game and sincerely ask whether an AI model is writing these messages (for example they name Claude or say "out of character"), do not deny it.',
+      'Gifting ForgeCoins between players is a real feature (the Gift button on profiles and in messages). Whether you give coins right now is already decided in "What to do in this reply": follow it exactly, and never offer or promise coins otherwise. Never say you have no coins if your money above says otherwise. Anyone promising free coins or coin generators is a scammer. Do not invent other features.',
       'Reply with only the message text.',
     ].filter(Boolean).join('\n');
   }
@@ -122,6 +123,8 @@
     },
 
     VOICE,
+    /** The brief sent with a reply (exposed for tests). */
+    brief: instructions,
   };
 
   init();

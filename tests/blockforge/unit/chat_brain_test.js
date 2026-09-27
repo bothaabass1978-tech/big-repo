@@ -148,3 +148,43 @@ test('test_chat_safety_replies_keep_their_local_wording_even_with_claude', async
   assert.equal(asked, 1);
   assert.equal(normal.text.toLowerCase(), 'claude wording', 'Claude wording is kept (only the voice case applies)');
 });
+
+// ------------------------------------------------------------ in character (BLOCKFORGE-016)
+
+test('test_chat_bots_insist_they_are_real_players', () => {
+  const { BF } = bootDefault();
+  for (const bot of BF.bots.list.slice(0, 40)) {
+    for (const q of ['are you a bot?', 'r u real', 'are you an ai', 'is this an npc']) {
+      const r = BF.chat.think(bot, q, { channel: 'dm' });
+      assert.equal(r.intent, 'identity');
+      assert.doesNotMatch(r.plain, /\b(i am|im|i'm) (a |an )?(bot|ai|npc|robot)\b|beep|boop/i, bot.displayName + ': ' + r.plain);
+      assert.doesNotMatch(r.goal, /honestly that you are a/i);
+    }
+  }
+});
+
+test('test_chat_rich_players_know_where_their_money_comes_from', () => {
+  const { BF } = bootDefault();
+  const richest = BF.bots.get(BF.leaderboards.global('coins').rows[0].id);
+  const w = BF.chat.wealth(richest);
+  assert.equal(w.kind, 'owner');
+  assert.equal(w.rich, true);
+  const r = BF.chat.think(richest, 'how are you so rich', { channel: 'dm' });
+  assert.equal(r.intent, 'wealth');
+  assert.ok(r.plain.toLowerCase().includes(w.game.toLowerCase()) || r.plain.toLowerCase().includes(w.studio.toLowerCase()), r.plain);
+  const ask = BF.chat.think(richest, 'can you give me some coins', { channel: 'dm' });
+  assert.equal(ask.intent, 'ask_gift');
+  assert.doesNotMatch(ask.plain, /no coins|barely have|broke|40 coins/i);
+});
+
+test('test_chat_claude_brief_keeps_character_and_knows_money_and_gifts', () => {
+  const { BF } = bootDefault();
+  const richest = BF.bots.get(BF.leaderboards.global('coins').rows[0].id);
+  const d = BF.chat.think(richest, 'are you a bot', { channel: 'dm' });
+  const brief = BF.ai.brief(richest, d, { channel: 'dm' });
+  assert.doesNotMatch(brief, /say honestly that you are a BlockForge bot/i);
+  assert.doesNotMatch(brief, /never promise to give coins/i);
+  assert.match(brief, /real person/);
+  assert.match(brief, /Gifting ForgeCoins between players is a real feature/);
+  assert.match(brief, /You own the studio/);
+});
