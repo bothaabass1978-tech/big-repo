@@ -48,6 +48,16 @@
   let s = null; // current session
 
   const R = (BF.runtime = {
+    /**
+     * 3D graphics are switched on but the browser will not give us WebGL right
+     * now (it can pause it after the graphics card resets). Say so once, with a
+     * reload, instead of silently showing Classic 2D.
+     */
+    notice3d() {
+      if (R._noticed3d || !BF.ui || !BF.ui.toast) return;
+      R._noticed3d = true;
+      BF.ui.toast({ title: '3D graphics are paused by your browser', text: 'This game runs in 2D for now. Reloading the page usually brings 3D back.', kind: 'info', icon: 'refresh', duration: 12000, action: { label: 'Reload', onClick: () => location.reload() } });
+    },
     active: false,
     W,
     H,
@@ -178,6 +188,7 @@
     s.canvas = root.querySelector('#gr-canvas');
     s.g = s.canvas.getContext('2d');
     s.use3d = !!(s.mod.three && BF.g3d && BF.g3d.enabled());
+    if (s.mod.three && BF.g3d && !s.use3d && BF.g3d.quality() !== 'classic') R.notice3d();
     if (s.use3d) {
       try {
         s.g3 = BF.g3d.world({ W, H });
@@ -382,6 +393,16 @@
     }
     const g = s.g;
     g.setTransform(s.scale, 0, 0, s.scale, 0, 0);
+    // the browser took the 3D context away mid-game and did not give it back: finish in 2D
+    if (s.g3 && BF.g3d.lost) {
+      s.lostFor = (s.lostFor || 0) + dt;
+      if (s.lostFor > 2) {
+        if (s.g3.canvas.parentNode) s.g3.canvas.remove();
+        s.canvas.classList.remove('hud');
+        s.g3 = null; s.use3d = false; s.ctx.g3 = null;
+        R.notice3d();
+      }
+    } else s.lostFor = 0;
     try {
       if (s.g3) {
         const vdt = s.paused ? 0 : dt;

@@ -22,10 +22,13 @@
   let renderer = null, pumping = false, fontsReady = false;
 
   function setup() {
-    if (renderer) return true;
+    if (renderer && !renderer._lost) return true;
+    if (renderer) { try { renderer.dispose(); } catch (e) { /* gone */ } renderer = null; }
     if (!BF.g3d || !BF.g3d.supported()) return false;
     try {
       renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+      // if the browser drops this context, the next render builds a new renderer
+      renderer.domElement.addEventListener('webglcontextlost', (e) => { e.preventDefault(); if (renderer) renderer._lost = true; });
       renderer.outputColorSpace = THREE.SRGBColorSpace;
       renderer.shadowMap.enabled = true;
       renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -841,6 +844,8 @@
   function schedule() { if (!pumping && queue.size) { pumping = true; setTimeout(() => requestAnimationFrame(pump), 16); } }
 
   BF.thumb3d = {
+    /** GPU memory held by the thumbnail renderer (debugging and tests). */
+    info() { return renderer ? { geometries: renderer.info.memory.geometries, textures: renderer.info.memory.textures, programs: renderer.info.programs ? renderer.info.programs.length : 0 } : null; },
     /** A finished render for this game, or null. */
     get(game) {
       if (!game || !game.name) return null;

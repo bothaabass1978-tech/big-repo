@@ -821,9 +821,11 @@
   const PLACEHOLDER = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
 
   function thumbSetup() {
-    if (thumbR) return true;
+    if (thumbR && !thumbR._lost) return true;
+    if (thumbR) { try { thumbR.dispose(); } catch (e) { /* gone */ } thumbR = null; }
     if (!BF.g3d || !BF.g3d.supported()) return false;
-    thumbR = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+    try { thumbR = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true }); } catch (e) { thumbR = null; return false; }
+    thumbR.domElement.addEventListener('webglcontextlost', (e) => { e.preventDefault(); if (thumbR) thumbR._lost = true; });
     thumbR.outputColorSpace = THREE.SRGBColorSpace;
     thumbR.setClearColor(0x000000, 0);
     thumbScene = new THREE.Scene();
@@ -886,9 +888,11 @@
   const live = { r: null, scene: null, cam: null, rig: null, key: '', el: null, yaw: -0.3, drag: null, raf: 0, last: 0, auto: true, opts: {} };
 
   function liveSetup() {
-    if (live.r) return true;
+    if (live.r && !live.r._lost) return true;
+    if (live.r) { try { live.r.dispose(); } catch (e) { /* gone */ } if (live.r.domElement.parentNode) live.r.domElement.remove(); live.r = null; }
     if (!BF.g3d || !BF.g3d.supported()) return false;
-    live.r = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    try { live.r = new THREE.WebGLRenderer({ antialias: true, alpha: true }); } catch (e) { live.r = null; return false; }
+    live.r.domElement.addEventListener('webglcontextlost', (e) => { e.preventDefault(); if (live.r) live.r._lost = true; });
     live.r.outputColorSpace = THREE.SRGBColorSpace;
     live.r.setClearColor(0x000000, 0);
     live.r.shadowMap.enabled = true;

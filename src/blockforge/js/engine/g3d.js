@@ -22,8 +22,11 @@
   const hasThree = () => typeof THREE !== 'undefined' && THREE.WebGLRenderer;
 
   let supportedCache = null;
+  let checkedAt = 0;
   function supported() {
-    if (supportedCache != null) return supportedCache;
+    // a "no" is re-checked every few seconds: WebGL can come back after the GPU recovers
+    if (supportedCache === true || (supportedCache === false && Date.now() - checkedAt < 5000)) return supportedCache;
+    checkedAt = Date.now();
     if (!hasThree() || typeof document === 'undefined') return (supportedCache = false);
     try {
       const c = document.createElement('canvas');
@@ -155,8 +158,19 @@
   // ------------------------------------------------------------ shared renderer
 
   let gameRenderer = null;
+  /**
+   * The shared game renderer. If the browser dropped its WebGL context and has
+   * not given it back, the next game gets a fresh renderer instead of falling
+   * back to 2D for the rest of the session.
+   */
   function renderer() {
-    if (gameRenderer) return gameRenderer;
+    if (gameRenderer && !BF.g3d.lost) return gameRenderer;
+    if (gameRenderer) {
+      try { gameRenderer.dispose(); } catch (e) { /* context already gone */ }
+      if (gameRenderer.domElement.parentNode) gameRenderer.domElement.remove();
+      gameRenderer = null;
+      BF.g3d.lost = false;
+    }
     const q = quality();
     gameRenderer = new THREE.WebGLRenderer({ antialias: q !== 'low', powerPreference: 'high-performance' });
     gameRenderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -165,6 +179,7 @@
     gameRenderer.domElement.className = 'gr-3d';
     gameRenderer.domElement.setAttribute('aria-hidden', 'true');
     gameRenderer.domElement.addEventListener('webglcontextlost', (e) => { e.preventDefault(); BF.g3d.lost = true; });
+    gameRenderer.domElement.addEventListener('webglcontextrestored', () => { BF.g3d.lost = false; });
     return gameRenderer;
   }
 
@@ -810,7 +825,7 @@
     quality,
     /** 3D is used unless the device lacks WebGL or the player picked Classic 2D. */
     enabled() {
-      return supported() && quality() !== 'classic' && !BF.g3d.lost;
+      return supported() && quality() !== 'classic';
     },
     world(opts) { return new World(opts); },
     renderer,
