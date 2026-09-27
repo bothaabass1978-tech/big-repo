@@ -15,7 +15,7 @@
   'use strict';
 
   const U = BF.util;
-  const VERSION = 'v4';
+  const VERSION = 'v5';
   const PX_W = 640, PX_H = 360;
   const mem = new Map();
   const queue = new Map();
@@ -534,13 +534,190 @@
     },
   };
 
-  const TEMPLATE_SCENE = { arena: 'block-battlegrounds', racing: 'skyline-racers', obby: 'sky-obby', simulator: 'pet-world', towerdefense: 'towerfall-legends', custom: 'sky-obby' };
+  // ------------------------------------------------------------ creator template scenes
+
+  /** Sky per template, picked from the game id so every creation looks different. */
+  const TPL_SKY = { arena: ['arena', 'dusk', 'night', 'sunset'], racing: ['sunset', 'day', 'night', 'dusk'], obby: ['day', 'sunset', 'space', 'dusk'], simulator: ['cave', 'day', 'dusk', 'cave'], towerdefense: ['day', 'dusk', 'sunset', 'day'], custom: ['day', 'dusk', 'night', 'sunset'] };
+  function tpl(A, kind, game, c) {
+    const r = U.rng('tpl:' + kind + ':' + (game.id || game.name || 'x'));
+    const sky = TPL_SKY[kind][Math.floor(r() * 4)];
+    A.W.preset(sky);
+    if (sky === 'night' || sky === 'space') A.W.stars(300); else if (sky === 'dusk') A.W.stars(120);
+    return { r, sky, dark: U.shade(c, -0.55), mid: U.shade(c, -0.25), light: U.shade(c, 0.35), yaw: (r() - 0.5) * 0.9 };
+  }
+  /** Points along a gentle S-curve from x0 to x1 around z0 (paths, roads). */
+  function sCurve(r, x0, x1, z0, amp, n) {
+    const ph = r() * Math.PI * 2, out = [];
+    for (let i = 0; i <= n; i++) { const t = i / n; out.push({ x: x0 + (x1 - x0) * t, z: z0 + Math.sin(t * Math.PI * 1.4 + ph) * amp }); }
+    return out;
+  }
+  /** Lay boxes along a path: {w, h, y, color(i)}; returns segment headings. */
+  function lay(A, pts, o) {
+    const segs = [];
+    for (let i = 0; i < pts.length - 1; i++) {
+      const a = pts[i], b = pts[i + 1], dx = b.x - a.x, dz = b.z - a.z, len = Math.hypot(dx, dz), ang = -Math.atan2(dz, dx);
+      const m = A.box((a.x + b.x) / 2, o.y || 0, (a.z + b.z) / 2, len + 2, o.h || 2, o.w, typeof o.color === 'function' ? o.color(i) : o.color, o.op);
+      m.rotation.y = ang;
+      segs.push({ x: (a.x + b.x) / 2, z: (a.z + b.z) / 2, ang, nx: -dz / len, nz: dx / len });
+    }
+    return segs;
+  }
+
+  const TEMPLATE_SCENES = {
+    arena(A, c, game) {
+      const W = A.W, t = tpl(A, 'arena', game, c), r = t.r;
+      W.gridFloor(-400, -400, 1200, 1200, '#171b26', U.alpha(c, 0.3), 40);
+      A.shape('cyl', 400, -4, 300, 400, 8, 400, U.shade(c, -0.7));
+      for (let i = 0; i < 36; i++) { const a = (i / 36) * Math.PI * 2; A.box(400 + Math.cos(a) * 196, 0, 300 + Math.sin(a) * 196, 20, 4, 6, c, { glow: 1.1, shadow: false }).rotation.y = -a + Math.PI / 2; }
+      const n = 4 + Math.floor(r() * 3);
+      for (let i = 0; i < n; i++) {
+        const a = Math.PI * (0.95 + (i / (n - 1)) * 1.1) + (r() - 0.5) * 0.2, d = 120 + r() * 60, x = 400 + Math.cos(a) * d, z = 300 + Math.sin(a) * d, h = 30 + r() * 30;
+        A.box(x, 0, z, 34, h, 34, '#2c3242'); A.box(x, h, z, 36, 4, 36, c, { glow: 0.7 });
+      }
+      for (const s of [-1, 1]) { A.box(400 + s * 170, 0, 110, 4, 120, 4, '#39414f'); A.box(400 + s * 170 + s * 14, 70, 110, 26, 44, 2, c, { glow: 0.3 }); }
+      const w = ['sword', 'hammer', 'blaster'];
+      A.guy(372, 0, 300, { rot: 1.4 + r() * 0.3, hold: w[Math.floor(r() * 3)], holdColor: t.light, attack: true, move: 0.6 });
+      A.guy(432, 0, 292, { rot: -1.7, hold: w[Math.floor(r() * 3)], holdColor: '#39f3ff', move: 0.4 });
+      A.guy(460 + r() * 30, 18, 240, { rot: -2.4, air: true, hold: 'sword', holdColor: t.light });
+      for (let i = 0; i < 10; i++) A.glow('box', 402 + Math.cos(i * 1.7) * 14, 30 + Math.sin(i * 2.3) * 12, 296 + Math.sin(i) * 12, 3.5, i % 2 ? '#ffe066' : t.light, 1.6);
+      A.light(400, 90, 300, c, 140, 520);
+      A.look(405, 22, 290, { dist: 270, pitch: 0.42, yaw: 0.15 + t.yaw * 0.5, fov: 46 });
+    },
+    racing(A, c, game) {
+      const W = A.W, t = tpl(A, 'racing', game, c), r = t.r;
+      const night = t.sky === 'night';
+      A.box(400, -3, 300, 3000, 2, 3000, night ? '#1d2a22' : '#4f8f45');
+      const pts = sCurve(r, -300, 1100, 300, 70, 28);
+      const segs = lay(A, pts, { w: 120, h: 2, y: -1, color: '#2a2d34' });
+      segs.forEach((s, i) => {
+        for (const side of [-1, 1]) A.box(s.x + s.nx * 62 * side, -0.5, s.z + s.nz * 62 * side, 50, 3, 8, i % 2 ? '#ffffff' : c).rotation.y = s.ang;
+        if (i % 2) A.box(s.x, 0, s.z, 22, 1.2, 3, '#f4d35e').rotation.y = s.ang;
+      });
+      const deco = [];
+      for (let i = 0; i < 46; i++) { const x = -300 + i * 32, side = i % 2 ? 1 : -1, z = 300 + side * (170 + r() * 160); deco.push({ x, z, h: 40 + r() * 70 }); }
+      if (t.sky === 'night' || t.sky === 'dusk') W.boxes(deco.map((d) => ({ x: d.x, z: d.z, w: 40, h: d.h * 2.4, d: 40, color: U.shade('#343a55', (d.x % 7) / 40) })));
+      else A.trees(deco.map((d) => [d.x, d.z, d.h]), '#2f8f47');
+      const lead = segs[12], cols = [c, '#e8ecf1', '#39f3ff'];
+      [[13, 0], [12, 28], [11, -30]].forEach(([k, off], i) => {
+        const s = segs[k], m = BF.props3d.car({ color: cols[i] });
+        m.position.set(s.x + s.nx * off, 0, s.z + s.nz * off); m.rotation.y = s.ang; W.scene.add(m);
+        if (i === 0) A.glow('cone', m.position.x - Math.cos(s.ang) * 28, 7, m.position.z + Math.sin(s.ang) * 28, 7, t.light, 1.5).rotation.z = Math.PI / 2;
+      });
+      const g = segs[17];
+      for (const side of [-1, 1]) A.box(g.x + g.nx * 70 * side, 0, g.z + g.nz * 70 * side, 8, 80, 8, '#39414f');
+      A.box(g.x, 76, g.z, 8, 12, 150, c, { glow: 0.9 }).rotation.y = g.ang;
+      for (let k = 15; k < 17; k++) A.box(segs[k].x, 0.2, segs[k].z, 30, 1, 40, c, { glow: 1.1, shadow: false }).rotation.y = segs[k].ang;
+      A.look(lead.x, 12, lead.z, { dist: 270, pitch: 0.34, yaw: -1.2 + t.yaw * 0.6, fov: 50 });
+    },
+    obby(A, c, game) {
+      const W = A.W, t = tpl(A, 'obby', game, c), r = t.r;
+      const clouds = [];
+      for (let i = 0; i < 26; i++) clouds.push({ x: -200 + r() * 1300, y: -160 - r() * 80, z: -100 + r() * 800, w: 90 + r() * 120, h: 22, d: 60 + r() * 80, color: t.sky === 'space' ? '#3a3f6a' : '#ffffff' });
+      W.boxes(clouds);
+      const plats = [];
+      let x = 250, y = 0, z = 330;
+      for (let i = 0; i < 9; i++) {
+        const round = r() < 0.35, w = 50 + r() * 30;
+        const col = [c, t.light, t.mid][i % 3];
+        if (round) A.shape('cyl', x, y - 5, z, w, 10, w, col); else A.box(x, y - 10, z, w, 10, w, col);
+        A.box(x, y - 60, z, w * 0.3, 50, w * 0.3, t.dark);
+        plats.push({ x, y, z, w });
+        x += 70 + r() * 30; y += 14 + r() * 16; z += (r() - 0.5) * 90;
+      }
+      for (let i = 1; i < plats.length - 1; i += 3) { const p = plats[i]; A.box(p.x - p.w / 2 + 4, p.y, p.z, p.w - 8, 3, 6, '#ff3d4a', { glow: 1.2 }); }
+      const spin = plats[4]; const bar = A.box(spin.x, spin.y + 6, spin.z, spin.w * 1.3, 6, 6, '#ff3d4a', { glow: 1 }); bar.rotation.y = r() * Math.PI;
+      const cp = plats[2]; A.box(cp.x + 16, cp.y, cp.z, 3, 50, 3, '#e8ecf1'); A.box(cp.x + 30, cp.y + 36, cp.z, 26, 14, 2, c, { glow: 0.5 });
+      const end = plats[plats.length - 1];
+      A.box(end.x - 26, end.y, end.z, 8, 70, 8, '#ffd23f', { glow: 1 }); A.box(end.x + 26, end.y, end.z, 8, 70, 8, '#ffd23f', { glow: 1 }); A.box(end.x, end.y + 66, end.z, 60, 8, 8, '#ffd23f', { glow: 1 });
+      A.box(end.x, end.y + 4, end.z, 44, 60, 2, t.light, { glow: 1.4, opacity: 0.55, shadow: false });
+      A.guy(plats[1].x, plats[1].y, plats[1].z, { rot: -1.4, move: 0.5 });
+      A.guy((plats[2].x + plats[3].x) / 2, (plats[2].y + plats[3].y) / 2 + 26, (plats[2].z + plats[3].z) / 2, { rot: -1.5, air: true, move: 1, scale: 11 });
+      A.guy(cp.x, cp.y, cp.z - 8, { rot: -2.2, emote: 'wave' });
+      const mid = plats[3];
+      A.look(mid.x + 20, mid.y + 10, mid.z, { dist: 280, pitch: 0.28, yaw: -0.5 + t.yaw * 0.6, fov: 50 });
+    },
+    simulator(A, c, game) {
+      const W = A.W, t = tpl(A, 'simulator', game, c), r = t.r;
+      const cave = t.sky === 'cave' || t.sky === 'dusk';
+      const blocks = [], earth = cave ? ['#4a3f38', '#3d342e', '#564a40'] : ['#7a5a3a', '#6b4e33', '#8a6a44'];
+      for (let gx = 0; gx < 14; gx++) for (let gz = 0; gz < 9; gz++) {
+        const x = 240 + gx * 26, z = 200 + gz * 26, dug = Math.hypot(gx - 7, gz - 4) < 2.4;
+        const h = dug ? 4 : 10 + Math.floor(r() * 3) * 12;
+        blocks.push({ x, y: -10, z, w: 26, h, d: 26, color: earth[(gx + gz) % 3] });
+        if (!dug && r() < 0.13) A.glow('octa', x, h - 2, z, 9, r() < 0.5 ? c : t.light, 0.9);
+        else if (!dug && r() < 0.06) A.box(x, h - 10, z, 12, 12, 12, '#ffd23f', { metal: 0.6, glow: 0.3 });
+      }
+      W.boxes(blocks);
+      if (!cave) A.trees([[200, 140, 90], [620, 160, 110], [640, 440, 80], [190, 460, 100]], '#3a9a4a');
+      A.guy(420, 4, 300, { rot: -0.6, hold: 'pickaxe', attack: true, scale: 11 });
+      A.guy(500, 22, 250, { rot: -2.2, hold: 'shovel', move: 0.5 });
+      for (let i = 0; i < 16; i++) { const m = A.shape('cyl', 330 + (i % 5) * 7, 24 + Math.floor(i / 5) * 3, 330 + (i % 3) * 6, 9, 2, 9, '#ffd23f', { metal: 0.7, glow: 0.25 }); m.rotation.z = (r() - 0.5) * 0.6; }
+      A.box(300, 20, 230, 44, 3, 44, c, { glow: 1.1, shadow: false });
+      A.glow('octa', 440, 80, 280, 26, c, 1.3);
+      for (let i = 0; i < 10; i++) A.glow('box', 440 + Math.cos(i) * 40, 70 + Math.sin(i * 1.7) * 26, 280 + Math.sin(i) * 30, 3, t.light, 1.6);
+      if (cave) { A.light(440, 100, 280, c, 180, 400); A.light(300, 60, 380, '#ffb454', 90, 260); }
+      A.look(430, 30, 300, { dist: 230, pitch: 0.5, yaw: 0.35 + t.yaw * 0.5, fov: 46 });
+    },
+    towerdefense(A, c, game) {
+      const W = A.W, t = tpl(A, 'towerdefense', game, c), r = t.r;
+      A.box(400, -12, 300, 2000, 12, 2000, t.sky === 'dusk' ? '#3a6a3a' : '#4f9a45');
+      const pts = sCurve(r, 120, 700, 300, 110, 16);
+      const segs = lay(A, pts, { w: 56, h: 2, y: -1, color: (i) => (i % 2 ? '#c49a62' : '#b08a5a') });
+      const spots = [[4, 1], [7, -1], [10, 1], [12, -1]];
+      spots.forEach(([k, side], i) => {
+        const s = segs[k], x = s.x + s.nx * 70 * side, z = s.z + s.nz * 70 * side;
+        A.box(x, -1, z, 44, 6, 44, '#8a94a6');
+        A.shape('cyl', x, 26, z, 28, 50, 28, i % 2 ? '#9aa5b5' : '#7a8494'); A.shape('cone', x, 64, z, 38, 28, 38, c);
+        A.glow('sphere', x, 86, z, 10, t.light, 1.3);
+        if (i === 1) { const e = segs[k + 1]; const dx = e.x - x, dz = e.z - z, len = Math.hypot(dx, dz); const b = A.box((x + e.x) / 2, 44, (z + e.z) / 2, len, 3, 3, t.light, { glow: 2, shadow: false }); b.rotation.y = -Math.atan2(dz, dx); b.rotation.z = Math.atan2(70, len) * 0.8; }
+      });
+      for (let i = 0; i < 7; i++) {
+        const s = segs[2 + i * 2]; if (!s) break;
+        if (i % 3 === 0) { const z2 = BF.props3d.zombie({ skin: '#8fbf6a', shirt: t.dark, eyes: '#ff3d5a' }); z2.scale.setScalar(0.5); z2.position.set(s.x, 0, s.z); z2.rotation.y = s.ang + Math.PI / 2; z2.userData.tick(i, true); W.scene.add(z2); }
+        else A.shape('sphere', s.x, 8, s.z, 18, 14, 18, i % 2 ? '#7fe06a' : '#b67cff', { glow: 0.2 });
+      }
+      const end = pts[pts.length - 1];
+      A.box(end.x + 40, 0, end.z, 70, 60, 90, '#9aa5b5');
+      for (let k = 0; k < 5; k++) A.box(end.x + 12 + k * 14, 60, end.z - 45, 8, 10, 8, '#9aa5b5');
+      A.box(end.x + 40, 60, end.z, 4, 50, 4, '#e8ecf1'); A.box(end.x + 55, 94, end.z, 28, 16, 2, c, { glow: 0.4 });
+      A.trees([[160, 150, 80], [260, 470, 90], [520, 130, 100], [620, 480, 70], [720, 180, 90]], '#2f8f47');
+      A.guy(segs[8].x - segs[8].nx * 60, 0, segs[8].z - segs[8].nz * 60, { rot: 0.8, emote: 'cheer' });
+      A.look(420, 10, 300, { dist: 330, pitch: 0.62, yaw: 0.25 + t.yaw * 0.5, fov: 46 });
+    },
+    custom(A, c, game) {
+      const W = A.W, t = tpl(A, 'custom', game, c), r = t.r;
+      const S = 36, cols = 14, rows = 9, x0 = 400 - (cols * S) / 2, z0 = 300 - (rows * S) / 2;
+      const floor = [], walls = [];
+      const at = (gx, gz) => ({ x: x0 + gx * S + S / 2, z: z0 + gz * S + S / 2 });
+      for (let gx = 0; gx < cols; gx++) for (let gz = 0; gz < rows; gz++) {
+        const p = at(gx, gz), edge = gx === 0 || gz === 0 || gx === cols - 1 || gz === rows - 1;
+        floor.push({ x: p.x, y: -6, z: p.z, w: S - 1, h: 6, d: S - 1, color: (gx + gz) % 2 ? U.shade(c, -0.72) : U.shade(c, -0.64) });
+        if (edge || (r() < 0.12 && gz % 2 === 0)) walls.push({ x: p.x, y: 0, z: p.z, w: S, h: edge ? 26 : 40, d: S, color: edge ? t.dark : c });
+      }
+      W.boxes(floor); W.boxes(walls);
+      const free = () => { const gx = 1 + Math.floor(r() * (cols - 2)), gz = 1 + Math.floor(r() * (rows - 2)); return at(gx, gz); };
+      for (let i = 0; i < 3; i++) { const p = free(); A.box(p.x, -4, p.z, S - 2, 5, S - 2, '#ff5a1f', { glow: 1.3, shadow: false }); }
+      for (let i = 0; i < 3; i++) { const p = free(); for (const [dx, dz] of [[-8, -8], [8, -8], [-8, 8], [8, 8]]) A.shape('cone', p.x + dx, 6, p.z + dz, 8, 14, 8, '#c8cfd8', { metal: 0.6 }); }
+      for (let i = 0; i < 8; i++) { const p = free(); const m = A.shape('cyl', p.x, 12, p.z, 12, 3, 12, '#ffd23f', { metal: 0.7, glow: 0.4 }); m.rotation.x = Math.PI / 2; m.rotation.y = r() * 3; }
+      for (let i = 0; i < 2; i++) { const p = free(); A.glow('octa', p.x, 14, p.z, 9, t.light, 1.2); }
+      const pad = free(); A.shape('cyl', pad.x, 0, pad.z, 26, 3, 26, '#39f3ff', { glow: 1.3, shadow: false });
+      const key = free(); A.box(key.x, 10, key.z, 14, 5, 5, '#ffd23f', { glow: 0.8 });
+      const goal = at(cols - 2, 1 + Math.floor(r() * (rows - 2)));
+      A.box(goal.x, 0, goal.z, 3, 60, 3, '#e8ecf1'); A.box(goal.x + 12, 44, goal.z, 22, 14, 2, c, { glow: 0.6 });
+      const s = at(3, 4);
+      A.guy(s.x, 0, s.z, { rot: -1.4, move: 1, scale: 9 });
+      A.guy(s.x + 60, 0, s.z + 50, { rot: -2.4, move: 0.6, scale: 9 });
+      A.look(400, 0, 300, { dist: 330, pitch: 0.78, yaw: 0.25 + t.yaw * 0.4, fov: 46 });
+    },
+  };
+
 
   function sceneFor(game) {
     if (SCENES[game.id]) return { fn: SCENES[game.id], color: null };
     if (TYPE_SCENES[game.gameType]) return { fn: (A, c) => TYPE_SCENES[game.gameType](A, c, game), color: null };
-    const tpl = TEMPLATE_SCENE[game.template] || 'block-battlegrounds';
-    return { fn: SCENES[tpl], color: (game.thumbnail && game.thumbnail.color) || '#ff7a2e' };
+    const color = (game.thumbnail && game.thumbnail.color) || '#ff7a2e';
+    const scene = TEMPLATE_SCENES[game.template] || TEMPLATE_SCENES.arena;
+    return { fn: (A, c) => scene(A, c, game), color };
   }
 
   // ------------------------------------------------------------ title lettering
@@ -574,7 +751,8 @@
     g.textBaseline = 'alphabetic';
     g.lineJoin = 'round';
     for (const l of lines) {
-      const x = 28;
+      // the title is slanted (skewX); start each line further right so the slant never clips it
+      const x = 28 + 0.08 * y;
       g.save(); g.transform(1, 0, -0.08, 1, 0, 0);
       g.fillStyle = accent || '#ff7a2e'; g.fillText(l, x + 5, y + 5);
       g.lineWidth = Math.max(6, size * 0.16); g.strokeStyle = '#141018'; g.strokeText(l, x, y);
@@ -590,7 +768,7 @@
 
   function keyOf(game) {
     const custom = !SCENES[game.id] && !game.builtIn;
-    return VERSION + ':' + (custom ? 'ug:' + (game.template || '') + ':' + ((game.thumbnail && game.thumbnail.color) || '') + ':' + game.name : game.id);
+    return VERSION + ':' + (custom ? 'ug:' + (game.id || '') + ':' + (game.template || '') + ':' + ((game.thumbnail && game.thumbnail.color) || '') + ':' + game.name : game.id);
   }
   const storeKey = (k) => 'bf.thumb3d.' + k;
   /** Most renders kept in localStorage (the rest re-render per visit), so thumbnails never crowd out saves. */

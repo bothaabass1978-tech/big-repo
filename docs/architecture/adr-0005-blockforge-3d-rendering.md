@@ -224,6 +224,20 @@ extracted from its `draw(g)`. The 2D `draw` path was kept as is.
   with the flat renderer; no page errors.
 - Visual checks of each game in Low and High quality.
 
+## Amendment (2026-09-27): template thumbnails
+
+Creator and community games used to borrow a built-in game's key art, so
+every obby looked like Sky Obby and the chosen colour barely showed.
+
+- `thumbs3d.TEMPLATE_SCENES` now has a staged scene for each template:
+  arena, racing, obby, simulator, tower defense and custom.
+  - Each is themed in the game's chosen colour.
+  - Each is laid out from a seed of the game id: sky, platforms, road curve,
+    towers, tiles, props and camera angle.
+- Title lettering now starts further right on lower lines, so the slant never
+  clips it.
+- Render cache version `v5`, and the cache key includes the game id.
+
 ## Related Decisions
 
 ADR-0001, ADR-0003, ADR-0004 (Mansion secret unaffected), ADR-0007 (Studio levels).

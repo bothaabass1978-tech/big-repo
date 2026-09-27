@@ -167,6 +167,29 @@ what a game earns.
 - e2e: a Studio layout saves and plays; a campaign charges, buys visits,
   appears in the Home Sponsored row and refunds when stopped; earnings collect.
 
+## Amendment (2026-09-27): regulars
+
+The owner reported: "I bought millions in ads, the game peaked at 1.7m players
+now it has dropped to 4k". Crowds were only recent visits × 8 minutes, so
+every ad player vanished the minute a campaign ended.
+
+- **Regulars.** Each creation now keeps regulars (`ug.aud`) in
+  `creator.retain()`:
+  - The crowd feeds a 5-minute running average (`ug.warm`).
+  - `keep(ug)` of that average becomes regulars. `keep` is 6-25%, rising
+    with quality (description, thumbnail, passes, a Studio layout, likes).
+  - Regulars fade with a 4-day half-life, counted in real time, so they
+    also fade while the page is closed.
+  - Each minute, regulars/8 of them come back as `returning` visits. These
+    pay out, sell passes and show in the crowd like any other visit.
+- **Example.** A 10-minute campaign at about 1.7M playing leaves about 240k
+  playing half an hour later, about 200k after a day and about 77k after a
+  week (unit test: `test_regulars_an_ad_spike_leaves_a_lasting_audience`).
+- **Old saves.** Saves from before regulars existed get a one-time estimate:
+  ad visits × 0.7 × keep, fading from when the last campaign ended.
+- **UI.** The game dashboard shows Regulars ("keep coming back").
+- **Tuning.** All values are in `BF.creator.RETAIN`.
+
 ## Related Decisions
 
 ADR-0002, ADR-0003, ADR-0004, ADR-0005.

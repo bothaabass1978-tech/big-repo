@@ -19,6 +19,13 @@
 
   const VISIT_PAYOUT = 0.2; // ForgeCoins a creator earns per visit
   const HIST_MAX = 120; // minutes of earnings history kept per creation
+  /**
+   * Regulars: part of every crowd (ads included) keeps coming back.
+   * The crowd feeds a running average (warmSec); `keep` of that average, by
+   * quality, becomes regulars, who fade with a half-life of halfLifeDays
+   * (counted in real time, so it also runs while the page is closed).
+   */
+  const RETAIN = { warmSec: 300, keepMin: 0.06, keepMax: 0.25, keepPerQuality: 0.3, halfLifeDays: 4, sessionMin: 8, bootstrap: 0.7 };
 
   const PASS_EFFECTS = {
     double_xp: 'Double XP in this game',
@@ -350,11 +357,54 @@
       return { ok: true, amount };
     },
 
+    RETAIN,
+
+    /** Share of the recent crowd that sticks around as regulars (0.06-0.25, by quality). */
+    keep(ug) {
+      return U.clamp(RETAIN.keepMin + (creator.quality(ug) - 0.4) * RETAIN.keepPerQuality, RETAIN.keepMin, RETAIN.keepMax);
+    },
+
+    /** Players who keep coming back to a creation (right now). */
+    regulars(ug) {
+      if (!ug || !ug.aud) return 0;
+      const now = BF.clock.now();
+      return Math.round(ug.aud * Math.pow(0.5, (now - (ug.audAt || now)) / (RETAIN.halfLifeDays * 86400000)));
+    },
+
+    /**
+     * Update a creation's regulars and return how many of them visit this tick.
+     * @param {object} ug creation
+     * @param {number} now ms
+     * @returns {number} returning visits
+     */
+    retain(ug, now) {
+      if (ug.aud == null && ug.visits > 0) {
+        // saves from before regulars existed: estimate them from ad visits,
+        // fading from when the last ad campaign ended
+        const camps = BF.ads ? BF.ads.list(ug.id) : [];
+        const ended = camps.reduce((m, c) => Math.max(m, c.endedAt || (c.status === 'active' ? now : 0)), 0);
+        const adVisits = camps.reduce((a, c) => a + (c.visits || 0), 0);
+        ug.aud = adVisits * RETAIN.bootstrap * creator.keep(ug);
+        ug.warm = ug.aud / creator.keep(ug);
+        ug.audAt = ended && ended < now ? ended : now;
+      }
+      const dt = ug.audAt ? U.clamp((now - ug.audAt) / 1000, 0, 30) : 4;
+      if (ug.aud && ug.audAt) ug.aud *= Math.pow(0.5, (now - ug.audAt) / (RETAIN.halfLifeDays * 86400000));
+      const h = (ug.hist || []).slice(-3);
+      const crowd = h.length ? (h.reduce((a, b) => a + b.v, 0) / h.length) * RETAIN.sessionMin : 0;
+      ug.warm = (ug.warm || 0) + (crowd - (ug.warm || 0)) * Math.min(1, dt / RETAIN.warmSec);
+      ug.aud = Math.max(ug.aud || 0, ug.warm * creator.keep(ug));
+      ug.audAt = now;
+      const expected = (ug.aud / RETAIN.sessionMin) * (dt / 60);
+      return Math.floor(expected) + (Math.random() < expected % 1 ? 1 : 0);
+    },
+
     /** World tick: published games attract visits, votes and pass sales. */
     simulate() {
       const s = BF.store.state;
       if (!s || !s.created.length) return;
       let touched = false;
+      const now = BF.clock.now();
       for (const ug of s.created) {
         if (!ug.published || ug.visibility === 'private') continue;
         const quality = creator.quality(ug);
@@ -362,9 +412,10 @@
         // word of mouth: a game that already has an audience keeps attracting more of it
         const momentum = Math.sqrt(ug.visits || 0) / 40 * quality;
         const visits = (Math.random() < 0.55 * quality ? U.randInt(1, 3) : 0) + (playing > 0 && Math.random() < 0.3 ? 1 : 0) + Math.floor(momentum * Math.random() * 2);
-        if (!visits) continue;
+        const back = creator.retain(ug, now);
         touched = true;
-        creator.receiveVisits(ug, visits, 'organic');
+        if (visits) creator.receiveVisits(ug, visits, 'organic');
+        if (back) creator.receiveVisits(ug, back, 'returning');
       }
       if (BF.ads && BF.ads.simulate(4)) touched = true;
       if (touched) BF.store.touch('created');

@@ -180,3 +180,60 @@ test('test_bot_games_persist_in_the_save', () => {
   const again = bootDefault({ storage: sb.storage });
   assert.equal(JSON.stringify(again.BF.botGames.list().map((g) => g.id).sort()), JSON.stringify(ids));
 });
+
+// ------------------------------------------------------------ regulars (BLOCKFORGE-017)
+
+function clockSandbox() {
+  const vm = require('node:vm');
+  const sb = bootDefault();
+  sb.ctx.__t = Date.now();
+  vm.runInContext('Date.now = () => globalThis.__t', sb.ctx);
+  sb.step = (ms) => { sb.ctx.__t += ms; };
+  return sb;
+}
+function spikeGame(BF) {
+  const r = BF.creator.create({ name: 'Spike Test', description: 'A fun obby with many stages and secrets to find. '.repeat(3), genre: 'Obby', maxPlayers: 8, template: 'obby', visibility: 'public', difficulty: 'normal' });
+  BF.creator.publish(r.game.id);
+  return BF.creator.get(r.game.id);
+}
+
+test('test_regulars_an_ad_spike_leaves_a_lasting_audience', () => {
+  const sb = clockSandbox();
+  const { BF } = sb;
+  const ug = spikeGame(BF);
+  // ten minutes of ads at about 212k visits a minute (about 1.7M playing)
+  for (let i = 0; i < 150; i++) { sb.step(4000); BF.creator.receiveVisits(ug, 14133, 'ad'); BF.creator.simulate(); }
+  const peak = BF.world.crowd(ug.id);
+  assert.ok(peak > 1.4e6, 'peak ' + peak);
+  for (let i = 0; i < 450; i++) { sb.step(4000); BF.creator.simulate(); } // 30 minutes after the ads
+  const after = BF.world.crowd(ug.id);
+  const keep = BF.creator.keep(ug);
+  assert.ok(after > peak * keep * 0.6, 'after ' + after + ' of peak ' + peak);
+  assert.ok(after < peak * 0.3, 'most ad players still leave');
+  const regulars = BF.creator.regulars(ug);
+  sb.step(4 * 86400000);
+  const later = BF.creator.regulars(ug);
+  assert.ok(Math.abs(later / regulars - 0.5) < 0.02, 'half-life of ' + BF.creator.RETAIN.halfLifeDays + ' days: ' + later + ' vs ' + regulars);
+});
+
+test('test_regulars_better_games_keep_more_players', () => {
+  const { BF } = bootDefault();
+  const ug = spikeGame(BF);
+  const bare = Object.assign({}, ug, { description: '', passes: [], layout: null, thumbnail: null, likes: 0, dislikes: 0 });
+  assert.ok(BF.creator.keep(ug) > BF.creator.keep(bare));
+  assert.ok(BF.creator.keep(bare) >= BF.creator.RETAIN.keepMin);
+  assert.ok(BF.creator.keep(ug) <= BF.creator.RETAIN.keepMax);
+});
+
+test('test_regulars_old_saves_estimate_them_from_ad_visits', () => {
+  const sb = clockSandbox();
+  const { BF } = sb;
+  const ug = spikeGame(BF);
+  BF.economy.earn(100000, 'test', 'debug');
+  const c = BF.ads.create({ gameId: ug.id, headline: 'Play my spike test now!', tier: 'standard', placements: ['home'], budget: 1000, pace: 'burst' });
+  c.campaign.visits = 2000000; c.campaign.status = 'ended'; c.campaign.endedAt = sb.ctx.__t;
+  ug.visits = 2000000; delete ug.aud; delete ug.warm; delete ug.audAt; ug.hist = [];
+  sb.step(60000);
+  BF.creator.simulate();
+  assert.ok(BF.creator.regulars(ug) > 100000, 'regulars ' + BF.creator.regulars(ug));
+});
