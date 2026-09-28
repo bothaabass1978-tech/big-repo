@@ -82,7 +82,11 @@ async function signIn(page) {
   // ------------------------------------------------------------ shop
   await page.evaluate(() => { location.hash = '#/shop/accessories'; });
   await page.waitForSelector('[data-act="buy-item"]', { timeout: 5000 }).catch(() => {});
-  const shopState = await page.evaluate(() => ({ hash: location.hash, balance: BF.economy.balance(), buttons: document.querySelectorAll('[data-act="buy-item"]').length }));
+  const paged = await page.evaluate(() => ({ first: document.querySelectorAll('#shop-grid > *').length, more: !!document.querySelector('[data-shop-more]') }));
+  await page.click('[data-shop-more]').catch(() => {});
+  const pagedAfter = await page.evaluate(() => document.querySelectorAll('#shop-grid > *').length);
+  check('the shop shows 48 items at a time and Show more adds the next page', paged.first === 48 && paged.more && pagedAfter === 96, JSON.stringify({ paged, pagedAfter }));
+  const shopState =await page.evaluate(() => ({ hash: location.hash, balance: BF.economy.balance(), buttons: document.querySelectorAll('[data-act="buy-item"]').length }));
   const target = await page.evaluate(() => {
     const btns = Array.from(document.querySelectorAll('[data-act="buy-item"]'));
     const b = btns.map((x) => ({ x, item: BF.ITEMS[x.dataset.item] })).filter((o) => o.item && o.item.price <= BF.economy.balance()).sort((a, b2) => a.item.price - b2.item.price)[0];

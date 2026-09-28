@@ -398,7 +398,9 @@
       else eq[BF.ITEM_CATS[cat].slot] = item.id;
       if (['head', 'face', 'hair', 'accessory'].includes(cat)) crop = 'head';
       else if (cat === 'hat') crop = 'hat';
-      else if (cat === 'neck' || cat === 'shoulder') crop = 'bust';
+      else if (cat === 'neck') crop = 'neck';
+      else if (cat === 'shoulder' && item.look.style === 'pads') crop = 'bust';
+      else if (cat === 'shoulder') crop = 'pet';
       if (opts.onAvatar && BF.store.state) {
         const mine = U.clone(BF.store.state.avatar);
         if (cat === 'bundle') item.contents.forEach((id) => { const it = BF.ITEMS[id]; mine.equipped[BF.ITEM_CATS[it.cat].slot] = id; });
@@ -409,6 +411,8 @@
       return BF.avatar.render(base, {
         size: opts.size || 160,
         crop,
+        // back items face away from the camera, so turn the mannequin to a three-quarter back view
+        yaw: cat === 'back' ? 2.55 : undefined,
         still: !opts.animate && !moving,
         emote: cat === 'emote' ? item.look.anim : null,
         anim: cat === 'animation' ? item.look.anim : null,

@@ -223,6 +223,9 @@
 
   // --------------------------------------------------------------- creator
 
+  /** Avatar items shown on a creator page before linking to the full list. */
+  const CREATOR_ITEMS = 24;
+
   BF.pages.register('creatorpage', {
     title: (p) => decodeURIComponent(p.name || 'Creator'),
     nav: 'discover',
@@ -240,7 +243,7 @@
         '<div class="ph-actions" style="margin-top:12px"><a class="btn btn-outline btn-sm" href="#/community/' + BF.communities.slug(name) + '">' + BF.icon('flag', 14) + 'Community</a>' + (BF.company ? (studio.mine ? '<span class="pill gold">' + BF.icon('crown', 11) + ' You own this studio</span>' : '<a class="btn btn-ghost btn-sm" href="#/mystudio">' + BF.icon('crown', 14) + 'Buy · ' + U.compact(BF.company.value(studio)) + '</a>') : '') + '</div>' : '';
       return '<div class="creator-hero"><span class="ch-mark">' + BF.icon('anvil', 34) + '</span><div><div class="eyebrow">' + (studio ? 'Studio' : 'Creator') + '</div><h1 class="page-title">' + esc(name) + '</h1><div class="ch-stats"><span><b class="num">' + games.length + '</b> games</span><span><b class="num">' + items.length + '</b> avatar items</span><span><b class="num">' + U.compact(visits) + '</b> visits</span><span><b class="num">' + U.fmt(playing) + '</b> playing now</span></div>' + money + '</div></div>' + people +
         (games.length ? '<section class="section">' + BF.ui.sectionHead('Games', 'gamepad') + '<div class="grid-cards">' + games.map((g) => BF.ui.gameCard(g)).join('') + '</div></section>' : '') +
-        (items.length ? '<section class="section">' + BF.ui.sectionHead('Avatar items', 'bag') + '<div class="grid-cards items">' + items.map((i) => BF.ui.itemCard(i)).join('') + '</div></section>' : '');
+        (items.length ? '<section class="section">' + BF.ui.sectionHead('Avatar items', 'bag', items.length > CREATOR_ITEMS ? { href: '#/shop?q=' + encodeURIComponent(name), label: 'All ' + U.fmt(items.length) } : null) + '<div class="grid-cards items">' + items.slice().sort((a, b) => BF.RARITY[b.rarity].rank - BF.RARITY[a.rarity].rank || a.order - b.order).slice(0, CREATOR_ITEMS).map((i) => BF.ui.itemCard(i)).join('') + '</div></section>' : '');
     },
   });
 })((window.BF = window.BF || {}));

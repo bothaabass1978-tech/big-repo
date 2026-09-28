@@ -18,7 +18,7 @@
   const g3 = () => BF.g3d;
   const INK = '#1b1b22';
   /** Hat styles that sit over the crown of the head, so only hair below the brim shows. */
-  const COVERING_HATS = ['cap', 'beanie', 'explorer', 'wizard', 'viking', 'default'];
+  const COVERING_HATS = ['cap', 'beanie', 'explorer', 'wizard', 'viking', 'default', 'tophat', 'cowboy', 'chef', 'bucket', 'santa', 'beret', 'straw', 'frog', 'grad', 'propeller'];
 
   function lookOf(id) {
     if (id && typeof id === 'object') return id;
@@ -99,6 +99,49 @@
           stroke(6); g.beginPath(); g.moveTo(38, 82); g.quadraticCurveTo(64, 98, 90, 82); g.stroke();
           g.fillStyle = '#fff'; g.beginPath(); g.moveTo(48, 86); g.lineTo(55, 87); g.lineTo(51, 99); g.fill(); g.beginPath(); g.moveTo(73, 87); g.lineTo(80, 86); g.lineTo(77, 99); g.fill();
           break;
+        case 'happy':
+          stroke(6); g.beginPath(); g.moveTo(30, 56); g.quadraticCurveTo(40, 44, 50, 56); g.moveTo(78, 56); g.quadraticCurveTo(88, 44, 98, 56); g.stroke();
+          g.fillStyle = INK; g.beginPath(); g.moveTo(38, 78); g.quadraticCurveTo(64, 112, 90, 78); g.closePath(); g.fill();
+          g.fillStyle = '#ff7a8a'; g.beginPath(); g.ellipse(64, 96, 12, 6, 0, 0, PI * 2); g.fill();
+          break;
+        case 'cool':
+          g.fillStyle = INK; BF.gfx.rr(g, 20, 40, 40, 22, 6); g.fill(); BF.gfx.rr(g, 68, 40, 40, 22, 6); g.fill(); g.fillRect(56, 44, 16, 6);
+          g.fillStyle = 'rgba(255,255,255,.35)'; g.fillRect(26, 44, 12, 4); g.fillRect(74, 44, 12, 4);
+          stroke(6); g.beginPath(); g.moveTo(48, 86); g.quadraticCurveTo(70, 94, 88, 80); g.stroke();
+          break;
+        case 'angry':
+          eye(40, 58); eye(88, 58);
+          stroke(7); g.beginPath(); g.moveTo(24, 38); g.lineTo(54, 50); g.moveTo(104, 38); g.lineTo(74, 50); g.stroke();
+          g.beginPath(); g.moveTo(42, 96); g.quadraticCurveTo(64, 80, 86, 96); g.stroke();
+          break;
+        case 'surprised':
+          g.fillStyle = INK; g.beginPath(); g.arc(40, 52, 10, 0, PI * 2); g.arc(88, 52, 10, 0, PI * 2); g.fill();
+          g.fillStyle = '#fff'; g.beginPath(); g.arc(43, 48, 3, 0, PI * 2); g.arc(91, 48, 3, 0, PI * 2); g.fill();
+          g.fillStyle = INK; g.beginPath(); g.ellipse(64, 90, 10, 13, 0, 0, PI * 2); g.fill();
+          break;
+        case 'blush':
+          eye(40, 52); eye(88, 52);
+          g.fillStyle = 'rgba(255,110,140,.55)'; g.beginPath(); g.ellipse(26, 74, 12, 7, 0, 0, PI * 2); g.ellipse(102, 74, 12, 7, 0, 0, PI * 2); g.fill();
+          stroke(5.5); g.beginPath(); g.moveTo(52, 82); g.quadraticCurveTo(58, 90, 64, 82); g.quadraticCurveTo(70, 90, 76, 82); g.stroke();
+          break;
+        case 'smug':
+          stroke(6); g.beginPath(); g.moveTo(28, 54); g.lineTo(52, 54); g.moveTo(76, 54); g.lineTo(100, 54); g.stroke();
+          g.fillStyle = INK; g.fillRect(32, 50, 12, 8); g.fillRect(80, 50, 12, 8);
+          g.beginPath(); g.moveTo(44, 86); g.quadraticCurveTo(70, 92, 90, 76); g.stroke();
+          break;
+        case 'derp':
+          g.fillStyle = '#fff'; g.beginPath(); g.arc(40, 52, 13, 0, PI * 2); g.arc(88, 50, 10, 0, PI * 2); g.fill();
+          g.lineWidth = 3; g.strokeStyle = INK; g.stroke();
+          g.fillStyle = INK; g.beginPath(); g.arc(46, 58, 5, 0, PI * 2); g.arc(84, 44, 4, 0, PI * 2); g.fill();
+          stroke(6); g.beginPath(); g.moveTo(40, 86); g.quadraticCurveTo(64, 100, 88, 84); g.stroke();
+          g.fillStyle = '#ff7a8a'; BF.gfx.rr(g, 62, 88, 14, 14, 6); g.fill();
+          break;
+        case 'hearts': {
+          const heart = (cx, cy) => { g.fillStyle = '#ff3d6e'; g.beginPath(); g.moveTo(cx, cy + 12); g.bezierCurveTo(cx - 20, cy - 2, cx - 8, cy - 16, cx, cy - 4); g.bezierCurveTo(cx + 8, cy - 16, cx + 20, cy - 2, cx, cy + 12); g.fill(); };
+          heart(40, 52); heart(88, 52);
+          stroke(6); g.beginPath(); g.moveTo(40, 82); g.quadraticCurveTo(64, 104, 88, 82); g.stroke();
+          break;
+        }
         default:
           eye(40, 52); eye(88, 52);
           stroke(6.5); g.beginPath(); g.moveTo(40, 80); g.quadraticCurveTo(64, 102, 88, 80); g.stroke();
@@ -140,6 +183,23 @@
       const r = U.rng('gal' + l.c1); g.fillStyle = '#fff'; for (let i = 0; i < 26; i++) g.fillRect(r() * 128, r() * 128, 2, 2);
     },
   };
+
+  // more shirt patterns (items2.js)
+  Object.assign(SHIRT_ART, {
+    plaid: (g, l) => { g.globalAlpha = 0.55; g.fillStyle = l.c2; for (let i = 0; i < 128; i += 32) { g.fillRect(i, 0, 12, 128); g.fillRect(0, i, 128, 12); } g.globalAlpha = 0.35; g.fillStyle = '#000'; for (let i = 16; i < 128; i += 32) { g.fillRect(i, 0, 3, 128); g.fillRect(0, i, 128, 3); } g.globalAlpha = 1; },
+    camo: (g, l) => { const r = U.rng('camo' + l.c1 + l.c2); for (let i = 0; i < 22; i++) { g.fillStyle = i % 2 ? l.c2 : U.shade(l.c1, -0.3); g.beginPath(); g.ellipse(r() * 128, r() * 128, 10 + r() * 14, 6 + r() * 9, r() * PI, 0, PI * 2); g.fill(); } },
+    flame: (g, l) => { g.fillStyle = l.c2; g.beginPath(); g.moveTo(0, 128); for (let x = 0; x <= 128; x += 16) { g.quadraticCurveTo(x + 4, 70 - (x % 32 ? 10 : 34), x + 8, 88); g.quadraticCurveTo(x + 12, 100, x + 16, 84); } g.lineTo(128, 128); g.fill(); g.fillStyle = U.shade(l.c2, 0.45); g.beginPath(); g.moveTo(0, 128); for (let x = 0; x <= 128; x += 16) g.quadraticCurveTo(x + 8, 96, x + 16, 112); g.lineTo(128, 128); g.fill(); },
+    heart: (g, l) => { g.fillStyle = l.c2; g.beginPath(); g.moveTo(64, 104); g.bezierCurveTo(10, 66, 34, 24, 64, 50); g.bezierCurveTo(94, 24, 118, 66, 64, 104); g.fill(); },
+    dots: (g, l) => { g.fillStyle = l.c2; for (let y = 10; y < 128; y += 24) for (let x = (y / 24) % 2 ? 22 : 10; x < 128; x += 24) { g.beginPath(); g.arc(x, y, 6, 0, PI * 2); g.fill(); } },
+    split: (g, l) => { g.fillStyle = l.c2; g.fillRect(64, 0, 64, 128); },
+    rainbow: (g) => { const c = ['#ff4f5a', '#ff9a3c', '#ffd23f', '#4ad17f', '#46a8ff', '#b67cff']; c.forEach((col, i) => { g.fillStyle = col; g.fillRect(0, 20 + i * 15, 128, 15); }); },
+    zigzag: (g, l) => { g.strokeStyle = l.c2; g.lineWidth = 9; for (let y = 24; y < 128; y += 34) { g.beginPath(); for (let x = -8; x <= 136; x += 16) g.lineTo(x, y + ((x / 16) % 2 ? 10 : -10)); g.stroke(); } },
+    check: (g, l) => { g.fillStyle = l.c2; for (let y = 0; y < 128; y += 32) for (let x = (y / 32) % 2 ? 32 : 0; x < 128; x += 64) g.fillRect(x, y, 32, 32); },
+    star: (g, l) => { g.fillStyle = l.c2; g.beginPath(); for (let i = 0; i < 10; i++) { const r = i % 2 ? 16 : 40, a = -PI / 2 + i * PI / 5; g.lineTo(64 + Math.cos(a) * r, 66 + Math.sin(a) * r); } g.closePath(); g.fill(); },
+    circuit: (g, l) => { const r = U.rng('circ' + l.c2); g.strokeStyle = l.c2; g.fillStyle = l.c2; g.lineWidth = 3; for (let i = 0; i < 9; i++) { let x = r() * 128, y = r() * 128; g.beginPath(); g.moveTo(x, y); x += (r() - 0.5) * 60; g.lineTo(x, y); y += (r() - 0.5) * 60; g.lineTo(x, y); g.stroke(); g.beginPath(); g.arc(x, y, 4, 0, PI * 2); g.fill(); } },
+    bolt: (g, l) => { g.fillStyle = l.c2; g.beginPath(); g.moveTo(72, 14); g.lineTo(38, 70); g.lineTo(62, 70); g.lineTo(52, 116); g.lineTo(92, 54); g.lineTo(66, 54); g.closePath(); g.fill(); },
+    sport: (g, l) => { g.fillStyle = l.c2; g.fillRect(0, 0, 128, 18); g.fillRect(0, 0, 16, 128); g.fillRect(112, 0, 16, 128); g.font = '900 54px Arial Black, sans-serif'; g.textAlign = 'center'; g.fillText(String(l.num || 10), 64, 96); },
+  });
 
   function shirtTex(sl, jl) {
     const key = 'shirt:' + JSON.stringify(sl) + '|' + JSON.stringify(jl || null);
@@ -322,7 +382,7 @@
       const shape = headL.shape || 'block';
       const bald = ['pumpkin', 'robot', 'crystal', 'void'].includes(shape);
       const covered = !!hatL && COVERING_HATS.includes(hatL.style);
-      if (hairL && !bald && !(hatL && ['helmet', 'hood'].includes(hatL.style))) this.hair(head, hairL, covered, shape === 'round');
+      if (hairL && !bald && !(hatL && ['helmet', 'hood', 'knight'].includes(hatL.style))) this.hair(head, hairL, covered, shape === 'round');
       if (hatL) this.hat(head, hatL);
       if (accL) this.acc(head, accL);
       if (neckL) this.neck(B, neckL);
@@ -510,6 +570,94 @@
           this.anims.push((t) => { h.rotation.y = t * 0.8; h.position.y = 1.72 + Math.sin(t * 2.4) * 0.06; });
           break;
         }
+        case 'tophat':
+          this.part(head, 'cyl', 2.0, 0.08, 2.0, 0, 1.3, 0, c1);
+          this.part(head, 'cyl', 1.3, 1.3, 1.3, 0, 1.95, 0, c1);
+          this.part(head, 'cyl', 1.33, 0.22, 1.33, 0, 1.46, 0, c2);
+          break;
+        case 'cowboy': {
+          const b = this.part(head, 'cyl', 2.6, 0.08, 2.2, 0, 1.3, 0, c1); b.rotation.z = 0.04;
+          for (const s of [-1, 1]) { const f = this.part(head, 'box', 0.5, 0.08, 2.0, s * 1.15, 1.42, 0, c1); f.rotation.z = s * 0.5; }
+          this.part(head, 'box', 1.3, 0.8, 1.3, 0, 1.72, 0, c1);
+          this.part(head, 'box', 1.34, 0.16, 1.34, 0, 1.42, 0, c2);
+          this.part(head, 'box', 0.3, 0.14, 1.32, 0, 2.1, 0, U.shade(c1, -0.15));
+          break;
+        }
+        case 'chef':
+          this.part(head, 'cyl', 1.36, 0.5, 1.36, 0, 1.45, 0, c1);
+          for (const [x, z] of [[-0.35, 0], [0.35, 0], [0, 0.35], [0, -0.35], [0, 0]]) this.part(head, 'sphere', 0.85, 0.75, 0.85, x, 2.0, z, c1);
+          break;
+        case 'party': {
+          const c = this.part(head, 'cone', 0.9, 1.3, 0.9, 0.12, 2.0, 0, c1); c.rotation.z = -0.12;
+          for (let i = 0; i < 3; i++) this.part(c, 'box', 0.9, 0.08, 0.9, 0, -0.3 + i * 0.25, 0, c2);
+          this.part(head, 'sphere', 0.3, 0.3, 0.3, 0.2, 2.68, 0, c2);
+          break;
+        }
+        case 'antlers':
+          for (const s of [-1, 1]) {
+            const a = this.part(head, 'box', 0.14, 0.9, 0.14, s * 0.5, 1.7, 0, c1); a.rotation.z = -s * 0.35;
+            for (const [dy, dx] of [[0.2, 0.25], [0.45, 0.2]]) { const t = this.part(head, 'box', 0.1, 0.4, 0.1, s * (0.6 + dx), 1.6 + dy, 0, c1); t.rotation.z = -s * 1.0; }
+          }
+          break;
+        case 'catears':
+          for (const s of [-1, 1]) { const e = this.part(head, 'cone4', 0.42, 0.55, 0.22, s * 0.46, 1.52, 0, c1); e.rotation.y = PI / 4; this.part(head, 'cone4', 0.22, 0.3, 0.1, s * 0.46, 1.5, 0.08, c2, { noShadow: true }).rotation.y = PI / 4; }
+          break;
+        case 'propeller': {
+          this.part(head, 'sphere', 1.4, 0.7, 1.4, 0, 1.2, 0, c1);
+          for (let i = 0; i < 4; i++) this.part(head, 'box', 0.7, 0.36, 0.02, 0, 1.3, 0, i % 2 ? c2 : c1).rotation.y = i * PI / 2;
+          this.part(head, 'box', 0.08, 0.3, 0.08, 0, 1.68, 0, '#39414f');
+          const p = new THREE.Group(); p.position.set(0, 1.85, 0); head.add(p);
+          for (const s of [-1, 1]) this.part(p, 'box', 0.8, 0.04, 0.18, s * 0.4, 0, 0, c2);
+          this.anims.push((t) => { p.rotation.y = t * 9; });
+          break;
+        }
+        case 'flowers':
+          for (let i = 0; i < 9; i++) { const a = (i / 9) * PI * 2; const x = Math.sin(a) * 0.72, z = Math.cos(a) * 0.72; this.part(head, 'sphere', 0.34, 0.2, 0.34, x, 1.34, z, i % 2 ? c1 : c2); this.part(head, 'sphereLo', 0.12, 0.12, 0.12, x, 1.42, z, '#ffd23f', { noShadow: true }); }
+          break;
+        case 'bucket':
+          this.part(head, 'cyl', 1.5, 0.7, 1.5, 0, 1.5, 0, c1);
+          { const b = this.part(head, 'cone', 2.2, 0.35, 2.2, 0, 1.2, 0, c1); b.rotation.x = PI; b.scale.y = 0.35; }
+          this.part(head, 'cyl', 1.53, 0.12, 1.53, 0, 1.28, 0, c2);
+          break;
+        case 'santa': {
+          this.part(head, 'cyl', 1.5, 0.3, 1.5, 0, 1.22, 0, c2);
+          const c = this.part(head, 'cone', 1.35, 1.3, 1.35, -0.2, 1.95, 0, c1); c.rotation.z = 0.45;
+          this.part(head, 'sphere', 0.34, 0.34, 0.34, -0.72, 2.4, 0, c2);
+          break;
+        }
+        case 'tiara':
+          for (const x of [-0.4, -0.2, 0, 0.2, 0.4]) this.part(head, 'cone4', 0.14, x === 0 ? 0.42 : 0.28, 0.1, x, 1.4, 0.55, c1, { metal: 0.8, rough: 0.25 });
+          this.part(head, 'box', 1.1, 0.1, 0.08, 0, 1.28, 0.58, c1, { metal: 0.8, rough: 0.25 });
+          this.part(head, 'sphereLo', 0.16, 0.16, 0.1, 0, 1.46, 0.62, c2, { glow: 0.7 });
+          break;
+        case 'straw':
+          this.part(head, 'cyl', 2.4, 0.06, 2.4, 0, 1.28, 0, c1);
+          this.part(head, 'cyl', 1.4, 0.5, 1.4, 0, 1.54, 0, c1);
+          this.part(head, 'cyl', 1.43, 0.16, 1.43, 0, 1.38, 0, c2);
+          break;
+        case 'frog':
+          this.part(head, 'box', 1.42, 0.6, 1.42, 0, 1.3, 0, c1);
+          for (const s of [-1, 1]) { this.part(head, 'sphere', 0.5, 0.5, 0.5, s * 0.4, 1.72, 0.35, c1); this.part(head, 'sphere', 0.3, 0.3, 0.2, s * 0.4, 1.76, 0.56, '#ffffff'); this.part(head, 'sphereLo', 0.14, 0.14, 0.1, s * 0.4, 1.76, 0.64, INK, { noShadow: true }); }
+          this.part(head, 'box', 0.9, 0.06, 0.04, 0, 1.2, 0.72, c2, { noShadow: true });
+          break;
+        case 'beret': { const b = this.part(head, 'cyl', 1.6, 0.3, 1.6, 0.15, 1.34, 0, c1); b.rotation.z = -0.15; this.part(head, 'box', 0.1, 0.18, 0.1, 0.15, 1.56, 0, c1); break; }
+        case 'grad':
+          this.part(head, 'box', 1.36, 0.42, 1.36, 0, 1.36, 0, c1);
+          this.part(head, 'box', 1.9, 0.08, 1.9, 0, 1.6, 0, c1).rotation.y = PI / 4;
+          this.part(head, 'box', 0.06, 0.6, 0.06, 0.75, 1.3, 0.4, c2, { noShadow: true });
+          this.part(head, 'sphereLo', 0.14, 0.14, 0.14, 0, 1.68, 0, c2);
+          break;
+        case 'cone':
+          this.part(head, 'box', 1.5, 0.12, 1.5, 0, 1.28, 0, c1);
+          this.part(head, 'cone', 1.1, 1.6, 1.1, 0, 2.1, 0, c1);
+          this.part(head, 'cyl', 0.72, 0.2, 0.72, 0, 2.0, 0, c2);
+          break;
+        case 'knight':
+          this.part(head, 'box', 1.5, 1.5, 1.5, 0, 0.64, 0, c1, { metal: 0.6, rough: 0.35 });
+          this.part(head, 'box', 1.1, 0.12, 0.05, 0, 0.78, 0.76, INK, { noShadow: true });
+          this.part(head, 'box', 0.12, 0.6, 0.05, 0, 0.45, 0.76, INK, { noShadow: true });
+          this.part(head, 'box', 0.16, 0.6, 1.0, 0, 1.6, 0, c2);
+          break;
         default:
           this.part(head, 'box', 1.36, 0.4, 1.36, 0, 1.4, 0, c1);
       }
@@ -542,6 +690,34 @@
         case 'mask':
           this.part(head, 'box', 1.3, 0.42, 0.08, 0, 0.74, z, c1);
           for (const x of [-0.26, 0.26]) this.part(head, 'sphereLo', 0.24, 0.14, 0.04, x, 0.74, z + 0.05, c2, { glow: 1.2, noShadow: true });
+          break;
+        case 'eyepatch': {
+          this.part(head, 'sphereLo', 0.34, 0.3, 0.08, -0.26, 0.72, z + 0.02, c1);
+          const b = this.part(head, 'box', 1.45, 0.06, 1.45, 0, 0.8, 0, c1, { noShadow: true }); b.rotation.z = 0.25;
+          break;
+        }
+        case 'mustache':
+          for (const s of [-1, 1]) { const m = this.part(head, 'sphere', 0.4, 0.16, 0.1, s * 0.17, 0.46, z + 0.04, c1, { noShadow: true }); m.rotation.z = s * 0.35; }
+          break;
+        case 'heartshades':
+          // a heart per eye: two round lobes over a point
+          for (const x of [-0.26, 0.26]) {
+            for (const d of [-0.07, 0.07]) this.part(head, 'sphere', 0.2, 0.2, 0.06, x + d, 0.76, z + 0.02, c1, { glow: 0.3, noShadow: true });
+            const p = this.part(head, 'cone4', 0.26, 0.2, 0.06, x, 0.64, z + 0.02, c1, { glow: 0.3, noShadow: true }); p.rotation.z = PI;
+          }
+          this.part(head, 'box', 0.14, 0.04, 0.04, 0, 0.74, z + 0.02, INK);
+          break;
+        case 'sunglasses':
+          for (const x of [-0.26, 0.26]) this.part(head, 'box', 0.42, 0.24, 0.05, x, 0.72, z + 0.02, c1, { rough: 0.1 });
+          this.part(head, 'box', 1.2, 0.05, 0.05, 0, 0.82, z + 0.02, c2);
+          break;
+        case 'vr':
+          this.part(head, 'box', 1.2, 0.46, 0.34, 0, 0.72, z + 0.12, c1);
+          this.part(head, 'box', 1.0, 0.18, 0.04, 0, 0.72, z + 0.3, c2, { glow: 1.0, noShadow: true });
+          { const st = this.part(head, 'torus', 1.34, 1.34, 1.1, 0, 0.72, 0, INK); st.rotation.x = PI / 2; }
+          break;
+        case 'clownnose':
+          this.part(head, 'sphere', 0.28, 0.28, 0.28, 0, 0.56, z + 0.1, c1);
           break;
         default:
           for (const x of [-0.26, 0.26]) { const f = new THREE.Mesh(squareRing(), BF.g3d.mat(c1)); f.position.set(x, 0.7, z + 0.02); head.add(f); }
@@ -593,6 +769,25 @@
           this.part(B, 'box', 0.14, 0.6, 0.04, -0.12, 3.7, 0.52, c2); this.part(B, 'box', 0.14, 0.6, 0.04, 0.12, 3.7, 0.52, U.shade(c2, -0.2));
           { const d = this.part(B, 'cyl', 0.42, 0.06, 0.42, 0, 3.3, 0.54, c1, { metal: 0.7, rough: 0.3 }); d.rotation.x = PI / 2; }
           break;
+        case 'lei':
+          for (let i = 0; i < 12; i++) { const a = (i / 12) * PI * 2; this.part(B, 'sphere', 0.3, 0.22, 0.3, Math.sin(a) * 0.72, 3.78 - Math.max(0, Math.cos(a)) * 0.35, Math.cos(a) * 0.62, i % 2 ? c1 : c2, { noShadow: true }); }
+          break;
+        case 'tie':
+          this.part(B, 'box', 0.24, 0.16, 0.06, 0, 3.86, 0.53, c1);
+          { const t = this.part(B, 'cone4', 0.3, 1.0, 0.06, 0, 3.3, 0.53, c1); t.rotation.z = PI; }
+          this.part(B, 'box', 0.24, 0.06, 0.07, 0, 3.55, 0.54, c2, { noShadow: true });
+          break;
+        case 'pendant': {
+          const r = this.part(B, 'torus', 1.08, 1.08, 0.22, 0, 3.74, 0.2, c2, { metal: 0.8, rough: 0.3 }); r.rotation.x = PI / 2 + 0.55;
+          this.part(B, 'box', 0.08, 0.08, 0.08, 0, 3.52, 0.58, c2, { metal: 0.8, noShadow: true });
+          this.part(B, 'octa', 0.42, 0.56, 0.24, 0, 3.24, 0.62, c1, { glow: 0.6, rough: 0.15 });
+          break;
+        }
+        case 'spikes': {
+          const r = this.part(B, 'torus', 1.35, 1.35, 1.2, 0, 3.98, 0, c1); r.rotation.x = PI / 2;
+          for (let i = 0; i < 8; i++) { const a = (i / 8) * PI * 2; const sp = this.part(B, 'cone', 0.12, 0.26, 0.12, Math.sin(a) * 0.7, 3.98, Math.cos(a) * 0.62, c2, { metal: 0.6 }); sp.rotation.set(Math.cos(a) * PI / 2, 0, -Math.sin(a) * PI / 2); }
+          break;
+        }
         default:
           this.part(B, 'box', 1.0, 0.2, 1.0, 0, 3.98, 0, c1);
       }
@@ -639,6 +834,50 @@
           this.part(B, 'box', 1.86, 0.14, 0.22, 0, 1.98, -0.62, U.shade(c1, -0.25));
           for (const [x, y] of [[0, 3.4], [-0.45, 2.75], [0.45, 2.75]]) { const p = this.part(B, 'cyl', 0.62, 0.08, 0.62, x, y, -1.2, c2); p.rotation.x = PI / 2; }
           break;
+        case 'guitar': {
+          const g = new THREE.Group(); g.position.set(0, 2.9, -0.66); g.rotation.z = -0.5; B.add(g);
+          this.part(g, 'sphere', 1.0, 1.1, 0.3, 0, -0.5, 0, c1);
+          this.part(g, 'sphere', 0.8, 0.8, 0.3, 0, 0.25, 0, c1);
+          this.part(g, 'cyl', 0.3, 0.04, 0.3, 0, -0.3, -0.16, INK).rotation.x = PI / 2;
+          this.part(g, 'box', 0.16, 1.5, 0.1, 0, 1.2, 0, c2);
+          this.part(g, 'box', 0.26, 0.34, 0.12, 0, 2.0, 0, U.shade(c2, -0.3));
+          break;
+        }
+        case 'balloons': {
+          const cols = [c1, c2, '#ffd23f'];
+          const bs = cols.map((c, i) => {
+            const piv = new THREE.Group(); piv.position.set(0.35, 3.3, -0.5); B.add(piv);
+            const a = (i - 1) * 0.35;
+            this.part(piv, 'box', 0.02, 2.2, 0.02, Math.sin(a) * 0.55, 1.1, 0, '#e8ecf1', { noShadow: true }).rotation.z = -a;
+            this.part(piv, 'sphere', 0.7, 0.85, 0.7, Math.sin(a) * 1.2, 2.5, 0, c, { rough: 0.3 });
+            return piv;
+          });
+          this.anims.push((t) => { bs.forEach((b, i) => { b.rotation.z = Math.sin(t * 1.6 + i) * 0.08; b.rotation.x = Math.cos(t * 1.3 + i) * 0.06; }); });
+          break;
+        }
+        case 'quiver': {
+          const g = new THREE.Group(); g.position.set(0.3, 3.0, -0.7); g.rotation.z = 0.45; B.add(g);
+          this.part(g, 'cyl', 0.55, 1.8, 0.55, 0, 0, 0, c1);
+          for (const x of [-0.12, 0, 0.12]) { this.part(g, 'box', 0.04, 0.8, 0.04, x, 1.2, 0, '#8b5a2b'); this.part(g, 'cone4', 0.16, 0.24, 0.04, x, 1.66, 0, c2); }
+          break;
+        }
+        case 'tail': {
+          const g = new THREE.Group(); g.position.set(0, 2.1, -0.52); B.add(g);
+          this.part(g, 'sphere', 0.5, 0.5, 1.1, 0, 0, -0.5, c1);
+          this.part(g, 'sphere', 0.46, 0.46, 0.5, 0, 0.1, -1.05, c2);
+          this.anims.push((t, rig) => { g.rotation.y = Math.sin(t * (4 + rig.state.move * 6)) * 0.45; g.rotation.x = -0.35; });
+          break;
+        }
+        case 'shield':
+          this.part(B, 'cyl', 1.7, 0.16, 1.7, 0, 3.0, -0.66, c1, { metal: 0.5, rough: 0.35 }).rotation.x = PI / 2;
+          this.part(B, 'cyl', 0.6, 0.1, 0.6, 0, 3.0, -0.78, c2, { metal: 0.6 }).rotation.x = PI / 2;
+          this.part(B, 'torus', 1.6, 1.6, 0.4, 0, 3.0, -0.74, c2, { metal: 0.6 });
+          break;
+        case 'surfboard': {
+          const b = this.part(B, 'sphere', 1.1, 3.6, 0.16, 0, 3.0, -0.66, c1); b.rotation.z = 0.25;
+          const st = this.part(B, 'box', 0.16, 3.0, 0.02, 0, 3.0, -0.75, c2, { noShadow: true }); st.rotation.z = 0.25;
+          break;
+        }
         default:
           this.part(B, 'box', 1.6, 1.5, 0.7, 0, 3.0, -0.84, U.shade(c1, -0.1));
           this.part(B, 'box', 1.2, 0.5, 0.2, 0, 2.6, -1.22, c1);
@@ -670,6 +909,55 @@
         case 'pads':
           P.position.set(0, 4.05, 0);
           for (const s of [-1, 1]) { this.part(P, 'box', 1.2, 0.36, 1.12, s * 1.5, 0, 0, c1, { metal: 0.3 }); for (const z of [-0.25, 0.25]) this.part(P, 'cone4', 0.2, 0.42, 0.2, s * 1.6, 0.35, z, c2, { metal: 0.3 }); }
+          break;
+        case 'bunny':
+          this.part(P, 'sphere', 0.6, 0.55, 0.65, 0, 0.3, -0.05, c1); this.part(P, 'sphere', 0.44, 0.42, 0.42, 0, 0.72, 0.2, c1);
+          for (const s of [-1, 1]) { const e = this.part(P, 'box', 0.12, 0.5, 0.06, s * 0.12, 1.12, 0.18, c1); e.rotation.z = s * -0.15; this.part(P, 'box', 0.06, 0.34, 0.02, s * 0.12, 1.12, 0.22, c2, { noShadow: true }); }
+          this.part(P, 'sphereLo', 0.2, 0.2, 0.2, 0, 0.3, -0.4, '#ffffff');
+          eyes(0, 0.76, 0.4, 0.11);
+          this.anims.push((t) => { P.position.y = 4.05 + Math.max(0, Math.sin(t * 4)) * 0.18; });
+          break;
+        case 'penguin':
+          this.part(P, 'sphere', 0.6, 0.85, 0.55, 0, 0.45, 0, c1); this.part(P, 'sphere', 0.44, 0.64, 0.2, 0, 0.4, 0.2, '#ffffff');
+          { const b = this.part(P, 'cone', 0.12, 0.2, 0.12, 0, 0.72, 0.34, '#ffb020'); b.rotation.x = PI / 2; }
+          eyes(0, 0.82, 0.26, 0.1);
+          for (const s of [-1, 1]) this.part(P, 'box', 0.06, 0.4, 0.22, s * 0.32, 0.4, 0, c1);
+          this.anims.push((t) => { P.rotation.z = Math.sin(t * 5) * 0.12; });
+          break;
+        case 'slime': {
+          const b = this.part(P, 'sphere', 0.72, 0.5, 0.72, 0, 0.25, 0, c1, { glow: 0.25, opacity: 0.85 });
+          
+          this.part(P, 'sphereLo', 0.2, 0.2, 0.2, 0.12, 0.2, 0.06, c2, { glow: 0.6, noShadow: true });
+          eyes(0, 0.36, 0.34, 0.13);
+          this.anims.push((t) => { const k = Math.sin(t * 4); b.scale.set(0.72 * (1 + k * 0.08), 0.5 * (1 - k * 0.12), 0.72 * (1 + k * 0.08)); });
+          break;
+        }
+        case 'ghost': {
+          P.position.set(1.4, 5.3, -0.3);
+          const g = this.part(P, 'sphere', 0.6, 0.7, 0.6, 0, 0.3, 0, c1, { glow: 0.4, opacity: 0.8 });
+          
+          for (const x of [-0.18, 0, 0.18]) this.part(P, 'cone', 0.14, 0.24, 0.14, x, -0.08, 0, c1, { noShadow: true }).rotation.x = PI;
+          eyes(0, 0.38, 0.28, 0.12);
+          this.part(P, 'sphereLo', 0.1, 0.12, 0.05, 0, 0.18, 0.29, INK, { noShadow: true });
+          this.anims.push((t) => { P.position.y = 5.3 + Math.sin(t * 1.8) * 0.2; P.rotation.y = Math.sin(t * 0.9) * 0.4; });
+          break;
+        }
+        case 'bee': {
+          P.position.set(1.3, 5.5, 0.1);
+          this.part(P, 'sphere', 0.5, 0.42, 0.62, 0, 0, 0, c1);
+          for (const z of [-0.12, 0.1]) this.part(P, 'box', 0.52, 0.44, 0.07, 0, 0, z, INK, { noShadow: true });
+          eyes(0, 0.06, 0.3, 0.1);
+          const wings = [];
+          for (const s of [-1, 1]) { const w = this.part(P, 'sphereLo', 0.36, 0.05, 0.22, s * 0.24, 0.26, -0.05, c2 || '#dff6ff', { glow: 0.3, opacity: 0.7, noShadow: true }); wings.push([w, s]); }
+          this.anims.push((t) => { wings.forEach(([w, s]) => { w.rotation.z = s * Math.sin(t * 40) * 0.5; }); P.position.y = 5.5 + Math.sin(t * 3) * 0.2; P.position.x = 1.3 + Math.sin(t * 1.3) * 0.2; });
+          break;
+        }
+        case 'owl':
+          this.part(P, 'sphere', 0.62, 0.8, 0.56, 0, 0.42, 0, c1);
+          this.part(P, 'sphere', 0.4, 0.5, 0.2, 0, 0.36, 0.2, c2);
+          for (const s of [-1, 1]) { this.part(P, 'sphereLo', 0.2, 0.2, 0.08, s * 0.13, 0.66, 0.26, '#ffffff', { noShadow: true }); this.part(P, 'box', 0.08, 0.08, 0.04, s * 0.13, 0.66, 0.3, INK, { noShadow: true }); this.part(P, 'cone4', 0.1, 0.2, 0.1, s * 0.2, 0.9, 0, c1); }
+          { const b = this.part(P, 'cone4', 0.08, 0.12, 0.08, 0, 0.54, 0.3, '#ffb020'); b.rotation.x = PI; }
+          this.anims.push((t) => { P.rotation.y = Math.sin(t * 0.6) > 0.7 ? 0.6 : 0; });
           break;
         default: {
           const fox = l.style === 'fox', dragon = l.style === 'dragon';
@@ -812,6 +1100,9 @@
     head: [68 / 72, 4.78, 2.2],
     hat: [88 / 92, 5.05, 3.1],
     shot: [1, 4.62, 2.5],
+    // shoulder pets sit off to the right, so this crop also shifts the camera: [.., focus x]
+    pet: [1, 4.8, 3.4, 0.62],
+    neck: [1, 4.0, 2.9],
   };
 
   let thumbR = null, thumbScene = null, thumbCam = null;
@@ -842,7 +1133,7 @@
   }
 
   function renderThumb(av, o) {
-    const [aspect, fy, vh] = CROPS[o.crop || 'full'] || CROPS.full;
+    const [aspect, fy, vh, fx = 0] = CROPS[o.crop || 'full'] || CROPS.full;
     const pxW = o.px, pxH = Math.round(o.px / aspect);
     const rig = new Rig(av);
     rig.group.rotation.y = o.yaw == null ? -0.42 : o.yaw;
@@ -855,8 +1146,8 @@
     thumbR.setSize(pxW, pxH, false);
     thumbCam.aspect = aspect;
     const dist = (vh / 2) / Math.tan((thumbCam.fov * PI / 180) / 2);
-    thumbCam.position.set(0, fy + vh * 0.12, dist);
-    thumbCam.lookAt(0, fy, 0);
+    thumbCam.position.set(fx, fy + vh * 0.12, dist);
+    thumbCam.lookAt(fx, fy, 0);
     thumbCam.updateProjectionMatrix();
     thumbR.render(thumbScene, thumbCam);
     const url = thumbR.domElement.toDataURL('image/png');
@@ -945,7 +1236,7 @@
 
     /**
      * HTML for a 3D avatar image (rendered now if cached, else filled in shortly).
-     * opts: {size, crop:'full'|'bust'|'head'|'hat', pose (emote name), cls, still}
+     * opts: {size, crop:'full'|'bust'|'head'|'hat'|'pet'|'neck', yaw (radians, default a slight turn), pose (emote name), cls, still}
      */
     image(av, opts) {
       opts = opts || {};

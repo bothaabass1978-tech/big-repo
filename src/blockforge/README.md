@@ -37,7 +37,7 @@ online and fall back to system fonts when you are not.
 | **Game pages** | Description, how to play, server browser (join a specific server), game store with 351 game passes (5 per game) and 9 products, 204 game badges, per-game leaderboards, and what the creator has earned from the game |
 | **Community games** | Bots publish their own games every few minutes on the creator templates and arcade engines. Each one rises, peaks and fades on its own curve: most stay small and a few become hits. Their creators run ad campaigns that compete with yours for the Sponsored slots. Players you follow tell you when they release something. Every community game is playable |
 | **Creator economy** | Every studio has an owner and a team who earn from their games' visits and pass sales. The biggest studios have earned billions of ForgeCoins, and their owners lead the **Richest** board. A **Top Creators** board ranks studios, bot creators and you. Studio pages show the team and live earnings; bot profiles show their studio roles, their own games and their net worth |
-| **Avatar Shop** | 133 items in 17 categories across 8 rarities (common → mythic, then exotic and divine), bundles, **Limited Drops** with fixed stock, serial numbers and a resale market (up to 5,000,000 ForgeCoins), two ultra-rare free finds (1 in 4,000 and 1 in 20,000 finished games), "Purchase successful!" and "Not enough ForgeCoins." flows |
+| **Avatar Shop** | 908 items in 17 categories across 8 rarities (common → mythic, then exotic and divine): the hand-made originals plus 775 more (763 wearables, 8 bundles and 4 limited drops), from new hats, pets, backs, faces and shirt prints to every style dyed in named colour themes. The shop shows 48 at a time with **Show more**, and its featured rows rotate daily. It also has bundles, **Limited Drops** with fixed stock, serial numbers and a resale market (up to 5,000,000 ForgeCoins), two ultra-rare free finds (1 in 4,000 and 1 in 20,000 finished games), "Purchase successful!" and "Not enough ForgeCoins." flows |
 | **Inventory / Avatar** | Wear, favourite and sell items (40% back), a 14-slot avatar editor with skin tones, randomize and reset |
 | **Wallet** | Live balance in the header (click it to open the Wallet) and a full ledger with categories and filters |
 | **Progress** | Daily rewards 50 → 75 → 100 → 150 → 200 → 300 → 500 over a 7-day streak; 32 quests (5 daily and 4 weekly slots); 35 achievements; 6 platform badges; levels with ForgeCoin level-up rewards |
@@ -157,7 +157,7 @@ src/blockforge/
 ├── css/                base · components · pages · game
 └── js/
     ├── core/           util, event bus + clock, storage adapter, synthesized sfx, icons, store + accounts
-    ├── data/           items, games and games2 (passes, badges, products), quests/achievements, bots, thumbnails, developer updates
+    ├── data/           items and items2 (the extended avatar catalog), games and games2 (passes, badges, products), quests/achievements, bots, thumbnails, developer updates
     ├── systems/        economy, meta (quests, badges, achievements, notifications), inventory,
     │                   avatar, social, world (servers, catalog, leaderboards, search), creator,
     │                   studio (level layouts), ads (campaigns, pacing), creatoreconomy (studio owners, wealth),
@@ -194,6 +194,7 @@ Design decisions are recorded in `docs/architecture/`:
 - [ADR-0013 Performance on weak devices](../../docs/architecture/adr-0013-blockforge-performance-on-weak-devices.md)
 - [ADR-0014 Fame and dev teams](../../docs/architecture/adr-0014-blockforge-fame-and-dev-teams.md)
 - [ADR-0015 Studios, communities, giveaways and acquisitions](../../docs/architecture/adr-0015-blockforge-studios-communities-giveaways.md)
+- [ADR-0016 The extended avatar catalog](../../docs/architecture/adr-0016-blockforge-extended-avatar-catalog.md)
 
 To **add a game**, register a module with `BF.GameModules.register(type, {...})`
 in a new `js/games/*.js` file (see ADR-0003). Add `three: true` with a

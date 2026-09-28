@@ -234,7 +234,7 @@
     const animItem = BF.ITEMS[eq.animation];
     const animName = opts.still ? '' : opts.emote ? 'emote-' + opts.emote : 'anim-' + ((opts.anim || (animItem && animItem.look.anim)) || 'idle');
     const size = opts.size || 160;
-    const crop = HEAD_CROP[opts.crop || 'full'];
+    const crop = HEAD_CROP[opts.crop || 'full'] || HEAD_CROP.bust;
     const uid = 'av' + Math.random().toString(36).slice(2, 7);
     const defs = '<defs><filter id="avglow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="1.6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>';
 

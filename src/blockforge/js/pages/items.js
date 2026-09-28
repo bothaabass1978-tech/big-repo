@@ -21,7 +21,9 @@
     ['bundles', 'Bundles', 'gift'],
   ];
   const SHOP_SORTS = [['featured', 'Recommended'], ['price-asc', 'Price: low to high'], ['price-desc', 'Price: high to low'], ['rarity', 'Rarity'], ['name', 'Name A–Z']];
-  const shop = { q: '', sort: 'featured', rarity: 'all', sub: 'all', hideOwned: false };
+  const shop = { q: '', sort: 'featured', rarity: 'all', sub: 'all', hideOwned: false, shown: 0, tab: null };
+  /** Shop cards per page; "Show more" adds another page. Featured rows show a daily rotation of this many. */
+  const SHOP_PAGE = 48, ROW_MAX = 16;
 
   function sortItems(list, key) {
     const r = (i) => BF.RARITY[i.rarity].rank;
@@ -48,10 +50,26 @@
     return sortItems(list, shop.sort);
   }
 
+  function moreBtn(left) {
+    return left > 0 ? '<div class="shop-more"><button class="btn btn-outline" data-shop-more>Show more<span class="faint">' + U.fmt(left) + ' left</span></button></div>' : '';
+  }
+
+  /** The shop grid, paged: the first `shop.shown` matches plus a Show more button. */
   function shopGrid(tab) {
     const list = shopList(tab);
+    const n = Math.max(SHOP_PAGE, shop.shown || 0);
     return '<div class="results-meta"><span class="faint">' + U.plural(list.length, 'item') + '</span></div>' +
-      (list.length ? '<div class="grid-cards items">' + list.map((i) => BF.ui.itemCard(i)).join('') + '</div>' : BF.ui.empty({ icon: 'bag', title: 'No items match', text: 'Try a different rarity or search.' }));
+      (list.length ? '<div class="grid-cards items" id="shop-grid">' + list.slice(0, n).map((i) => BF.ui.itemCard(i)).join('') + '</div>' + moreBtn(list.length - n) : BF.ui.empty({ icon: 'bag', title: 'No items match', text: 'Try a different rarity or search.' }));
+  }
+
+  /** A stable daily pick of up to `n` items, so big rows rotate instead of growing. */
+  function dailyPick(list, n, salt) {
+    if (list.length <= n) return list;
+    const day = Math.floor(BF.clock.now() / 86400000);
+    const r = U.rng(salt + ':' + day);
+    const pool = list.slice();
+    for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
+    return pool.slice(0, n);
   }
 
   /** A limited drop: art, price or RAP, and a stock bar. */
@@ -68,8 +86,10 @@
     const bundles = BF.ITEM_LIST.filter((i) => i.cat === 'bundle');
     const topRare = BF.ITEM_LIST.filter((i) => !i.notForSale && !i.limitedStock && ['legendary', 'mythic'].includes(i.rarity) && i.cat !== 'bundle' && i.cat !== 'collectible' && i.price > 0);
     const drops = BF.limiteds ? BF.limiteds.list() : [];
-    const cheap = BF.ITEM_LIST.filter((i) => i.price > 0 && i.price <= 150 && i.cat !== 'tool' && !i.notForSale).sort((a, b) => a.price - b.price);
-    const newest = BF.ITEM_LIST.filter((i) => i.price > 0 && !i.notForSale && !i.limitedStock && i.cat !== 'tool' && i.cat !== 'collectible').slice(-10).reverse();
+    const cheap = dailyPick(BF.ITEM_LIST.filter((i) => i.price > 0 && i.price <= 150 && i.cat !== 'tool' && !i.notForSale), ROW_MAX, 'cheap').sort((a, b) => a.price - b.price);
+    const forSale = BF.ITEM_LIST.filter((i) => i.price > 0 && !i.notForSale && !i.limitedStock && i.cat !== 'tool' && i.cat !== 'collectible');
+    const fresh = forSale.filter((i) => i.fresh && i.cat !== 'bundle');
+    const newest = fresh.length ? dailyPick(fresh, ROW_MAX, 'new') : forSale.slice(-10).reverse();
     const heroOwned = BF.inventory.owns(hero.id);
     return '<section class="shop-hero rar-mythic"><div class="sh-art">' + BF.ui.itemPreview(hero, { size: 220, onAvatar: true }) + '</div><div class="sh-info"><span class="eyebrow" style="color:var(--r-mythic)">Mythic spotlight</span><h2 class="sh-title">' + esc(hero.name) + '</h2><p class="muted">' + esc(hero.desc) + '</p>' +
       '<div class="sh-buy">' + (heroOwned ? BF.ui.ownedTag() + '<button class="btn btn-primary" data-act="equip" data-item="' + hero.id + '">Equip</button>' : BF.ui.coins(hero.price, { cls: 'lg', size: 22 }) + '<button class="btn btn-primary btn-lg" data-act="buy-item" data-item="' + hero.id + '">' + BF.icon('bag', 17) + 'Buy</button>') + '<button class="btn btn-ghost" data-act="item-detail" data-item="' + hero.id + '">Preview</button></div>' +
@@ -77,7 +97,7 @@
       '<div class="sh-limited" data-act="item-detail" data-item="' + limited.id + '" tabindex="0"><span class="pill gold">' + BF.icon('clock', 11) + 'Limited · 1 per account</span><div class="shl-art">' + BF.ui.itemPreview(limited) + '</div><b>' + esc(limited.name) + '</b>' + (BF.inventory.owns(limited.id) ? BF.ui.ownedTag() : BF.ui.coins(limited.price)) + '</div></section>' +
       (drops.length ? '<section class="section">' + BF.ui.sectionHead('Limited Drops', 'gem') + '<p class="faint" style="margin:-4px 0 12px;font-size:13px">A fixed number of copies, each with a serial number. When they sell out they are only on the resale market.</p><div class="ltd-grid">' + drops.map(ltdCard).join('') + '</div></section>' : '') +
       '<section class="section">' + BF.ui.sectionHead('Bundles', 'gift', { href: '#/shop/bundles', label: 'All bundles' }) + '<div class="row-scroll items">' + bundles.map((i) => BF.ui.itemCard(i)).join('') + '</div></section>' +
-      '<section class="section">' + BF.ui.sectionHead('Legendary & Mythic', 'crown') + '<div class="row-scroll items">' + sortItems(topRare, 'rarity').map((i) => BF.ui.itemCard(i)).join('') + '</div></section>' +
+      '<section class="section">' + BF.ui.sectionHead('Legendary & Mythic', 'crown') + '<div class="row-scroll items">' + sortItems(dailyPick(topRare, ROW_MAX, 'top'), 'rarity').map((i) => BF.ui.itemCard(i)).join('') + '</div></section>' +
       '<section class="section">' + BF.ui.sectionHead('Great deals under 150', 'wallet') + '<div class="row-scroll items">' + cheap.map((i) => BF.ui.itemCard(i)).join('') + '</div></section>' +
       '<section class="section">' + BF.ui.sectionHead('New arrivals', 'sparkle') + '<div class="row-scroll items">' + newest.map((i) => BF.ui.itemCard(i)).join('') + '</div></section>' +
       '<section class="section">' + BF.ui.sectionHead('Everything in the shop', 'bag') + '<div id="shop-results">' + shopGrid('featured') + '</div></section>';
@@ -89,8 +109,11 @@
     keepScrollOnParams: false,
     watch: ['inventory', 'avatar', 'wallet'],
     loading: () => '<div class="skel" style="height:220px;border-radius:16px;margin-bottom:18px"></div>' + BF.ui.skeletonCards(10),
-    render(params) {
+    render(params, query) {
       const tab = params.tab && SHOP_TABS.some((t) => t[0] === params.tab) ? params.tab : 'featured';
+      if (shop.tab !== tab) { shop.tab = tab; shop.shown = SHOP_PAGE; }
+      // #/shop?q=Name (a creator page's "All" link) pre-fills the search once
+      if (query && query.q && query.q !== shop.linkQ) { shop.linkQ = query.q; shop.q = query.q; shop.shown = SHOP_PAGE; }
       const subs = tab === 'featured' || tab === 'bundles' ? [] : Object.entries(BF.ITEM_CATS).filter(([, c]) => c.group === tab);
       if (shop.sub !== 'all' && !subs.some(([k]) => k === shop.sub)) shop.sub = 'all';
       const toolbar = '<div class="toolbar"><div class="search-box inline"><input class="input" id="shop-q" type="search" placeholder="Search items or creators" value="' + esc(shop.q) + '" autocomplete="off">' + BF.icon('search', 16) + '</div>' +
@@ -105,7 +128,21 @@
     },
     mount(root, params) {
       const tab = params.tab && SHOP_TABS.some((t) => t[0] === params.tab) ? params.tab : 'featured';
-      const refresh = () => { const r = root.querySelector('#shop-results'); if (r) r.innerHTML = shopGrid(tab); };
+      // Show more appends the next page in place (the button is rebuilt, so bind it each time)
+      const bindMore = () => {
+        const b = root.querySelector('[data-shop-more]');
+        if (!b) return;
+        b.addEventListener('click', () => {
+          const list = shopList(tab), from = Math.max(SHOP_PAGE, shop.shown);
+          shop.shown = from + SHOP_PAGE;
+          const grid = root.querySelector('#shop-grid');
+          if (grid) grid.insertAdjacentHTML('beforeend', list.slice(from, shop.shown).map((i) => BF.ui.itemCard(i)).join(''));
+          b.parentNode.outerHTML = moreBtn(list.length - shop.shown);
+          bindMore();
+        });
+      };
+      const refresh = () => { shop.shown = SHOP_PAGE; const r = root.querySelector('#shop-results'); if (r) r.innerHTML = shopGrid(tab); bindMore(); };
+      bindMore();
       const q = root.querySelector('#shop-q');
       if (q) q.addEventListener('input', U.debounce(() => { shop.q = q.value; refresh(); }, 140));
       const bind = (id, key, prop) => { const el = root.querySelector('#' + id); if (el) el.addEventListener('change', () => { shop[key] = el[prop || 'value']; refresh(); }); };
@@ -210,11 +247,12 @@
       } else {
         const items = BF.ITEM_LIST.filter((i) => i.cat === cat);
         const owned = items.filter((i) => BF.inventory.owns(i.id));
-        const notOwned = items.filter((i) => !BF.inventory.owns(i.id) && !i.notForSale);
+        const forSale = items.filter((i) => !BF.inventory.owns(i.id) && !i.notForSale);
+        const notOwned = dailyPick(forSale, 12, 'edit-' + cat).sort((a, b) => a.price - b.price);
         const optional = !BF.REQUIRED_SLOTS[cat] && cat !== 'emote';
         grid = '<div class="edit-grid">' + (optional ? '<button class="edit-tile none' + (!eq[cat] ? ' on' : '') + '" data-clear="' + cat + '"><span class="et-art">' + BF.icon('block', 30) + '</span><span class="et-name">None</span></button>' : '') +
           owned.map((i) => '<button class="edit-tile rar-' + i.rarity + (eq[BF.ITEM_CATS[i.cat].slot] === i.id ? ' on' : '') + '" data-wear="' + i.id + '"><span class="et-art">' + BF.ui.itemPreview(i, { size: 90 }) + '</span><span class="et-name">' + esc(i.name) + '</span>' + (eq[BF.ITEM_CATS[i.cat].slot] === i.id ? '<span class="et-check">' + BF.icon('check', 12) + '</span>' : '') + '</button>').join('') + '</div>' +
-          (notOwned.length ? '<div class="section" style="margin-top:22px"><div class="section-head"><h3 class="section-title" style="font-size:14.5px">' + BF.icon('bag', 16) + 'More ' + esc(BF.ITEM_CATS[cat].label.toLowerCase()) + ' items in the shop</h3><a class="section-link" href="#/shop/' + BF.ITEM_CATS[cat].group + '">Open shop' + BF.icon('chevronRight', 14) + '</a></div><div class="edit-grid">' +
+          (notOwned.length ? '<div class="section" style="margin-top:22px"><div class="section-head"><h3 class="section-title" style="font-size:14.5px">' + BF.icon('bag', 16) + U.fmt(forSale.length) + ' more ' + esc(BF.ITEM_CATS[cat].label.toLowerCase()) + ' items in the shop</h3><a class="section-link" href="#/shop/' + BF.ITEM_CATS[cat].group + '">Open shop' + BF.icon('chevronRight', 14) + '</a></div><div class="edit-grid">' +
             notOwned.map((i) => '<button class="edit-tile locked rar-' + i.rarity + '" data-act="item-detail" data-item="' + i.id + '"><span class="et-art">' + BF.ui.itemPreview(i, { size: 90 }) + '</span><span class="et-name">' + esc(i.name) + '</span><span class="et-price">' + BF.ui.coins(i.price, { size: 12 }) + '</span></button>').join('') + '</div></div>' : '');
       }
       const emoteItem = BF.ITEMS[eq.emote];
