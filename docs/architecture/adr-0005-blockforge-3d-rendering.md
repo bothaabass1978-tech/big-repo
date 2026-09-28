@@ -270,6 +270,49 @@ Players can change the camera in any 3D game.
 - **Validation.** One e2e check, plus screenshots of every view in Block
   Battlegrounds and Skyline Racers.
 
+### Behind the back (added the same day)
+
+A seventh view, **Behind the back**, is a third-person chase camera. It is
+implemented in `World.chase`, which runs in `render()` after the game's
+`render3d`, so it overrides the game's shot.
+
+- **Who it follows.** It follows the local player's rig: the actor `me`, or
+  `me:<outfit>` in the city game.
+  - The camera sits 12.5 × the rig's scale behind the player, pitched 0.24
+    rad, at shoulder height, and offset over the right shoulder.
+  - It looks 7 × scale ahead of the player, with a 60° field of view.
+- **Swinging round.** While the player moves, the camera swings behind their
+  direction of travel at 1.9 per second.
+  - It uses the direction of travel, not the rig's facing, so mouse-aimed
+    characters don't spin the view.
+  - It never follows a move of more than 2.3 rad back toward the camera, so
+    backing up doesn't flip it.
+- **Where it starts.**
+  - Games that frame the whole stage start facing into the map.
+  - Follow-camera games start from the side their camera was already on.
+  - Either way, it eases in from the game's shot over about a third of a
+    second.
+- **Collision.** Two rays, one from the head and one from the waist, trace
+  toward the camera. The camera pulls in to the nearest solid mesh at once and
+  eases back out.
+  - Character rigs, see-through materials and hidden objects don't count.
+  - The shoulder offset shrinks as the camera closes in.
+- **Controls.** While the chase camera is active, `Input.axis()` rotates
+  WASD and the joystick by the camera yaw (`input.turn`), so "up" means away
+  from the camera. Right-drag orbits the camera.
+- **Side-on platformers** (a low pitch and a fixed depth) chase from a
+  three-quarter angle, and keep their left/right controls.
+- **Games without an on-foot character** (vehicles, boards) get a low, close
+  fallback shot through the normal view modifiers.
+- **Handing back.** Leaving the view restores the game's camera and field of
+  view.
+- **Validation.**
+  - One e2e check.
+  - Screenshots in Dungeon Frontier, Zombie Outbreak, Sky Obby, Block
+    Battlegrounds and Skyline Racers.
+  - No measurable frame-rate cost from the rays (the same frame rate as
+    Classic with software rendering).
+
 ## Related Decisions
 
 ADR-0001, ADR-0003, ADR-0004 (Mansion secret unaffected), ADR-0007 (Studio levels).

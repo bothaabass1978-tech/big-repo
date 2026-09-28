@@ -30,6 +30,8 @@
     this.joy = { x: 0, y: 0, active: false };
     this.pointer = { x: W / 2, y: H / 2, down: false, pressed: false, released: false, moved: false, touch: false };
     this.enabled = true;
+    /** Camera yaw that movement is relative to (set by the runtime for the behind-the-back view), or null. */
+    this.turn = null;
     const self = this;
 
     this._kd = (e) => {
@@ -117,6 +119,11 @@
       if (this.joy.active) { x += this.joy.x; y += this.joy.y; }
       const l = Math.hypot(x, y);
       if (l > 1) { x /= l; y /= l; }
+      // behind-the-back camera: up means away from the camera, not up the map
+      if (this.turn != null && (x || y)) {
+        const c = Math.cos(this.turn), s = Math.sin(this.turn);
+        return { x: x * c + y * s, y: -x * s + y * c };
+      }
       return { x, y };
     },
 

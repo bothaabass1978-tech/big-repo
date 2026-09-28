@@ -406,6 +406,13 @@
     if (dt > 0.05) dt = 0.05;
     const inst = s.instance;
     if (!inst) return;
+    // behind-the-back view: WASD moves relative to the camera, right-drag orbits it
+    s.input.turn = s.g3 ? s.g3.chaseYaw : null;
+    if (s.g3 && s.g3.chaseYaw != null && s.input.down('Mouse2')) {
+      const px = s.input.pointer.x;
+      if (s.orbitX != null) s.g3.orbit(px - s.orbitX);
+      s.orbitX = px;
+    } else s.orbitX = null;
     if (!s.paused && !s.ended) {
       s.ctx.time += dt;
       s.playTime += dt;

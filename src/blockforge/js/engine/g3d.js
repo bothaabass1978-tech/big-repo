@@ -59,7 +59,17 @@
     { id: 'overhead', name: 'Overhead', hint: 'Almost straight down, like a map', distMul: 1.08, pitch: 1.38, pitchMix: 1, yawAdd: 0 },
     { id: 'low', name: 'Low angle', hint: 'Near the ground, looking across', distMul: 0.88, pitch: 0.3, pitchMix: 0.8, yawAdd: 0 },
     { id: 'angled', name: 'Angled', hint: 'A three-quarter view from the side', distMul: 1.05, pitchMix: 0, yawAdd: 0.62 },
+    // follows your character over the shoulder (World.chase); games without an on-foot character get a low chase shot
+    { id: 'behind', name: 'Behind the back', hint: 'Over the shoulder; WASD follows the camera, right-drag to look around', distMul: 0.62, pitch: 0.3, pitchMix: 0.85, yawAdd: 0 },
   ];
+
+  /**
+   * Behind-the-back camera, in multiples of the character's scale (a rig is
+   * about 6.5 units tall). follow = how fast it swings round behind you while
+   * you move (per second); it never follows a move back toward the camera, so
+   * backing up does not flip the view.
+   */
+  const CHASE = { waist: 2.4, minDist: 2.5, pad: 0.8, recover: 2.5, dist: 12.5, height: 5.2, shoulder: 1.25, ahead: 7, pitch: 0.24, fov: 60, follow: 1.9, noFollow: 2.3, blendIn: 3, orbit: 0.006, sideYaw: -1.05 };
   /** How fast a new view eases in (fraction per 60 fps frame). */
   const VIEW_EASE = 0.12;
 
@@ -309,6 +319,9 @@
     // thumbnails pass their own renderer and keep the game's framing; play worlds follow the player's camera view
     this.userCam = opts.userCam == null ? !opts.renderer : opts.userCam;
     this._view = null;
+    /** Camera yaw of the behind-the-back view while it follows the player (null otherwise); movement input turns with it. */
+    this.chaseYaw = null;
+    this._chase = null;
     this.shakeT = 0;
     this.shakeMag = 0;
     this.labels = [];
@@ -606,6 +619,7 @@
       if (a) { a.seen = true; return a.rig; }
       const rig = BF.char3d.build(avatar, o);
       rig.group.scale.setScalar((o && o.scale) || 14);
+      rig.group.userData.actor = true;
       this.scene.add(rig.group);
       this.actors.set(id, { rig, seen: true, solid: !(o && o.solid === false) });
       return rig;
@@ -702,6 +716,8 @@
     look(tx, ty, tz, o, dt) {
       o = o || {};
       let dist = o.dist || 800, pitch = o.pitch == null ? 0.95 : o.pitch, yaw = o.yaw || 0;
+      // side-on platformer shots (low pitch, fixed depth) chase from a three-quarter angle instead of straight behind
+      this._sideish = pitch < 0.25 && tz === 0;
       if (this.userCam) ({ dist, pitch, yaw } = this.viewed(dist, pitch, yaw, dt));
       const k = o.lerp == null || !dt ? 1 : 1 - Math.pow(1 - o.lerp, dt * 60);
       this.camTarget.x += (tx - this.camTarget.x) * k;
@@ -717,6 +733,114 @@
       if (o.fov && this.camera.fov !== o.fov) { this.camera.fov = o.fov; this.camera.updateProjectionMatrix(); }
       this.camera.lookAt(t.x + sx * 0.5, t.y + sy * 0.5, t.z);
       this.focus(t.x, t.z);
+    },
+
+    /** The local player's character rig ('me' or 'me:<outfit>'), if the game shows one this frame. */
+    playerRig() {
+      const ok = (a) => a && a.rig.group.visible && a.rig.group.parent === this.scene;
+      const me = this.actors.get('me');
+      if (ok(me)) return me.rig;
+      for (const [id, a] of this.actors) if (id.startsWith('me:') && ok(a)) return a.rig;
+      return null;
+    },
+
+    /**
+     * Distance along a ray (unit direction dx, dy, dz) to the first solid scene mesh,
+     * or null if nothing is closer than `far`. Characters, effects and see-through
+     * meshes do not block the camera.
+     */
+    blocked(x, y, z, dx, dy, dz, far) {
+      const r = this._ray;
+      r.set(this._v.set(x, y, z), (this._dir || (this._dir = V())).set(dx, dy, dz).normalize());
+      r.near = 0; r.far = far;
+      const hits = r.intersectObjects(this.scene.children, true);
+      r.far = Infinity; // the same raycaster also picks for the mouse
+      for (const h of hits) {
+        const o = h.object, m = o.material;
+        if (!o.isMesh || (m && (m.transparent || m.opacity < 1 || Array.isArray(m)))) continue;
+        let a = o, skip = false;
+        for (; a; a = a.parent) if (!a.visible || a.userData.actor) { skip = true; break; }
+        if (!skip) return h.distance;
+      }
+      return null;
+    },
+
+    /** Right-drag orbit for the behind-the-back view (pixels of horizontal drag). */
+    orbit(dx) {
+      if (this._chase) this._chase.yaw -= dx * CHASE.orbit;
+    },
+
+    /**
+     * Behind-the-back view: place the camera over the player's shoulder, easing in
+     * from the game's own shot and swinging round behind the direction they run.
+     * Runs after the game's render3d, so it overrides the game's camera for this frame.
+     */
+    chase(dt) {
+      this.chaseYaw = null;
+      const rig = this.userCam && cameraView().id === 'behind' ? this.playerRig() : null;
+      if (!rig) {
+        if (this._chase) {
+          // hand the camera back (games that set their shot once, at the start, never move it again)
+          const c = this._chase;
+          this.camera.fov = c.fov0; this.camera.updateProjectionMatrix();
+          this.camera.position.copy(c.from); this.camera.lookAt(c.fromLook);
+          this._chase = null;
+        }
+        return false;
+      }
+      const g = rig.group, sc = g.scale.x, p = g.position, side = !!this._sideish;
+      const k = (rate) => (dt > 0 ? 1 - Math.exp(-rate * dt) : 0);
+      let c = this._chase;
+      if (!c) {
+        // start facing into the map when the game frames the whole stage, otherwise from the
+        // side the game's camera was on, so "forward" keeps meaning what it did a moment ago
+        const t = this.camTarget, far = Math.hypot(t.x - p.x, t.z - p.z) > sc * 12;
+        const from = far ? Math.atan2(p.x - t.x, p.z - t.z) : Math.atan2(this.camera.position.x - p.x, this.camera.position.z - p.z);
+        c = this._chase = { yaw: side ? CHASE.sideYaw : from, x: p.x, y: p.y, z: p.z, px: p.x, pz: p.z, t: 0, fov0: this.camera.fov, from: this.camera.position.clone(), fromLook: this.camTarget.clone() };
+      }
+      // swing behind the direction of travel (not the facing, which may follow the mouse)
+      const mx = p.x - c.px, mz = p.z - c.pz;
+      c.px = p.x; c.pz = p.z;
+      if (side) c.yaw += (CHASE.sideYaw - c.yaw) * k(4);
+      else if (Math.hypot(mx, mz) > sc * 0.01) {
+        const want = Math.atan2(-mx, -mz); // camera sits opposite the way they are going
+        const d = Math.atan2(Math.sin(want - c.yaw), Math.cos(want - c.yaw));
+        if (Math.abs(d) < CHASE.noFollow) c.yaw += d * k(CHASE.follow);
+      }
+      c.x += (p.x - c.x) * k(16); c.y += (p.y - c.y) * k(10); c.z += (p.z - c.z) * k(16);
+      const sy = Math.sin(c.yaw), cy = Math.cos(c.yaw);
+      const rx = cy, rz = -sy; // camera right
+      // pull in when a wall or crate sits between the camera and the player, ease back out after
+      const hy = c.y + sc * CHASE.height;
+      const full = sc * CHASE.dist, cp = Math.cos(CHASE.pitch);
+      // trace from the head and from the waist, so waist-high cover that hides the body also counts
+      const reach = full + sc * CHASE.shoulder;
+      const camY = hy + Math.sin(CHASE.pitch) * full, by = c.y + sc * CHASE.waist;
+      const bl = Math.hypot(cp * full, camY - by);
+      const h1 = this.blocked(c.x, hy, c.z, sy * cp, Math.sin(CHASE.pitch), cy * cp, reach);
+      const h2 = this.blocked(c.x, by, c.z, sy * cp * full / bl, (camY - by) / bl, cy * cp * full / bl, bl);
+      const hit = h1 == null && h2 == null ? null : Math.min(h1 == null ? Infinity : h1, h2 == null ? Infinity : h2 * full / bl);
+      const want = hit == null ? full : Math.max(sc * CHASE.minDist, hit - sc * CHASE.pad);
+      c.d = c.d == null || want < c.d ? want : c.d + (want - c.d) * k(CHASE.recover);
+      const dist = c.d;
+      // over the right shoulder, less so as the camera closes in, so the player stays in frame
+      const sh = sc * CHASE.shoulder * (dist / full);
+      const tx = c.x + rx * sh, ty = hy, tz = c.z + rz * sh;
+      const px = tx + sy * cp * dist, py = ty + Math.sin(CHASE.pitch) * dist, pz = tz + cy * cp * dist;
+      const lx = tx - sy * sc * CHASE.ahead, lz = tz - cy * sc * CHASE.ahead;
+      // ease in from wherever the game's camera was
+      c.t = Math.min(1, c.t + (dt > 0 ? dt * CHASE.blendIn : 0));
+      const e = c.t * c.t * (3 - 2 * c.t);
+      let sx = 0, shy = 0;
+      if (this.shakeT > 0) { sx = (Math.random() - 0.5) * this.shakeMag; shy = (Math.random() - 0.5) * this.shakeMag; }
+      this.camera.position.set(c.from.x + (px - c.from.x) * e + sx, c.from.y + (py - c.from.y) * e + shy, c.from.z + (pz - c.from.z) * e);
+      this.camera.lookAt(c.fromLook.x + (lx - c.fromLook.x) * e, c.fromLook.y + (ty - c.fromLook.y) * e, c.fromLook.z + (lz - c.fromLook.z) * e);
+      const fov = c.fov0 + (CHASE.fov - c.fov0) * e;
+      if (this.camera.fov !== fov) { this.camera.fov = fov; this.camera.updateProjectionMatrix(); }
+      this.focus(p.x, p.z);
+      // side-on games keep their left/right controls; everyone else moves relative to the camera
+      this.chaseYaw = side ? null : c.yaw;
+      return true;
     },
 
     /** Apply the player's camera view to a game's shot, easing between views over a few frames. */
@@ -813,6 +937,7 @@
 
     update(dt) {
       this.time += dt;
+      this._dt = (this._dt || 0) + dt;
       if (this.shakeT > 0) this.shakeT -= dt;
       this.fx.update(dt);
       for (let i = this.texts.length - 1; i >= 0; i--) { this.texts[i].t += dt; if (this.texts[i].t > 1.1) this.texts.splice(i, 1); }
@@ -867,6 +992,8 @@
     },
 
     render() {
+      if (this.userCam) this.chase(this._dt || 0);
+      this._dt = 0;
       this.renderer.render(this.scene, this.camera);
     },
 

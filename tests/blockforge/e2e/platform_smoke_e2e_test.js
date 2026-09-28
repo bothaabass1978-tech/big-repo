@@ -146,6 +146,10 @@ async function signIn(page) {
       const after = await page.evaluate(() => ({ view: BF.g3d.cameraView().id, label: document.querySelector('#gr-cam-name').textContent, flash: !document.querySelector('#gr-cam-flash').hidden, pos: (({ x, y, z }) => [x, y, z])(BF.runtime.session().g3.camera.position) }));
       await page.click('[data-g="camera"]');
       const clicked = await page.evaluate(() => BF.g3d.cameraView().id);
+      await page.evaluate(() => BF.g3d.cycleCamera('behind'));
+      await page.waitForTimeout(900);
+      const behind = await page.evaluate(() => { const s = BF.runtime.session(), w = s.g3, r = w.playerRig(); if (!r) return { rig: false }; const c = w.camera.position, p = r.group.position; return { rig: true, yaw: w.chaseYaw, turn: s.input.turn, near: Math.hypot(c.x - p.x, c.z - p.z) < r.group.scale.x * 16, low: c.y - p.y < r.group.scale.x * 12 }; });
+      check('Behind the back follows the player over the shoulder and turns WASD with the camera', behind.rig && behind.yaw != null && behind.turn === behind.yaw && behind.near && behind.low, JSON.stringify(behind));
       await page.evaluate(() => BF.g3d.cycleCamera('classic'));
       const moved = Math.hypot(after.pos[0] - cam[0], after.pos[1] - cam[1], after.pos[2] - cam[2]) > 20;
       check('V and the camera button switch between camera views', after.view === 'close' && after.label === 'Close-up' && after.flash && clicked === 'wide' && moved, JSON.stringify({ after, clicked, moved }));
