@@ -7,8 +7,8 @@
   const U = BF.util;
   const esc = U.esc;
 
-  const CAT_LABEL = { daily: 'Daily reward', game: 'Game reward', quest: 'Quest', achievement: 'Achievement', level: 'Level up', purchase: 'Avatar Shop', pass: 'Game pass', product: 'Game store', sale: 'Item sale', creator: 'Creator earnings', ads: 'Advertising', forgecore: 'FORGECORE', debug: 'Developer', gift: 'Gift', earn: 'Earned' };
-  const CAT_ICON = { daily: 'gift', game: 'gamepad', quest: 'target', achievement: 'medal', level: 'star', purchase: 'bag', pass: 'ticket', product: 'bag', sale: 'refresh', creator: 'anvil', ads: 'megaphone', forgecore: 'terminal', debug: 'bug', gift: 'sparkle', earn: 'plus' };
+  const CAT_LABEL = { daily: 'Daily reward', game: 'Game reward', quest: 'Quest', achievement: 'Achievement', level: 'Level up', purchase: 'Avatar Shop', pass: 'Game pass', product: 'Game store', sale: 'Item sale', creator: 'Creator earnings', ads: 'Advertising', forgecore: 'FORGECORE', debug: 'Developer', gift: 'Gift', fame: 'Fame', devs: 'Dev salaries', earn: 'Earned' };
+  const CAT_ICON = { daily: 'gift', game: 'gamepad', quest: 'target', achievement: 'medal', level: 'star', purchase: 'bag', pass: 'ticket', product: 'bag', sale: 'refresh', creator: 'anvil', ads: 'megaphone', forgecore: 'terminal', debug: 'bug', gift: 'sparkle', fame: 'star', devs: 'users', earn: 'plus' };
   let txFilter = 'all';
   let txCat = 'all';
   let txLimit = 60;
@@ -174,6 +174,35 @@
       (lb.you ? '<p class="faint" style="margin-top:10px;font-size:12.5px">You are ranked <b>#' + U.fmt(lb.you.rank) + '</b> of ' + U.fmt(lb.total) + ' creators.</p>' : '');
   }
 
+  /** Most Famous: everyone by fame points, with their tier. */
+  function fameTable(lb) {
+    const m = BF.fame.me();
+    const medal = (r) => (r <= 3 ? '<span class="medal m' + r + '">' + r + '</span>' : '<span class="rank num">' + r + '</span>');
+    const row = (r) => {
+      const tier = r.me ? m.tier : BF.fame.tierOf(r.bot);
+      const who = r.me
+        ? '<a class="lb-player" href="#/profile">' + BF.ui.avatarChip(BF.store.state.avatar, { size: 'sm' }) + '<span><b>' + esc(r.name) + '</b> <span class="pill accent">You</span></span></a>'
+        : '<a class="lb-player" href="#/user/' + r.bot.id + '">' + BF.ui.avatarChip(r.bot.avatar, { size: 'sm' }) + '<span><b>' + esc(r.name) + '</b><span class="faint"> @' + esc(r.username) + '</span></span></a>';
+      return '<tr class="' + (r.me ? 'me' : '') + '"><td>' + medal(r.rank) + '</td><td>' + who + '</td><td class="hide-sm">' + BF.pages.fameTier(tier) + '</td><td class="r num"><b>' + U.compact(r.value) + '</b></td></tr>';
+    };
+    let body = lb.rows.map(row).join('');
+    if (lb.you && lb.you.rank > lb.rows.length) body += '<tr class="gap"><td colspan="4">…</td></tr>' + row(lb.you);
+    return BF.pages.fameCard(m) +
+      '<div class="table-wrap" style="margin-top:14px"><table class="table lb-table"><thead><tr><th style="width:70px">Rank</th><th>Player</th><th class="hide-sm">Tier</th><th class="r">Fame</th></tr></thead><tbody>' + body + '</tbody></table></div>' +
+      '<p class="faint" style="margin-top:10px;font-size:12.5px">Fame = followers + 1.2 × players in your games right now + 10 × level + wins ÷ 2.</p>';
+  }
+
+  /** A tier pill. */
+  BF.pages.fameTier = (t) => '<span class="fame-tier" style="--tc:' + t.color + '">' + BF.icon(t.id === 'legend' ? 'crown' : 'star', 12) + esc(t.name) + '</span>';
+
+  /** Your fame card: tier, points, rank, progress to the next tier and what the tier does. */
+  BF.pages.fameCard = (m) => {
+    const perks = { newcomer: 'Grow followers and make games people play to get noticed.', rising: 'People are starting to notice you.', known: 'Some players recognise you when you join.', popular: 'Players notice you when you join a server.', famous: 'Players freak out, follow you around and you get a ✔ in chat.', superstar: 'Whole servers swarm you and fans pour in.', legend: 'You are the most famous player on BlockForge.' }[m.tier.id];
+    return '<div class="panel fame-card" style="--tc:' + m.tier.color + '"><div class="fc-top">' + BF.pages.fameTier(m.tier) + '<b class="num">' + U.fmt(m.score) + '</b><span class="faint">fame · #' + U.fmt(m.rank) + ' of ' + U.fmt(m.total) + '</span></div>' +
+      (m.next ? '<div class="bar"><i style="width:' + Math.round(m.progress * 100) + '%"></i></div><div class="faint fc-next">' + U.compact(Math.max(0, m.next.min - m.score)) + ' to ' + esc(m.next.name) + '</div>' : '') +
+      '<p class="fc-perk">' + esc(perks || '') + '</p></div>';
+  };
+
   let lbGlobal = 'level';
   let lbGame = 'block-battlegrounds';
   let lbGameStat = null;
@@ -182,10 +211,12 @@
     title: 'Leaderboards',
     nav: 'leaderboards',
     render(params) {
-      const scope = params.scope === 'games' ? 'games' : params.scope === 'creators' ? 'creators' : 'global';
-      const tabs = BF.ui.tabs([{ id: 'global', label: 'Global', href: '#/leaderboards', icon: 'globe' }, { id: 'creators', label: 'Top Creators', href: '#/leaderboards/creators', icon: 'anvil' }, { id: 'games', label: 'Games', href: '#/leaderboards/games', icon: 'gamepad' }], scope);
+      const scope = ['games', 'creators', 'fame'].includes(params.scope) ? params.scope : 'global';
+      const tabs = BF.ui.tabs([{ id: 'global', label: 'Global', href: '#/leaderboards', icon: 'globe' }, { id: 'fame', label: 'Most Famous', href: '#/leaderboards/fame', icon: 'star' }, { id: 'creators', label: 'Top Creators', href: '#/leaderboards/creators', icon: 'anvil' }, { id: 'games', label: 'Games', href: '#/leaderboards/games', icon: 'gamepad' }], scope);
       let body;
-      if (scope === 'creators') {
+      if (scope === 'fame' && BF.fame) {
+        body = fameTable(BF.fame.board(50));
+      } else if (scope === 'creators') {
         body = creatorsTable(BF.creatorEconomy.topCreators(50));
       } else if (scope === 'global') {
         const def = BF.leaderboards.GLOBAL.find((d) => d.key === lbGlobal);

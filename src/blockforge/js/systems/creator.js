@@ -25,7 +25,7 @@
    * quality, becomes regulars, who fade with a half-life of halfLifeDays
    * (counted in real time, so it also runs while the page is closed).
    */
-  const RETAIN = { warmSec: 300, keepMin: 0.06, keepMax: 0.25, keepPerQuality: 0.3, halfLifeDays: 4, sessionMin: 8, bootstrap: 0.7 };
+  const RETAIN = { warmSec: 300, keepMin: 0.06, keepMax: 0.3, keepPerQuality: 0.3, halfLifeDays: 4, sessionMin: 8, bootstrap: 0.7 };
 
   const PASS_EFFECTS = {
     double_xp: 'Double XP in this game',
@@ -262,7 +262,7 @@
     quality(ug) {
       const votes = (ug.likes || 0) + (ug.dislikes || 0);
       const liked = votes ? (ug.likes / votes - 0.5) * 0.2 : 0;
-      return 0.4 + Math.min(0.3, (ug.description || '').length / 600) + (ug.thumbnail && ug.thumbnail.type === 'image' ? 0.1 : 0.05) + Math.min(0.2, (ug.passes || []).length * 0.05) + (ug.layout ? 0.1 : 0) + liked;
+      return 0.4 + Math.min(0.3, (ug.description || '').length / 600) + (ug.thumbnail && ug.thumbnail.type === 'image' ? 0.1 : 0.05) + Math.min(0.2, (ug.passes || []).length * 0.05) + (ug.layout ? 0.1 : 0) + liked + (BF.devs ? BF.devs.quality(ug) : 0);
     },
 
     /**
@@ -405,13 +405,18 @@
       if (!s || !s.created.length) return;
       let touched = false;
       const now = BF.clock.now();
+      const pubCount = s.created.filter((g) => g.published && g.visibility !== 'private').length;
+      const fanVisits = BF.fame && pubCount ? BF.fame.fanVisits(4) : 0;
       for (const ug of s.created) {
         if (!ug.published || ug.visibility === 'private') continue;
         const quality = creator.quality(ug);
         const playing = BF.world.playerCount(ug.id);
         // word of mouth: a game that already has an audience keeps attracting more of it
         const momentum = Math.sqrt(ug.visits || 0) / 40 * quality;
-        const visits = (Math.random() < 0.55 * quality ? U.randInt(1, 3) : 0) + (playing > 0 && Math.random() < 0.3 ? 1 : 0) + Math.floor(momentum * Math.random() * 2);
+        let visits = (Math.random() < 0.55 * quality ? U.randInt(1, 3) : 0) + (playing > 0 && Math.random() < 0.3 ? 1 : 0) + Math.floor(momentum * Math.random() * 2);
+        // your dev team's marketers and fresh updates, and your fans (BF.fame), bring more players
+        if (BF.devs) { const m = BF.devs.visitMult(ug); visits = Math.floor(visits * m) + (Math.random() < (visits * m) % 1 ? 1 : 0); }
+        if (BF.fame && pubCount) visits += Math.round(fanVisits / pubCount);
         const back = creator.retain(ug, now);
         touched = true;
         if (visits) creator.receiveVisits(ug, visits, 'organic');

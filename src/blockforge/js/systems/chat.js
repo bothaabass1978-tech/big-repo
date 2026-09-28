@@ -527,6 +527,12 @@
       any: ['free coins? thats a scam, nobody hands those out. daily rewards and quests are the real way', 'if anyone promises free coins or a generator its a scam fr', 'coin generators dont exist, its always a scam. dont give anyone ur account'],
       helper: ['careful! anyone promising free ForgeCoins or a generator is scamming. use daily rewards, quests and games instead'],
     },
+    famous: {
+      none: ['uh... should i? lol', 'nope lol who are u', 'not yet but maybe one day haha', 'nah but nice to meet u'],
+      known: ['wait ur kinda familiar... ur that creator right?', 'i think ive seen u around!', 'yeah i think my friend follows u'],
+      famous: ['BRO EVERYONE knows who u are', 'ofc!! ur {name}!!', 'are u kidding?? ur like #{rank} on the whole platform', 'yes omg can i get a follow back'],
+      legend: ['ur literally the most famous person on blockforge lol', 'who DOESNT know u', 'ur the legend. #1. everyone knows'],
+    },
     wealth: {
       owner: ['lol kinda. i made {game} with {studio}, it pays a LOT', 'yeah {game} kinda blew up. {studio} is my studio', 'honestly its all {game}. people keep playing it and i keep getting coins lol', 'i run {studio}. {game} basically pays my bills lol'],
       team: ['i work on {game} with {studio}, pays pretty well ngl', 'im on the {studio} team, {game} money is nice lol', 'not the richest but {game} pays ok'],
@@ -822,6 +828,7 @@
     personal: /\b(my (home )?address( is)?|i live (at|on) \d|my (real|full) name is|my password|my pass is|my school is|i go to .* school|my phone( number)? is|my email is)\b/,
     askPersonal: /\b(where do you live exactly|what is your (address|phone|password|real name|school|email)|your (address|phone number|password))\b/,
     scam: /\b(free (robux|coins|forgecoins|fc|money|items)|coin (generator|hack|glitch|dupe)|infinite (coins|forgecoins|fc)|(robux|coins|fc) generator)\b/,
+    famous: /\b(do you know (who i am|me|who this is)|am i famous|i am famous|im famous|am i (the )?(most famous|a celebrity|popular)|have you heard of me|you know my games|seen my games?)\b/,
     wealth: /\b(are you rich|you are (so |really )?rich|how (are you|did you get|did you become|you) (so )?rich|how (many|much) (coins|forgecoins|fc|money) (do )?you (have|got|make)|how much (do )?you (have|make|earn)|your (coins|net worth|money|balance)|are you the richest|richest (player|person|guy))\b/,
     askGift: /\b(gift|give|send|spare|lend|donate|toss|pass) me\b.*\b(coins?|forgecoins|fc|money|robux|gift)\b|\bgift me\b|\b(can|could|may) i (have|get|borrow)\b.*\b(coins?|forgecoins|fc|money)\b|\b(any|some) (coins?|forgecoins|fc) (to spare|for me)\b/,
     giftOffer: /\b(can|should|could) i (gift|send|give) you\b|\b(want|let) me (to )?(gift|send|give) you\b|\bwant (some )?(coins|fc|forgecoins)\b|\bi will (gift|send|give) you\b/,
@@ -998,6 +1005,11 @@
     if (RX.scam.test(n)) return { intent: 'scam', key: 'scam', goal: 'Warn that anyone promising free coins, generators or hacks is scamming. Point to daily rewards, quests and games.' };
     const giftTalk = BF.gifts && !ctx.banter ? giftIntent(bot, n) : null;
     if (giftTalk) return giftTalk;
+    if (RX.famous.test(n) && BF.fame) {
+      const f = BF.fame.me();
+      const sub = f.tier.id === 'legend' ? 'legend' : f.level >= 2 ? 'famous' : f.level === 1 || f.tier.id === 'known' ? 'known' : 'none';
+      return { intent: 'famous', key: 'famous', sub, vars: { tier: f.tier.name.toLowerCase(), rank: U.fmt(f.rank) }, facts: ['The player is ' + f.tier.name + ' on BlockForge, ranked #' + f.rank + ' by fame.'], goal: sub === 'none' ? 'Say honestly, in a friendly way, that you do not know them yet.' : 'React to who they are the way a player would: ' + (sub === 'known' ? 'you think you have seen them around.' : 'starstruck, excited.') };
+    }
     if (RX.wealth.test(n)) {
       const w = wealth(bot);
       return { intent: 'wealth', key: 'wealth', sub: w.kind, vars: { game: w.game, studio: w.studio, coins: U.fmt(w.coins) }, facts: [wealthFact(w)], goal: 'Answer how rich you are, honestly for your character, casually.' };

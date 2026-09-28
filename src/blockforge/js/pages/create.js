@@ -157,7 +157,7 @@
   BF.pages.register('creategame', {
     title: (p) => { const g = BF.creator.get(p.id); return g ? 'Manage ' + g.name : 'Manage'; },
     nav: 'create',
-    watch: (p) => (p.tab === 'settings' || p.tab === 'passes' || p.tab === 'studio' || p.tab === 'ads' ? [] : ['created', 'creatorStats']),
+    watch: (p) => (p.tab === 'team' ? ['devs'] : p.tab === 'settings' || p.tab === 'passes' || p.tab === 'studio' || p.tab === 'ads' ? [] : ['created', 'creatorStats']),
     render(params) {
       const ug = BF.creator.get(params.id);
       if (!ug) return BF.ui.empty({ icon: 'anvil', title: 'Game not found', action: { label: 'My Creations', href: '#/create' } });
@@ -169,11 +169,13 @@
         { id: 'studio', label: 'Studio', href: '#/create/' + ug.id + '/studio', icon: 'brush' },
         { id: 'ads', label: 'Ads', href: '#/create/' + ug.id + '/ads', icon: 'megaphone', count: BF.ads.active(ug.id).length || null },
         { id: 'passes', label: 'Game Passes', href: '#/create/' + ug.id + '/passes', icon: 'ticket', count: (ug.passes || []).length },
+        { id: 'team', label: 'Team', href: '#/create/' + ug.id + '/team', icon: 'users', count: BF.devs ? BF.devs.team(ug.id).length || null : null },
         { id: 'servers', label: 'Servers', href: '#/create/' + ug.id + '/servers', icon: 'server' },
         { id: 'settings', label: 'Settings', href: '#/create/' + ug.id + '/settings', icon: 'gear' },
       ], tab);
       let body = '';
-      if (tab === 'overview') {
+      if (tab === 'team' && BF.devs) body = teamTab(ug);
+      else if (tab === 'overview') {
         body = '<div class="admin-stats">' +
           [['Players', '<span class="live-dot"></span> <span data-live="playing:' + ug.id + '">' + U.compact(st.playing) + '</span>', 'users'], ['Regulars', U.fmt(BF.creator.regulars(ug)) + ' <span class="faint" style="font-size:12px">keep coming back</span>', 'refresh'], ['Visits', U.fmt(ug.visits), 'eye'], ['Favorites', U.fmt(st.favorites), 'heart'], ['Likes', U.fmt(st.likes) + ' <span class="faint" style="font-size:12px">/ ' + U.fmt(st.dislikes) + ' dislikes</span>', 'thumbUp'], ['Revenue', BF.ui.coins(Math.floor(ug.revenue || 0)), 'wallet'], ['Pass sales', U.fmt(ug.sales || 0), 'ticket']]
             .map((x) => '<div class="admin-stat"><span class="as-icon">' + BF.icon(x[2], 18) + '</span><span class="faint">' + x[0] + '</span><b class="num">' + x[1] + '</b></div>').join('') + '</div>' +
@@ -223,6 +225,22 @@
         BF.router.refresh();
       });
       root.addEventListener('click', async (e) => {
+        const hb = e.target.closest('[data-hire]');
+        if (hb) {
+          const r = BF.devs.hire(ug.id, hb.dataset.hire);
+          if (!r.ok) return BF.ui.toast({ title: r.error, kind: 'error' });
+          BF.sfx.play('purchase');
+          const b = BF.bots.get(r.hire.botId);
+          BF.ui.toast({ title: b.displayName + ' joined your team', text: BF.devs.T.roles[r.hire.role].name + ' · ' + U.fmt(r.hire.salary) + ' ForgeCoins an hour', kind: 'success', icon: 'users' });
+          return;
+        }
+        const fb = e.target.closest('[data-fire]');
+        if (fb) {
+          const ok = await BF.ui.confirm({ title: 'Let ' + fb.dataset.name + ' go?', message: 'They stop working on ' + ug.name + '. Salary already paid is not refunded.', confirmLabel: 'Let go', danger: true, icon: 'userX' });
+          if (ok) BF.devs.fire(fb.dataset.fire);
+          return;
+        }
+        if (e.target.closest('[data-reroll]')) { BF.devs.candidates(true); BF.router.refresh(); return; }
         if (e.target.closest('[data-collect]')) {
           const r = BF.creator.collect(ug.id);
           if (r.ok) { BF.ui.coinFly(e.target.closest('[data-collect]'), 8); BF.ui.toast({ title: 'Collected ' + U.fmt(r.amount) + ' ForgeCoins', text: 'Creator earnings from ' + ug.name, kind: 'coin' }); }
@@ -243,6 +261,29 @@
       BF.creatorTabs.ads.unmount();
     },
   });
+
+  /** Team tab: your developers, what they do, payroll, the next update and people to hire. */
+  function teamTab(ug) {
+    const D = BF.devs, T = D.T;
+    const team = D.team(ug.id);
+    const stars = (n) => '<span class="dev-stars" aria-label="' + n + ' stars">' + '★'.repeat(n) + '<i>' + '★'.repeat(5 - n) + '</i></span>';
+    const per = D.period(ug.id);
+    const next = ug.nextUpdateAt && per < Infinity ? Math.max(0, ug.nextUpdateAt - BF.clock.now()) : null;
+    const prog = next != null ? U.clamp(1 - next / (per * 60000), 0, 1) : 0;
+    const card = (h) => '<div class="dev-card"><div class="dev-top">' + BF.ui.avatarChip(h.bot.avatar, { size: 'sm', id: h.bot.id }) + '<div class="row-main"><a class="row-title" href="#/user/' + h.bot.id + '">' + esc(h.bot.displayName) + '</a><div class="row-sub">' + BF.icon(T.roles[h.role].icon, 12) + ' ' + T.roles[h.role].name + ' ' + stars(h.skill) + '</div></div></div>' +
+      '<div class="dev-what faint">' + esc(T.roles[h.role].what) + '</div><div class="dev-stats"><span>' + BF.coinIcon(12) + U.fmt(h.salary) + '/h</span><span>' + (T.roles[h.role].ships ? U.plural(h.updates || 0, 'update') : '') + '</span>' + (h.unpaid ? '<span class="pill danger">Unpaid</span>' : '') + '<button class="btn btn-xs btn-ghost" data-fire="' + h.id + '" data-name="' + esc(h.bot.displayName) + '">Let go</button></div></div>';
+    const cands = D.candidates();
+    const cand = (c) => '<div class="dev-card cand' + (c.locked ? ' locked' : '') + '"><div class="dev-top">' + BF.ui.avatarChip(c.bot.avatar, { size: 'sm', id: c.bot.id }) + '<div class="row-main"><a class="row-title" href="#/user/' + c.bot.id + '">' + esc(c.bot.displayName) + '</a><div class="row-sub">' + BF.icon(T.roles[c.role].icon, 12) + ' ' + T.roles[c.role].name + ' ' + stars(c.skill) + '</div></div></div>' +
+      '<div class="dev-what faint">' + esc(T.roles[c.role].what) + '</div><div class="dev-stats"><span>' + BF.coinIcon(12) + U.fmt(c.salary) + '/h</span>' +
+      (c.locked ? '<span class="pill">' + BF.icon('lock', 11) + ' Works for ' + esc((BF.fame.T.tiers.find((t) => t.id === c.needs) || {}).name || '') + ' creators</span>' : '<button class="btn btn-xs btn-primary" data-hire="' + c.botId + '">Hire · ' + U.fmt(c.salary) + '</button>') + '</div></div>';
+    const log = (BF.store.state.devs.log || []).filter((l) => l.gameId === ug.id).slice(0, 6);
+    return '<div class="team-head panel"><div><span class="faint">Team</span><b class="num">' + team.length + ' / ' + T.maxTeam + '</b></div><div><span class="faint">Payroll</span><b class="num">' + BF.coinIcon(14) + U.fmt(D.payroll(ug.id)) + '/h</b></div><div><span class="faint">Players boost</span><b class="num">×' + D.visitMult(ug).toFixed(2) + '</b></div><div><span class="faint">Quality from team</span><b class="num">+' + Math.round(D.quality(ug) * 100) + '%</b></div>' +
+      '<div class="team-next"><span class="faint">' + (next != null ? 'Next update in ' + Math.ceil(next / 60000) + ' min (every ' + Math.round(per) + ' min)' : 'Hire a builder, scripter, artist or designer to ship updates') + '</span><div class="bar"><i style="width:' + Math.round(prog * 100) + '%"></i></div></div>' +
+      '<p class="faint" style="margin:0;flex-basis:100%;font-size:12.5px">Salaries come out of this game\'s earnings first, then your wallet. A developer who goes unpaid for ' + T.quitAfterMin + ' minutes quits. Updates bring back regulars, raise quality for good and boost visits for ' + T.hypeMin + ' minutes.</p></div>' +
+      '<section class="section"><div class="section-head"><h2 class="section-title">' + BF.icon('users', 18) + 'Your developers</h2></div>' + (team.length ? '<div class="dev-grid">' + team.map(card).join('') + '</div>' : BF.ui.empty({ icon: 'users', title: 'No developers yet', text: 'Hire people below to keep ' + ug.name + ' growing.' })) + '</section>' +
+      '<section class="section"><div class="section-head"><h2 class="section-title">' + BF.icon('userPlus', 18) + 'Available to hire</h2><button class="btn btn-sm btn-outline" data-reroll>' + BF.icon('refresh', 14) + 'New candidates</button></div><div class="dev-grid">' + cands.map(cand).join('') + '</div><p class="faint" style="font-size:12.5px;margin-top:8px">The best developers only work for well-known creators: 3★ need Known, 4★ Popular, 5★ Famous. Hiring pays the first hour up front.</p></section>' +
+      (log.length ? '<section class="section"><div class="section-head"><h2 class="section-title">' + BF.icon('rocket', 18) + 'Updates your team shipped</h2></div><div class="panel tight update-log">' + log.map((l) => '<div class="ul-row"><b>v1.' + l.v + '</b><span>' + esc(l.notes.join(' · ')) + '</span><span class="faint">' + U.timeAgo(l.ts, BF.clock.now()) + '</span></div>').join('') + '</div></section>' : '');
+  }
 
   function adminDraft(ug) {
     return { name: ug.name, description: ug.description, genre: ug.genre, template: ug.template, maxPlayers: ug.maxPlayers, visibility: ug.visibility, difficulty: ug.difficulty || 'normal', thumbnail: U.clone(ug.thumbnail) };

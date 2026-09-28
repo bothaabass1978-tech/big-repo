@@ -324,6 +324,7 @@
     systemChat('You joined Server #' + s.server.id + ' (' + (s.all.length + 1) + '/' + s.server.max + ' players). Say hi!');
     const greeter = U.pick(s.active.length ? s.active : s.all);
     if (greeter) s.timers.push(setTimeout(() => botChat(greeter, BF.dialogue.line(greeter, 'greet')), 1800 + Math.random() * 2000));
+    celebrity();
     scheduleBotChat();
     scheduleBotFeed();
     s.lastT = performance.now();
@@ -538,7 +539,10 @@
         if (s.instance && s.instance.onBotJoin && !s.loading) { try { s.instance.onBotJoin(bot); } catch (e) { console.error(e); } }
       }
       updateCount();
-      if (Math.random() < 0.6) s.timers.push(setTimeout(() => botChat(bot, BF.dialogue.line(bot, 'join', s && s.game)), 1200 + Math.random() * 2500));
+      if (ev.fan && BF.fame) {
+        botChat(bot, BF.fame.fanLine('join', BF.store.state.player.displayName), 600 + Math.random() * 900);
+        if (s.fameLevel >= 3 && (s.mod.orders || []).includes('follow') && s.ctx) s.orders.set(bot.id, { verb: 'follow', arg: null, target: null, t: s.ctx.time, until: s.ctx.time + 25 });
+      } else if (Math.random() < 0.6) s.timers.push(setTimeout(() => botChat(bot, BF.dialogue.line(bot, 'join', s && s.game)), 1200 + Math.random() * 2500));
     }));
     s.offs.push(BF.bus.on('server:leave', (ev) => {
       if (!s || ev.serverId !== s.server.id || ev.gameId !== s.gameId) return;
@@ -643,7 +647,7 @@
     const color = me ? '#ffb454' : from === 'system' ? '#8fd3ff' : BF.gfx.nameColor(from.username);
     const el = document.createElement('div');
     el.className = 'gr-msg' + (from === 'system' ? ' sys' : '') + (o.emote ? ' emote' : '');
-    const vipTag = me && passEffect('vip') ? '<span class="vip-tag">VIP</span> ' : '';
+    const vipTag = (me && s.verified ? '<span class="fame-check" title="Famous">✔</span> ' : '') + (me && passEffect('vip') ? '<span class="vip-tag">VIP</span> ' : '');
     el.innerHTML = from === 'system' ? esc(text) : vipTag + '<b style="color:' + color + '">[' + esc(name) + ']:</b> ' + esc(text);
     s.lines.push({ who: me ? 'me' : from === 'system' ? 'system' : from.id, text: String(text) });
     if (s.lines.length > 60) s.lines.shift();
@@ -673,6 +677,40 @@
     };
     if (delay) s.timers.push(setTimeout(say, delay));
     else say();
+  }
+
+  /**
+   * Fame (BF.fame): players recognise you by how famous you are. At Famous
+   * and up they freak out, follow you around and cheer; Superstars get mobbed
+   * and fans pour into the server.
+   */
+  function celebrity() {
+    if (!BF.fame || !s) return;
+    s.verified = BF.fame.verified();
+    const canFollow = (s.mod.orders || []).includes('follow');
+    const bots = s.active.concat(s.all.filter((b) => !s.active.some((a) => a.id === b.id))).slice(0, 16);
+    s.fameLevel = BF.fame.arrive({
+      bots,
+      name: BF.store.state.player.displayName,
+      game: s.game,
+      server: { num: s.server.id },
+      chat: (b, text, delay) => botChat(b, text, delay),
+      feed: (text) => feed(text, 'star', '#ffd66b'),
+      follow: (b, secs) => { if (canFollow && s.ctx) s.orders.set(b.id, { verb: 'follow', arg: null, target: null, t: s.ctx.time, until: s.ctx.time + secs }); },
+      emote: (b, kind) => { if (s.g3) { const a = s.g3.actors.get(b.id); if (a) a.rig.emote(kind, 2.5); } },
+      rush: (n) => BF.world.rushSession(n),
+      banner: (title, desc) => { if (BF.notify.allowsBanner()) BF.ui.banner({ kind: 'level', kicker: 'Fame', title, desc, icon: 'star' }); },
+    });
+    if (s.fameLevel >= 2) scheduleFanChat();
+  }
+  /** Fans keep coming up to you while you play. */
+  function scheduleFanChat() {
+    s.timers.push(setTimeout(() => {
+      if (!s) return;
+      const b = U.pick(s.active.length ? s.active : s.all);
+      if (b && !s.paused) botChat(b, BF.fame.fanLine('during', BF.store.state.player.displayName));
+      scheduleFanChat();
+    }, (s.fameLevel >= 3 ? 9000 : 16000) + Math.random() * 12000));
   }
 
   function scheduleBotChat() {

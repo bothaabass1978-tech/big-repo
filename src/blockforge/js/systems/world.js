@@ -490,6 +490,8 @@
       if (BF.limiteds) BF.limiteds.worldTick();
       if (BF.updates) BF.updates.worldTick();
       if (BF.gifts) BF.gifts.tick();
+      if (BF.devs) BF.devs.worldTick();
+      if (BF.fame) BF.fame.worldTick();
       BF.bus.emit('world:tick');
     },
 
@@ -509,6 +511,29 @@
      * A bot agreed (in chat) to meet the player in a game: it heads there now,
      * and the player's next Play for that game lands in the same server.
      */
+    /**
+     * Fans rush into your server (BF.fame): up to n online players from other
+     * places join while there is room. Returns how many came.
+     */
+    rushSession(n) {
+      const sess = world.sessionServer();
+      if (!sess) return 0;
+      const game = catalog.get(sess.gameId);
+      let came = 0;
+      const pool = U.shuffle(BF.bots.list.filter((b) => !sess.bots.includes(b.id) && !BF.friends.isBlocked(b.id) && world.botStatus(b.id).state !== 'offline').slice(0, 400));
+      for (const bot of pool) {
+        if (came >= n || sess.bots.length + 1 >= sess.max) break;
+        world.unplace(bot.id);
+        sess.bots.push(bot.id);
+        world.loc.set(bot.id, { gameId: sess.gameId, serverId: sess.id });
+        world.menuOnline.delete(bot.id);
+        came++;
+        const delay = 1500 + came * (700 + Math.random() * 900);
+        setTimeout(() => BF.bus.emit('server:join', { gameId: sess.gameId, serverId: sess.id, bot, game, fan: true }), delay);
+      }
+      return came;
+    },
+
     meetPlayer(botId, gameId) {
       const bot = BF.bots.get(botId);
       if (!bot || !catalog.get(gameId)) return null;

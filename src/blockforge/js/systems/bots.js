@@ -164,7 +164,7 @@
         gamesPlayed: bot.base.gamesPlayed + (s.played || 0),
         coins: bot.base.coins + (s.coins || 0) + (BF.creatorEconomy ? BF.creatorEconomy.wealthOf(bot.id) : 0),
         achievements: bot.base.achievements,
-        followers: bot.base.followers,
+        followers: bot.base.followers + (BF.creatorEconomy ? BF.creatorEconomy.fansOf(bot.id) : 0),
         following: bot.base.following,
         friends: bot.base.friends,
       };

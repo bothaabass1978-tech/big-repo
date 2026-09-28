@@ -48,6 +48,8 @@ online and fall back to system fonts when you are not.
 | **Updates** | The studios behind the games ship an update now and then, never often: the first a day after you start, then one every 4 to 7 days. Each brings patch notes in the game's update log and a three-day event (bonus XP, a bigger crowd, a pass sale) and some bring a new limited item |
 | **Create** | Build games from 6 templates (Arena, Racing, Obby, Simulator, Tower Defense, and **Custom** from scratch). Hand-build Obby, Tower Defense, Arena and Custom levels in the **Studio** tile editor. Custom games have 14 tiles (walls, coins, gems, lava, spikes, enemies, keys and doors, pads, checkpoints, a goal) and their own rules (goal, timer, lives, speeds, theme, bots). Add up to 25 passes priced up to 100,000,000 ForgeCoins (pricier passes sell less often, and big-ticket buyers are rich players), publish, and run **ad campaigns**: Standard / Boosted / Premium tiers; Home, Discover and Search placements; prepaid budgets up to 50,000,000 with refunds; and a spending pace from Steady (an hour) to Burst (about 30 seconds), with **Spend faster** on running campaigns. Players brought in by ads don't all vanish: part of every crowd becomes **regulars**, more for better games, who keep coming back and fade over days. Every creation gets its own 3D thumbnail in its colour. Follow earnings from visits and pass sales on per-minute charts with **Collect all** |
 | **Search** | Games, items and players, with autocomplete (press `/`) |
+| **Fame** | Everyone has a fame score (followers and fans, the players in your games right now, level and wins) and a tier: Newcomer, Rising Star, Known, Popular, Famous, Superstar, and the #1 player is the **Legend**. Each new tier pays a bonus. Join a server when you are famous and players react: at Popular someone notices you, at Famous they freak out, follow you around, follow and add you (and you get a ✔ in chat), and Superstars get mobbed while fans pour into the server. Fans also play your games. See the **Most Famous** leaderboard, the fame card on your profile and the tier on Home |
+| **Dev teams** | Hire developers for your games from the **Team** tab: builders, scripters, artists and game designers ship real updates (new versions with patch notes, a lasting quality boost, regulars rushing back and a 30-minute surge of players), marketers bring steady new players and community managers keep them around. Salaries (1-5★, paid hourly) come out of the game's earnings first, then your wallet; unpaid devs quit. The best developers only work for famous creators |
 | **Gifts** | Gift ForgeCoins to anyone from their profile, your DMs or the Wallet, with an optional note. Players thank you in their own voice, and some follow you or send a little back. Friends gift you now and then (a level-up, returning a favour, liking your game), and you can ask a friend in chat; they might say yes. Gifts from other players are limited to 5,000 a day. Settings → Privacy → Who can gift me ForgeCoins |
 | **Pop-ups** | Settings → Notifications → Pop-ups: show all, important only (friends, invites, messages) or none; switch off banners; stay quiet while playing (the default). **Quiet** in the bell menu is Do Not Disturb. Bursts collapse into one "N more notifications" pop-up, and everything still lands in the bell |
 | **Runs on weak laptops** | Auto graphics watches the frame rate and lowers resolution and shadows when a game gets slow (and raises them again when it can), remembering what suits your device. Weak machines also get cheaper shading and lighter page effects. 3D thumbnails render only while the page is idle, never during a game, and are cached for good. Settings → Gameplay → Graphics shows the level Auto uses on this device |
@@ -142,7 +144,7 @@ npm i -D playwright   # once, if Playwright is not installed globally
 node tests/blockforge/e2e/platform_smoke_e2e_test.js --shots /tmp/blockforge-shots
 ```
 
-Current status: 145 unit tests and 143 end-to-end checks, all passing.
+Current status: 154 unit tests and 143 end-to-end checks, all passing.
 
 ## Code layout
 
@@ -157,7 +159,8 @@ src/blockforge/
     ├── systems/        economy, meta (quests, badges, achievements, notifications), inventory,
     │                   avatar, social, world (servers, catalog, leaderboards, search), creator,
     │                   studio (level layouts), ads (campaigns, pacing), creatoreconomy (studio owners, wealth),
-    │                   botgames (community games and their ads), gifts (ForgeCoin gifts), secrets, voice (how each bot types),
+    │                   botgames (community games and their ads), gifts (ForgeCoin gifts), fame (tiers, celebrity reactions),
+    │                   devteam (hired developers and updates), secrets, voice (how each bot types),
     │                   chat (bot conversation), ai (Claude wording), followers, limiteds (stock, serials, resale),
     │                   updates (developer updates), orders (bot orders)
     ├── ui/             components, router, shell, actions, terminal
@@ -186,6 +189,7 @@ Design decisions are recorded in `docs/architecture/`:
 - [ADR-0011 Arcade engines (50 games) and human bot voices](../../docs/architecture/adr-0011-blockforge-arcade-engines-and-bot-voices.md)
 - [ADR-0012 ForgeCoin gifts](../../docs/architecture/adr-0012-blockforge-forgecoin-gifts.md)
 - [ADR-0013 Performance on weak devices](../../docs/architecture/adr-0013-blockforge-performance-on-weak-devices.md)
+- [ADR-0014 Fame and dev teams](../../docs/architecture/adr-0014-blockforge-fame-and-dev-teams.md)
 
 To **add a game**, register a module with `BF.GameModules.register(type, {...})`
 in a new `js/games/*.js` file (see ADR-0003). Add `three: true` with a

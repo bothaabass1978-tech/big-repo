@@ -17,11 +17,11 @@
     basePerMin: 0.35,
     maxPerMin: 6,
     unfollowShare: 0.12,
-    visitFollowRate: 0.004,
+    visitFollowRate: 0.008,
     batchSeconds: 45,
-    milestones: [[10, 50], [25, 100], [50, 200], [100, 400], [250, 750], [500, 1500], [1000, 3000], [2500, 6000], [5000, 12000], [10000, 25000]],
+    milestones: [[10, 50], [25, 100], [50, 200], [100, 400], [250, 750], [500, 1500], [1000, 3000], [2500, 6000], [5000, 12000], [10000, 25000], [25000, 40000], [50000, 60000], [100000, 100000], [250000, 150000], [500000, 250000], [1000000, 500000]],
   };
-  let pending = [], pendingT = 0, lastTick = 0;
+  let pending = [], pendingT = 0, lastTick = 0, pendingFans = 0;
 
   const followers = (BF.followers = {
     T,
@@ -32,7 +32,7 @@
       const st = s.player.stats || {};
       const badges = Object.keys(s.badges || {}).length;
       const visits = (s.created || []).reduce((a, g) => a + (g.visits || 0), 0);
-      const followers = s.social.followers.length;
+      const followers = s.social.followers.length + (s.social.fans || 0);
       return 0.3 + s.player.level * 0.06 + Math.sqrt(st.wins || 0) * 0.12 + badges * 0.03 + Math.sqrt(st.chatSent || 0) * 0.05 + Math.log10(1 + visits) * 0.6 + Math.sqrt(followers) * 0.08;
     },
 
@@ -89,30 +89,51 @@
       if (pendingT >= T.batchSeconds) followers.flush();
     },
 
-    /** Players who visited your creation sometimes follow its creator. */
+    /** Everyone following you: named players plus fans (people you will never meet one by one). */
+    total() {
+      const s = BF.store.state;
+      return s ? s.social.followers.length + (s.social.fans || 0) : 0;
+    },
+
+    /** Add anonymous fans (big audiences follow you by the thousand). */
+    addFans(n) {
+      n = Math.floor(n);
+      if (!(n > 0)) return;
+      BF.store.update('social', (st) => { st.social.fans = (st.social.fans || 0) + n; });
+      pendingFans += n;
+      followers.checkMilestones();
+    },
+
+    /** Players who visited your creation sometimes follow its creator: a named player or two, the rest as fans. */
     fromVisits(visits, gameName) {
       const expected = visits * T.visitFollowRate;
       let n = Math.floor(expected) + (Math.random() < expected % 1 ? 1 : 0);
-      while (n-- > 0) followers.gain(null, gameName ? 'after playing ' + gameName : '');
+      const named = Math.min(n, n <= 2 ? n : 1 + (Math.random() < 0.3 ? 1 : 0));
+      for (let i = 0; i < named; i++) followers.gain(null, gameName ? 'after playing ' + gameName : '');
+      followers.addFans(n - named);
     },
 
     /** Announce new followers as one notification. */
     flush() {
       pendingT = 0;
+      const fans = pendingFans;
+      pendingFans = 0;
+      if (!pending.length && fans && BF.notify) BF.notify.push({ type: 'friend', title: U.fmt(fans) + ' new fan' + (fans > 1 ? 's' : '') + ' followed you', body: 'You have ' + U.fmt(followers.total()) + ' followers.', icon: 'users', route: '#/friends/followers' });
       if (!pending.length || !BF.notify) { pending = []; return; }
       const s = BF.store.state;
       if (s && s.settings.notifications && s.settings.notifications.friends === false) { pending = []; return; }
       const first = BF.bots.get(pending[0].id);
       const more = pending.length - 1;
       const why = pending[0].reason ? ' ' + pending[0].reason : '';
-      BF.notify.push({ type: 'friend', title: (first ? first.displayName : 'Someone') + (more ? ' and ' + more + ' other' + (more > 1 ? 's' : '') : '') + ' followed you' + why, body: 'You have ' + U.fmt(s.social.followers.length) + ' followers.', icon: 'users', route: '#/friends/followers' });
+      const others = more + fans;
+      BF.notify.push({ type: 'friend', title: (first ? first.displayName : 'Someone') + (others ? ' and ' + U.fmt(others) + ' other' + (others > 1 ? 's' : '') : '') + ' followed you' + why, body: 'You have ' + U.fmt(followers.total()) + ' followers.', icon: 'users', route: '#/friends/followers' });
       pending = [];
     },
 
     /** Pay each follower milestone once. */
     checkMilestones() {
       const s = BF.store.state;
-      const n = s.social.followers.length;
+      const n = followers.total();
       const got = s.social.milestones || [];
       for (const [at, reward] of T.milestones) {
         if (n >= at && !got.includes(at)) {
@@ -125,7 +146,7 @@
 
     /** Next milestone {at, reward, progress 0-1} or null. */
     nextMilestone() {
-      const n = BF.store.state.social.followers.length;
+      const n = followers.total();
       const m = T.milestones.find(([at]) => at > n);
       if (!m) return null;
       const prev = T.milestones.filter(([at]) => at <= n).pop();

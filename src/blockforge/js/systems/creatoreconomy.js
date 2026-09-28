@@ -28,7 +28,7 @@
    *   teamShare  share each team member keeps
    *   cacheMs    how long computed totals are reused
    */
-  const T = { repeatBuy: 0.05, ownerShare: 0.35, teamShare: 0.03, teamSize: [2, 4], cacheMs: 1500, ownerMinLevel: 25 };
+  const T = { repeatBuy: 0.05, ownerShare: 0.35, teamShare: 0.03, teamSize: [2, 4], cacheMs: 1500, ownerMinLevel: 25, ownerFans: 1.2, teamFans: 0.08, creatorFans: 1 };
 
   let cache = null, cacheAt = 0;
   let owners = null; // studio name -> {owner, team}
@@ -122,6 +122,21 @@
     rolesOf(botId) {
       assignOwners();
       return (roles && roles.get(botId)) || [];
+    },
+
+    /**
+     * Followers a bot has because of what it made: players of a studio's games
+     * follow its owner (and a few follow the team), players of a bot's own
+     * community games follow the bot.
+     */
+    fansOf(botId) {
+      let f = 0;
+      const roles = ce.rolesOf(botId);
+      if (roles.length) {
+        for (const st of ce.studios()) for (const r of roles) if (r.studio === st.name) f += st.playing * (r.role === 'owner' ? T.ownerFans : T.teamFans);
+      }
+      if (BF.botGames) for (const g of BF.botGames.byCreator(botId)) f += BF.world.crowd(g.id) * T.creatorFans;
+      return Math.round(f);
     },
 
     /** A bot's personal fortune from creating: studio shares plus their own published games. */

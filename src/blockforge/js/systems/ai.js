@@ -72,6 +72,7 @@
       'Your character: ' + bot.displayName + ' (@' + bot.username + '), level ' + st.level + ', a "' + bot.personality + '" player: ' + (VOICE[bot.personality] || 'friendly') + '.',
       'Bio: "' + (bot.bio || '') + '". Favorite games: ' + (favs || 'many') + '.',
       BF.chat.wealthFact ? 'Your money: ' + BF.chat.wealthFact(BF.chat.wealth(bot)) : '',
+      (function () { const f = BF.fame && BF.fame.me(); return f && f.level >= 1 ? 'The player is ' + f.tier.name + ' on BlockForge (#' + f.rank + ' by fame). ' + (f.level >= 3 ? 'You are a huge fan and a bit starstruck.' : f.level >= 2 ? 'You know exactly who they are and you are excited to talk to them.' : 'You have seen them around.') : ''; })(),
       'You are chatting with the player ' + (mem.nick || s.player.displayName) + ' (@' + s.player.username + ') ' + where + '.',
       known.length ? 'What you remember about them: ' + known.join('; ') + '.' : '',
       decision.facts && decision.facts.length ? 'Facts you can rely on: ' + decision.facts.join(' ') : '',

@@ -104,6 +104,8 @@
       updates: { seen: [], last: 0 },
       botGames: { list: [], feed: [], nextAt: 0 },
       gifts: { log: [], byBot: {}, day: '', inToday: 0, countToday: 0, nextAt: 0, asked: {} },
+      fame: { paid: [], best: 0 },
+      devs: { hires: [], candidates: [], rolledAt: 0, log: [] },
       settings: defaultSettings(),
       secrets: { forgecore: { unlocked: false, at: 0, uses: 0, total: 0, wordSolved: false } },
       bots: {},
@@ -246,6 +248,8 @@
     if (!state.updates || typeof state.updates !== 'object' || !Array.isArray(state.updates.seen)) state.updates = { seen: [], last: 0 };
     if (!state.botGames || typeof state.botGames !== 'object' || !Array.isArray(state.botGames.list)) state.botGames = { list: [], feed: [], nextAt: 0 };
     if (!state.gifts || typeof state.gifts !== 'object' || !Array.isArray(state.gifts.log)) state.gifts = { log: [], byBot: {}, day: '', inToday: 0, countToday: 0, nextAt: 0, asked: {} };
+    if (!state.fame || typeof state.fame !== 'object' || !Array.isArray(state.fame.paid)) state.fame = { paid: [], best: 0 };
+    if (!state.devs || typeof state.devs !== 'object' || !Array.isArray(state.devs.hires)) state.devs = { hires: [], candidates: [], rolledAt: 0, log: [] };
     state.version = BF.SAVE_VERSION;
     return state;
   }
