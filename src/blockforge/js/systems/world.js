@@ -492,6 +492,8 @@
       if (BF.gifts) BF.gifts.tick();
       if (BF.devs) BF.devs.worldTick();
       if (BF.fame) BF.fame.worldTick();
+      if (BF.company) BF.company.worldTick();
+      if (BF.communities) BF.communities.worldTick();
       BF.bus.emit('world:tick');
     },
 

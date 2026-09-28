@@ -127,7 +127,10 @@ test('test_ads_campaign_charges_the_budget_up_front_and_refunds_the_rest_when_st
   const stop = BF.ads.stop(c.id);
   assert.equal(stop.ok, true);
   assert.equal(c.status, 'stopped');
-  assert.equal(BF.economy.balance(), before - 600 + Math.floor(600 - c.spent));
+  // check the refund itself: ad visitors can also cross a follower milestone and pay a bonus
+  const refund = BF.economy.history('ads').find((t) => t.amount > 0);
+  assert.equal(refund.amount, Math.floor(600 - c.spent));
+  assert.equal(c.refunded, refund.amount);
   assert.equal(BF.ads.boosting(ug.id), false);
 });
 

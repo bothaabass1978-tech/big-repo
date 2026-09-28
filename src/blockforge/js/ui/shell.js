@@ -20,6 +20,8 @@
     ['messages', 'Messages', 'chat', '#/messages'],
     ['notifications', 'Notifications', 'bell', '#/notifications'],
     ['create', 'Create', 'anvil', '#/create'],
+    ['mystudio', 'My Studio', 'crown', '#/mystudio'],
+    ['communities', 'Communities', 'flag', '#/communities'],
     ['profile', 'Profile', 'user', '#/profile'],
     ['settings', 'Settings', 'gear', '#/settings'],
   ];

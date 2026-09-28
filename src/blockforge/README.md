@@ -50,6 +50,8 @@ online and fall back to system fonts when you are not.
 | **Search** | Games, items and players, with autocomplete (press `/`) |
 | **Fame** | Everyone has a fame score (followers and fans, the players in your games right now, level and wins) and a tier: Newcomer, Rising Star, Known, Popular, Famous, Superstar, and the #1 player is the **Legend**. Each new tier pays a bonus. Join a server when you are famous and players react: at Popular someone notices you, at Famous they freak out, follow you around, follow and add you (and you get a ✔ in chat), and Superstars get mobbed while fans pour into the server. Fans also play your games. See the **Most Famous** leaderboard, the fame card on your profile and the tier on Home |
 | **Dev teams** | Hire developers for your games from the **Team** tab: builders, scripters, artists and game designers ship real updates (new versions with patch notes, a lasting quality boost, regulars rushing back and a 30-minute surge of players), marketers bring steady new players and community managers keep them around. Salaries (1-5★, paid hourly) come out of the game's earnings first, then your wallet; unpaid devs quit. The best developers only work for famous creators |
+| **Your studio** | Found your own studio in **My Studio** (name, colour, tagline). It gets its own community, and it can **buy other studios** at their worth (two days of the owner's income plus 10% of what they have earned): the owner's share of revenue then comes to you every few minutes, and their players count toward your fame. Sell a studio back for 90% of its value |
+| **Communities** | Every studio has a community in the **Communities** tab: updates, events, sneak peeks, milestones and polls, with likes and comments from players. Join the ones you like to hear about their news. Post in your own studio's community and your members reply. **Giveaways**: host one from your community (prize, winners, duration; the prize leaves your wallet) and entrants pour in, joining your community, following you and playing your games before the winners are drawn. Studios run free giveaways you can enter, with fair odds (winners ÷ entrants) |
 | **Gifts** | Gift ForgeCoins to anyone from their profile, your DMs or the Wallet, with an optional note. Players thank you in their own voice, and some follow you or send a little back. Friends gift you now and then (a level-up, returning a favour, liking your game), and you can ask a friend in chat; they might say yes. Gifts from other players are limited to 5,000 a day. Settings → Privacy → Who can gift me ForgeCoins |
 | **Pop-ups** | Settings → Notifications → Pop-ups: show all, important only (friends, invites, messages) or none; switch off banners; stay quiet while playing (the default). **Quiet** in the bell menu is Do Not Disturb. Bursts collapse into one "N more notifications" pop-up, and everything still lands in the bell |
 | **Runs on weak laptops** | Auto graphics watches the frame rate and lowers resolution and shadows when a game gets slow (and raises them again when it can), remembering what suits your device. Weak machines also get cheaper shading and lighter page effects. 3D thumbnails render only while the page is idle, never during a game, and are cached for good. Settings → Gameplay → Graphics shows the level Auto uses on this device |
@@ -144,7 +146,7 @@ npm i -D playwright   # once, if Playwright is not installed globally
 node tests/blockforge/e2e/platform_smoke_e2e_test.js --shots /tmp/blockforge-shots
 ```
 
-Current status: 154 unit tests and 143 end-to-end checks, all passing.
+Current status: 164 unit tests and 143 end-to-end checks, all passing.
 
 ## Code layout
 
@@ -160,11 +162,12 @@ src/blockforge/
     │                   avatar, social, world (servers, catalog, leaderboards, search), creator,
     │                   studio (level layouts), ads (campaigns, pacing), creatoreconomy (studio owners, wealth),
     │                   botgames (community games and their ads), gifts (ForgeCoin gifts), fame (tiers, celebrity reactions),
-    │                   devteam (hired developers and updates), secrets, voice (how each bot types),
+    │                   devteam (hired developers and updates), company (your studio, buying studios),
+    │                   communities (posts, comments, giveaways), secrets, voice (how each bot types),
     │                   chat (bot conversation), ai (Claude wording), followers, limiteds (stock, serials, resale),
     │                   updates (developer updates), orders (bot orders)
     ├── ui/             components, router, shell, actions, terminal
-    ├── pages/          one file per area (home, discover, game, items, social, create, studio, profile, settings, progress)
+    ├── pages/          one file per area (home, discover, game, items, social, create, studio, profile, settings, progress, communities)
     ├── engine/         input, gfx (particles, camera), g3d (3D world kit), perf (device tier, frame-rate governor, idle work),
     │                   avatar3d (rigs + thumbnails), thumbs3d (3D game thumbnails),
     │                   props3d (merged pets, cars, zombies, ships), phys, runtime (game sessions)
@@ -190,6 +193,7 @@ Design decisions are recorded in `docs/architecture/`:
 - [ADR-0012 ForgeCoin gifts](../../docs/architecture/adr-0012-blockforge-forgecoin-gifts.md)
 - [ADR-0013 Performance on weak devices](../../docs/architecture/adr-0013-blockforge-performance-on-weak-devices.md)
 - [ADR-0014 Fame and dev teams](../../docs/architecture/adr-0014-blockforge-fame-and-dev-teams.md)
+- [ADR-0015 Studios, communities, giveaways and acquisitions](../../docs/architecture/adr-0015-blockforge-studios-communities-giveaways.md)
 
 To **add a game**, register a module with `BF.GameModules.register(type, {...})`
 in a new `js/games/*.js` file (see ADR-0003). Add `three: true` with a

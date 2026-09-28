@@ -784,3 +784,48 @@ label.setting-row { cursor: pointer; }
 .update-log .ul-row { display: grid; grid-template-columns: 56px 1fr auto; gap: 10px; padding: 9px 12px; border-bottom: 1px solid var(--line); font-size: 13px; }
 .update-log .ul-row:last-child { border-bottom: 0; }
 .hh-fame { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; font-size: 12px; }
+
+/* ---- communities and studios (ADR-0015) */
+.com-badge { display: inline-grid; place-items: center; width: 44px; height: 44px; flex: none; border-radius: 12px; font-weight: 800; font-size: 15px; color: #fff; background: linear-gradient(135deg, var(--cc), color-mix(in srgb, var(--cc) 55%, #000)); }
+.com-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+.com-card { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 12px; background: var(--surface); border: 1px solid var(--line); color: var(--text); text-decoration: none; }
+.com-card:hover { border-color: var(--line-strong); }
+.com-card .row-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.com-card .row-main span { font-size: 12.5px; }
+.com-hero { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; padding: 18px; border-radius: 16px; margin-bottom: 16px; background: linear-gradient(135deg, color-mix(in srgb, var(--cc) 22%, var(--surface)), var(--surface)); border: 1px solid color-mix(in srgb, var(--cc) 35%, var(--line)); }
+.com-hero .com-badge { width: 64px; height: 64px; font-size: 22px; border-radius: 16px; }
+.com-hero .row-main { flex: 1; min-width: 200px; }
+.com-tag { margin-top: 4px; color: var(--text-2); }
+.com-games { display: flex; gap: 10px; overflow-x: auto; margin-bottom: 16px; padding-bottom: 4px; }
+.com-game { flex: none; width: 150px; display: flex; flex-direction: column; gap: 4px; color: var(--text); text-decoration: none; font-size: 12.5px; font-weight: 600; }
+.com-game img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 8px; }
+.com-compose, .gw-form { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
+.com-compose-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.gw-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.post-list { display: flex; flex-direction: column; gap: 12px; }
+.post { padding: 14px; border-radius: 14px; background: var(--surface); border: 1px solid var(--line); display: flex; flex-direction: column; gap: 10px; }
+.post-head { display: flex; align-items: center; gap: 10px; }
+.post-head .com-badge { width: 36px; height: 36px; font-size: 12px; border-radius: 10px; }
+.post-head a { color: var(--text); text-decoration: none; }
+.post-text { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.post-foot { display: flex; align-items: center; gap: 12px; font-size: 12.5px; }
+.post-foot > span { display: inline-flex; align-items: center; gap: 4px; }
+.post-comments { display: flex; flex-direction: column; gap: 6px; padding-left: 10px; border-left: 2px solid var(--line); font-size: 13px; }
+.post-comments a { color: var(--text); text-decoration: none; }
+.pc-form { display: flex; gap: 8px; }
+.pc-form .input { height: 32px; font-size: 13px; }
+.gw-box { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 12px 14px; border-radius: 12px; margin-bottom: 14px; background: linear-gradient(135deg, rgba(255, 200, 60, 0.2), rgba(255, 120, 60, 0.12)); border: 1px solid rgba(255, 200, 60, 0.45); }
+.post .gw-box { margin-bottom: 0; }
+.gw-prize { display: flex; align-items: center; gap: 10px; }
+.gw-prize > svg { color: var(--gold); }
+.gw-prize > div { display: flex; flex-direction: column; }
+.gw-prize b { display: inline-flex; align-items: center; gap: 5px; font-size: 20px; }
+.gw-prize span, .gw-meta > span:first-child { font-size: 12.5px; color: var(--text-2); }
+.gw-meta { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.studio-found { display: flex; flex-direction: column; gap: 14px; max-width: 560px; }
+.sf-swatch { position: relative; width: 34px; height: 34px; border-radius: 10px; background: var(--sw); cursor: pointer; }
+.sf-swatch input { position: absolute; opacity: 0; inset: 0; cursor: pointer; }
+.sf-swatch span { position: absolute; inset: -3px; border-radius: 12px; border: 2px solid transparent; }
+.sf-swatch input:checked + span { border-color: var(--text); }
+.sf-swatch input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (max-width: 600px) { .gw-fields { grid-template-columns: 1fr; } }

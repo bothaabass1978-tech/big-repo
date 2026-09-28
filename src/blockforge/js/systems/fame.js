@@ -71,6 +71,8 @@
     if (!s || !BF.world) return 0;
     let n = 0;
     for (const g of s.created || []) if (g.published) n += BF.world.crowd(g.id);
+    // studios you bought (BF.company) bring their players' attention with them
+    if (BF.company) n += BF.company.playing();
     return n;
   }
 

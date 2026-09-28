@@ -7,8 +7,8 @@
   const U = BF.util;
   const esc = U.esc;
 
-  const CAT_LABEL = { daily: 'Daily reward', game: 'Game reward', quest: 'Quest', achievement: 'Achievement', level: 'Level up', purchase: 'Avatar Shop', pass: 'Game pass', product: 'Game store', sale: 'Item sale', creator: 'Creator earnings', ads: 'Advertising', forgecore: 'FORGECORE', debug: 'Developer', gift: 'Gift', fame: 'Fame', devs: 'Dev salaries', earn: 'Earned' };
-  const CAT_ICON = { daily: 'gift', game: 'gamepad', quest: 'target', achievement: 'medal', level: 'star', purchase: 'bag', pass: 'ticket', product: 'bag', sale: 'refresh', creator: 'anvil', ads: 'megaphone', forgecore: 'terminal', debug: 'bug', gift: 'sparkle', fame: 'star', devs: 'users', earn: 'plus' };
+  const CAT_LABEL = { daily: 'Daily reward', game: 'Game reward', quest: 'Quest', achievement: 'Achievement', level: 'Level up', purchase: 'Avatar Shop', pass: 'Game pass', product: 'Game store', sale: 'Item sale', creator: 'Creator earnings', ads: 'Advertising', forgecore: 'FORGECORE', debug: 'Developer', gift: 'Gift', fame: 'Fame', devs: 'Dev salaries', studio: 'Studio', giveaway: 'Giveaways', earn: 'Earned' };
+  const CAT_ICON = { daily: 'gift', game: 'gamepad', quest: 'target', achievement: 'medal', level: 'star', purchase: 'bag', pass: 'ticket', product: 'bag', sale: 'refresh', creator: 'anvil', ads: 'megaphone', forgecore: 'terminal', debug: 'bug', gift: 'sparkle', fame: 'star', devs: 'users', studio: 'crown', giveaway: 'gift', earn: 'plus' };
   let txFilter = 'all';
   let txCat = 'all';
   let txLimit = 60;

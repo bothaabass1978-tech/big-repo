@@ -32,6 +32,9 @@
     ['/leaderboards/:scope?', 'leaderboards'],
     ['/search', 'search'],
     ['/creator/:name', 'creatorpage'],
+    ['/communities', 'communities'],
+    ['/community/:id', 'community'],
+    ['/mystudio', 'mystudio'],
   ];
 
   /** Launch a game (optionally a specific server). */

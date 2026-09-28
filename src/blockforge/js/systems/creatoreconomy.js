@@ -109,13 +109,17 @@
           playing += BF.world.playerCount(g.id);
         }
         const o = own.get(name);
-        return { name, games, owner: o.owner, team: o.team, lifetime, perMin, visits, playing };
+        // studios you bought (BF.company) are yours: the old owner keeps the sale price, not the income
+        const mine = !!(BF.company && BF.company.owns(name));
+        return { name, games, owner: o.owner, team: o.team, lifetime, perMin, visits, playing, mine };
       }).sort((a, b) => b.lifetime - a.lifetime);
       cache = out;
       cacheAt = now;
       return out;
     },
     studio(name) { return ce.studios().find((s) => s.name === name) || null; },
+    /** Forget cached totals (after a studio changes hands). */
+    invalidate() { cache = null; },
     ownerOf(name) { const o = assignOwners().get(name); return o ? o.owner : null; },
 
     /** Studios this bot owns or works at. */
@@ -145,7 +149,12 @@
       const roles = ce.rolesOf(botId);
       if (roles.length) {
         for (const s of ce.studios()) {
-          for (const r of roles) if (r.studio === s.name) w += s.lifetime * (r.role === 'owner' ? T.ownerShare : T.teamShare);
+          for (const r of roles) {
+            if (r.studio !== s.name) continue;
+            // a studio sold to you: the old owner keeps what it earned up to the sale (and the price)
+            const sold = s.mine && r.role === 'owner' ? (BF.company.mine().acquired.find((a) => a.name === s.name) || {}).lifetimeAt : null;
+            w += (sold != null ? Math.min(sold, s.lifetime) : s.lifetime) * (r.role === 'owner' ? T.ownerShare : T.teamShare);
+          }
         }
       }
       if (BF.botGames) w += BF.botGames.earningsOf(botId);
@@ -172,7 +181,8 @@
       if (s) {
         const t = BF.creator.totals();
         const mine = BF.creator.list().filter((g) => g.published);
-        rows.push({ kind: 'me', me: true, name: s.player.displayName, lifetime: t.revenue, perMin: BF.creator.series(3).reduce((a, b) => a + b.r, 0) / 3, games: mine.length, playing: mine.reduce((a, g) => a + BF.world.playerCount(g.id), 0) });
+        const co = BF.company && BF.company.mine();
+        rows.push({ kind: 'me', me: true, name: co ? co.name : s.player.displayName, lifetime: t.revenue + ((co && co.earned) || 0), perMin: BF.creator.series(3).reduce((a, b) => a + b.r, 0) / 3 + (BF.company ? BF.company.incomePerMin() : 0), games: mine.length + (co ? co.acquired.reduce((a, q) => { const x = ce.studio(q.name); return a + (x ? x.games.length : 0); }, 0) : 0), playing: mine.reduce((a, g) => a + BF.world.playerCount(g.id), 0) + (BF.company ? BF.company.playing() : 0) });
       }
       rows.sort((a, b) => b.lifetime - a.lifetime || (a.me ? -1 : 1));
       rows.forEach((r, i) => { r.rank = i + 1; });
