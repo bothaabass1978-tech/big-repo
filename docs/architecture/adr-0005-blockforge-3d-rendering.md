@@ -238,6 +238,38 @@ every obby looked like Sky Obby and the chosen colour barely showed.
   clips it.
 - Render cache version `v5`, and the cache key includes the game id.
 
+## Amendment (2026-09-28): player camera views
+
+Players can change the camera in any 3D game.
+
+- **The views.** There are six:
+
+  | View | Change to the game's own shot |
+  |------|-------------------------------|
+  | Classic | None (the game's own framing) |
+  | Close-up | 0.62 × distance, pitch pulled 35% toward 0.62 rad |
+  | Wide | 1.42 × distance |
+  | Overhead | pitch 1.38 rad, 1.08 × distance |
+  | Low angle | pitch pulled 80% toward 0.3 rad, 0.88 × distance |
+  | Angled | yaw + 0.62 rad, 1.05 × distance |
+
+- **One code path.** Every game camera goes through `World.look` (including
+  `stage` and `side`), so the view is applied there, in `World.viewed`. No
+  game module changed.
+- **Transitions.** Switching views eases over a few frames (12% per 60 fps
+  frame).
+- **Thumbnails.** Worlds that bring their own renderer keep the game's
+  framing (`userCam` false).
+- **Controls.** The eye button in the game bar or the V key switches views,
+  and a label shows the view's name for a moment.
+- **Saving.** The choice is saved as `settings.gameplay.camera`, which
+  Settings > Gameplay > Camera also sets.
+- **Aiming.** Mouse aiming keeps working, because it raycasts through the
+  live camera.
+- **Classic 2D.** Games in Classic 2D hide the button.
+- **Validation.** One e2e check, plus screenshots of every view in Block
+  Battlegrounds and Skyline Racers.
+
 ## Related Decisions
 
 ADR-0001, ADR-0003, ADR-0004 (Mansion secret unaffected), ADR-0007 (Studio levels).

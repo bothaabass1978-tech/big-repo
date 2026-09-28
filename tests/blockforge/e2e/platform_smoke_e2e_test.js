@@ -138,6 +138,18 @@ async function signIn(page) {
       await page.keyboard.up(keys[i % keys.length]);
     }
     const running = await page.evaluate(() => BF.runtime.active);
+    if (id === games[0] && webgl) {
+      // the camera button and V key cycle through the views and move the camera
+      const cam = await page.evaluate(() => { const c = BF.runtime.session().g3.camera.position; return [c.x, c.y, c.z]; });
+      await page.keyboard.press('KeyV');
+      await page.waitForTimeout(700);
+      const after = await page.evaluate(() => ({ view: BF.g3d.cameraView().id, label: document.querySelector('#gr-cam-name').textContent, flash: !document.querySelector('#gr-cam-flash').hidden, pos: (({ x, y, z }) => [x, y, z])(BF.runtime.session().g3.camera.position) }));
+      await page.click('[data-g="camera"]');
+      const clicked = await page.evaluate(() => BF.g3d.cameraView().id);
+      await page.evaluate(() => BF.g3d.cycleCamera('classic'));
+      const moved = Math.hypot(after.pos[0] - cam[0], after.pos[1] - cam[1], after.pos[2] - cam[2]) > 20;
+      check('V and the camera button switch between camera views', after.view === 'close' && after.label === 'Close-up' && after.flash && clicked === 'wide' && moved, JSON.stringify({ after, clicked, moved }));
+    }
     if (await page.evaluate(() => { const s = BF.runtime.session(); return !!(s && s.use3d && s.g3 && document.querySelector('canvas.gr-3d')); })) in3d++;
     if (id === 'mystery-mansion' || id === 'pet-battle-arena' || id === 'pixel-soccer') await shot(page, '04-game-' + id);
     await page.evaluate(() => BF.runtime.leave());

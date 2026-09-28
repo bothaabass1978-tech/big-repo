@@ -47,6 +47,28 @@
     return small ? 'low' : 'high';
   }
 
+  /**
+   * Player camera views, applied on top of whatever camera a game asks for.
+   * Each adjusts the game's own shot: dist × distMul, pitch pulled toward
+   * `pitch` by `pitchMix` (0 keeps the game's pitch), yaw + yawAdd.
+   */
+  const CAMERA_VIEWS = [
+    { id: 'classic', name: 'Classic', hint: 'The view the game was built with', distMul: 1, pitchMix: 0, yawAdd: 0 },
+    { id: 'close', name: 'Close-up', hint: 'Zoomed in behind the action', distMul: 0.62, pitch: 0.62, pitchMix: 0.35, yawAdd: 0 },
+    { id: 'wide', name: 'Wide', hint: 'Pulled back to see more of the map', distMul: 1.42, pitchMix: 0, yawAdd: 0 },
+    { id: 'overhead', name: 'Overhead', hint: 'Almost straight down, like a map', distMul: 1.08, pitch: 1.38, pitchMix: 1, yawAdd: 0 },
+    { id: 'low', name: 'Low angle', hint: 'Near the ground, looking across', distMul: 0.88, pitch: 0.3, pitchMix: 0.8, yawAdd: 0 },
+    { id: 'angled', name: 'Angled', hint: 'A three-quarter view from the side', distMul: 1.05, pitchMix: 0, yawAdd: 0.62 },
+  ];
+  /** How fast a new view eases in (fraction per 60 fps frame). */
+  const VIEW_EASE = 0.12;
+
+  function cameraView() {
+    const s = BF.store && BF.store.state;
+    const id = s && s.settings.gameplay.camera;
+    return CAMERA_VIEWS.find((v) => v.id === id) || CAMERA_VIEWS[0];
+  }
+
   // ------------------------------------------------------------ shared caches
 
   const cache = { mats: new Map(), geos: {}, tex: new Map() };
@@ -284,6 +306,9 @@
     this.camera.position.set(480, 700, 900);
     this.camera.lookAt(480, 0, 270);
     this.camTarget = V().set(480, 0, 270);
+    // thumbnails pass their own renderer and keep the game's framing; play worlds follow the player's camera view
+    this.userCam = opts.userCam == null ? !opts.renderer : opts.userCam;
+    this._view = null;
     this.shakeT = 0;
     this.shakeMag = 0;
     this.labels = [];
@@ -676,7 +701,8 @@
      */
     look(tx, ty, tz, o, dt) {
       o = o || {};
-      const dist = o.dist || 800, pitch = o.pitch == null ? 0.95 : o.pitch, yaw = o.yaw || 0;
+      let dist = o.dist || 800, pitch = o.pitch == null ? 0.95 : o.pitch, yaw = o.yaw || 0;
+      if (this.userCam) ({ dist, pitch, yaw } = this.viewed(dist, pitch, yaw, dt));
       const k = o.lerp == null || !dt ? 1 : 1 - Math.pow(1 - o.lerp, dt * 60);
       this.camTarget.x += (tx - this.camTarget.x) * k;
       this.camTarget.y += (ty - this.camTarget.y) * k;
@@ -691,6 +717,16 @@
       if (o.fov && this.camera.fov !== o.fov) { this.camera.fov = o.fov; this.camera.updateProjectionMatrix(); }
       this.camera.lookAt(t.x + sx * 0.5, t.y + sy * 0.5, t.z);
       this.focus(t.x, t.z);
+    },
+
+    /** Apply the player's camera view to a game's shot, easing between views over a few frames. */
+    viewed(dist, pitch, yaw, dt) {
+      const v = cameraView();
+      const want = { d: v.distMul, p: v.pitchMix, pv: v.pitch == null ? pitch : v.pitch, y: v.yawAdd };
+      const c = this._view || (this._view = Object.assign({}, want));
+      const k = dt ? 1 - Math.pow(1 - VIEW_EASE, dt * 60) : 1;
+      for (const key of ['d', 'p', 'pv', 'y']) c[key] += (want[key] - c[key]) * k;
+      return { dist: dist * c.d, pitch: pitch + (c.pv - pitch) * c.p, yaw: yaw + c.y };
     },
 
     /** Whole 960×540 stage from a tilted top-down view (tilt 0 = straight down). */
@@ -852,6 +888,17 @@
   BF.g3d = {
     supported,
     quality,
+    /** Player camera views (see CAMERA_VIEWS) and the one in use. */
+    CAMERA_VIEWS,
+    cameraView,
+    /** Switch to the next camera view (or a given id); saves the choice and returns the new view. */
+    cycleCamera(id) {
+      const cur = cameraView();
+      const next = id ? CAMERA_VIEWS.find((v) => v.id === id) : CAMERA_VIEWS[(CAMERA_VIEWS.indexOf(cur) + 1) % CAMERA_VIEWS.length];
+      if (!next) return cur;
+      BF.store.update('settings', (st) => { st.settings.gameplay.camera = next.id; });
+      return next;
+    },
     /** 3D is used unless the device lacks WebGL or the player picked Classic 2D. */
     enabled() {
       return supported() && quality() !== 'classic';

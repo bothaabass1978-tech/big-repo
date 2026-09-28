@@ -170,12 +170,13 @@
       '<div class="gr-title"><img src="' + BF.thumbs.url(g) + '" alt=""><div><b>' + esc(g.name) + '</b><span>Server #' + s.server.id + ' · ' + esc(s.server.region) + ' · <span class="gr-ping">' + s.server.ping + 'ms</span></span></div></div>' +
       '<div class="gr-top-right"><span class="gr-chip" data-tip="Players in this server">' + BF.icon('users', 15) + '<b id="gr-count" class="num">1/' + s.server.max + '</b></span>' +
       '<span class="gr-chip gold" data-tip="ForgeCoins">' + BF.coinIcon(15) + '<b id="gr-coins" class="num">' + U.fmt(BF.economy.balance()) + '</b></span>' +
+      '<button class="gr-btn" data-g="camera" id="gr-cam-btn" data-tip="Change camera view (V)" aria-label="Change camera view">' + BF.icon('eye', 17) + '<span class="gr-hide-sm" id="gr-cam-name">' + esc(BF.g3d ? BF.g3d.cameraView().name : 'Camera') + '</span></button>' +
       '<button class="gr-btn icon" data-g="emotes" data-tip="Emotes" aria-label="Emotes">' + BF.icon('emote', 18) + '</button>' +
       '<button class="gr-btn icon" data-g="side" data-tip="Chat and players (Tab)" aria-label="Chat and players">' + BF.icon('chat', 18) + '<span class="gr-dot" id="gr-chat-dot" hidden></span></button>' +
       '<button class="gr-btn icon gr-hide-sm" data-g="fullscreen" data-tip="Fullscreen" aria-label="Fullscreen">' + BF.icon('expand', 18) + '</button>' +
       '<button class="gr-btn icon" data-g="pause" data-tip="Menu (Esc)" aria-label="Menu">' + BF.icon('pause', 18) + '</button></div></header>' +
       '<div class="gr-body"><div class="gr-stage" id="gr-stage"><div class="gr-frame" id="gr-frame"><canvas id="gr-canvas" aria-label="' + esc(g.name) + ' game view"></canvas>' +
-      '<div class="gr-ui" id="gr-ui"></div><div class="gr-feed" id="gr-feed" aria-live="polite"></div><div class="gr-touch" id="gr-touch"></div><div class="gr-fps" id="gr-fps" hidden></div><div class="gr-overlay" id="gr-overlay" hidden></div></div>' +
+      '<div class="gr-ui" id="gr-ui"></div><div class="gr-feed" id="gr-feed" aria-live="polite"></div><div class="gr-touch" id="gr-touch"></div><div class="gr-cam-flash" id="gr-cam-flash" hidden></div><div class="gr-fps" id="gr-fps" hidden></div><div class="gr-overlay" id="gr-overlay" hidden></div></div>' +
       '<div class="gr-hint">' + BF.icon('keyboard', 14) + '<span>' + esc(g.controls || 'Use the on-screen controls') + '</span><span class="faint">· Enter to chat · Esc for menu</span></div></div>' +
       '<aside class="gr-side" id="gr-side"><div class="gr-side-tabs"><button class="on" data-gtab="chat">' + BF.icon('chat', 14) + 'Chat</button><button data-gtab="players">' + BF.icon('users', 14) + 'Players <span id="gr-pcount" class="num"></span></button><button class="gr-side-close" data-g="side" aria-label="Close panel">' + BF.icon('x', 14) + '</button></div>' +
       '<div class="gr-chat" id="gr-chat-log" role="log"></div><form class="gr-chat-form" id="gr-chat-form"><input id="gr-chat-input" maxlength="120" placeholder="Press Enter to chat" autocomplete="off" aria-label="Chat message"><button type="submit" aria-label="Send">' + BF.icon('send', 15) + '</button></form>' +
@@ -201,6 +202,8 @@
         s.g3 = null;
       }
     }
+    // camera views only change 3D games
+    root.querySelector('#gr-cam-btn').hidden = !s.use3d;
     s.frame = root.querySelector('#gr-frame');
     s.stage = root.querySelector('#gr-stage');
     s.chatLog = root.querySelector('#gr-chat-log');
@@ -237,6 +240,8 @@
         e.preventDefault();
         openSide('chat');
         root.querySelector('#gr-chat-input').focus();
+      } else if (e.code === 'KeyV' && !inChat && !e.repeat && !s.loading && !(document.activeElement && /^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName))) {
+        nextCamera();
       } else if (e.key === 'Tab' && !inChat) {
         e.preventDefault();
         root.classList.toggle('side-closed');
@@ -246,6 +251,22 @@
     document.addEventListener('keydown', s.onKey, true);
     s.onVis = () => { if (document.hidden && s && !s.paused && !s.ended && !s.loading) togglePause(true); };
     document.addEventListener('visibilitychange', s.onVis);
+  }
+
+  /** Switch to the next camera view and show its name over the game for a moment. */
+  function nextCamera() {
+    if (!s || !s.use3d || !BF.g3d) return;
+    const v = BF.g3d.cycleCamera();
+    const name = s.root.querySelector('#gr-cam-name');
+    if (name) name.textContent = v.name;
+    const f = s.root.querySelector('#gr-cam-flash');
+    if (!f) return;
+    const i = BF.g3d.CAMERA_VIEWS.indexOf(v) + 1;
+    f.innerHTML = BF.icon('eye', 16) + '<b>' + esc(v.name) + '</b><span>' + esc(v.hint) + ' · ' + i + '/' + BF.g3d.CAMERA_VIEWS.length + ' · V for next</span>';
+    f.hidden = false;
+    f.classList.remove('show'); void f.offsetWidth; f.classList.add('show');
+    clearTimeout(s.camFlashT);
+    s.camFlashT = setTimeout(() => { if (s) f.hidden = true; }, 1800);
   }
 
   function resize() {
@@ -299,7 +320,8 @@
       const el = s.root;
       if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
       else if (el.requestFullscreen) el.requestFullscreen().then(() => setTimeout(resize, 60)).catch(() => BF.ui.toast({ title: 'Fullscreen is not available here', kind: 'info' }));
-    } else if (a === 'emotes') emoteMenu(t);
+    } else if (a === 'camera') nextCamera();
+    else if (a === 'emotes') emoteMenu(t);
     else if (a === 'resume') togglePause(false);
     else if (a === 'restart') restart();
     else if (a === 'again') restart();

@@ -30,7 +30,7 @@
         types: { friend: true, achievement: true, invite: true, purchase: true, daily: true, quest: true, bot: true, update: true, level: true, system: true },
       },
       appearance: { theme: 'dark', accent: 'ember', density: 'comfortable', reduceMotion: false, fontScale: 1 },
-      gameplay: { volume: 0.6, sfx: true, touchControls: 'auto', showFps: false, botChat: 'normal', chatFilter: true, autoJoinBest: true, botAI: 'smart', graphics: 'auto' },
+      gameplay: { volume: 0.6, sfx: true, touchControls: 'auto', showFps: false, botChat: 'normal', chatFilter: true, autoJoinBest: true, botAI: 'smart', graphics: 'auto', camera: 'classic' },
       data: { autosave: true },
     };
   }
