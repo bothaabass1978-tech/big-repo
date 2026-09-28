@@ -100,6 +100,7 @@
         pendingCoins: 0, pendingReasons: new Set(), flushTimer: null,
         bubbles: new Map(), badges: [], sessionCoins: 0, sessionXp: 0,
         fpsT: 0, fpsN: 0,
+        real: new Map(), // real players (BF.net) on this server: key -> {x, y, z, ry, sayId}
       };
       buildDom();
       syncRoster(true);
@@ -138,6 +139,7 @@
       document.removeEventListener('visibilitychange', s.onVis);
       if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
       if (s.active.length) BF.friends.recordRecent(s.active.map((b) => b.id).slice(0, 8), gameId);
+      if (BF.net) BF.net.gameState(null);
       s.root.remove();
       document.body.classList.remove('in-game');
       BF.world.leave();
@@ -302,7 +304,11 @@
     const t = e.target.closest('[data-g], [data-gtab], [data-gact], [data-pl]');
     if (!t || !s) return;
     if (t.dataset.gtab) { openSide(t.dataset.gtab); return; }
-    if (t.dataset.pl) { playerCard(t.dataset.pl); return; }
+    if (t.dataset.pl) {
+      if (BF.net && BF.net.isKey(t.dataset.pl)) BF.actions.run('rp-menu', t, e, { rp: t.dataset.pl });
+      else playerCard(t.dataset.pl);
+      return;
+    }
     if (t.dataset.gact) {
       if (s.uiHandler) s.uiHandler(t.dataset.gact, t, e);
       return;
@@ -425,6 +431,7 @@
     } else if (s.ended && inst.updateEnded) {
       try { inst.updateEnded(dt); } catch (e) { /* cosmetic */ }
     }
+    try { netFrame(s.paused ? 0 : dt); } catch (e) { console.warn('[BF.net] in-game', e); }
     const g = s.g;
     g.setTransform(s.scale, 0, 0, s.scale, 0, 0);
     // the browser took the 3D context away mid-game and did not give it back: finish in 2D
@@ -547,10 +554,11 @@
 
   function updateCount() {
     if (!s) return;
+    const n = s.all.length + 1 + s.real.size;
     const el = s.root.querySelector('#gr-count');
-    if (el) el.textContent = (s.all.length + 1) + '/' + s.server.max;
+    if (el) el.textContent = n + '/' + Math.max(s.server.max, n);
     const pc = s.root.querySelector('#gr-pcount');
-    if (pc) pc.textContent = s.all.length + 1;
+    if (pc) pc.textContent = n;
     if (!s.root.querySelector('#gr-players').hidden) renderPlayers();
   }
 
@@ -603,7 +611,13 @@
       const friend = BF.friends.isFriend(b.id);
       return '<button class="gr-player" data-pl="' + b.id + '">' + BF.ui.avatarChip(b.avatar, { size: 'sm' }) + '<span class="gp-main"><span class="gp-name" style="color:' + BF.gfx.nameColor(b.username) + '">' + esc(b.displayName) + '</span><span class="gp-sub">@' + esc(b.username) + ' · Lv ' + BF.bots.level(b) + (s.active.some((x) => x.id === b.id) ? '' : ' · in lobby') + '</span></span>' + (friend ? '<span class="pill success">Friend</span>' : BF.friends.hasOutgoing(b.id) ? '<span class="pill">Sent</span>' : '') + '</button>';
     };
-    el.innerHTML = '<div class="gr-player me">' + BF.ui.avatarChip(me.avatar, { size: 'sm' }) + '<span class="gp-main"><span class="gp-name">' + esc(me.player.displayName) + ' <span class="pill accent">You</span></span><span class="gp-sub">@' + esc(me.player.username) + ' · Lv ' + me.player.level + '</span></span></div>' + s.all.map(row).join('');
+    const realRow = (k) => {
+      const p = BF.net.person(k) || (BF.net.playersIn(s.gameId, s.server.id).find((x) => x.key === k) || {}).person;
+      if (!p) return '';
+      const rel = BF.net.relation(k);
+      return '<button class="gr-player real" data-pl="' + k + '">' + BF.ui.avatarChip(p.avatar, { size: 'sm' }) + '<span class="gp-main"><span class="gp-name" style="color:#7fe0ff">' + esc(p.displayName) + '</span><span class="gp-sub">@' + esc(p.username) + ' · real player</span></span>' + (rel === 'friends' ? '<span class="pill success">Friend</span>' : rel === 'outgoing' ? '<span class="pill">Sent</span>' : '') + '</button>';
+    };
+    el.innerHTML = '<div class="gr-player me">' + BF.ui.avatarChip(me.avatar, { size: 'sm' }) + '<span class="gp-main"><span class="gp-name">' + esc(me.player.displayName) + ' <span class="pill accent">You</span></span><span class="gp-sub">@' + esc(me.player.username) + ' · Lv ' + me.player.level + '</span></span></div>' + Array.from(s.real.keys()).map(realRow).join('') + s.all.map(row).join('');
   }
 
   /** In-game player card with social actions. */
@@ -666,6 +680,59 @@
     });
   }
 
+  // ------------------------------------------------------------ real players (BF.net)
+
+  /**
+   * Once a frame: tell BF.net where you are, and bring in the real players on
+   * this server: their characters (3D), name tags, chat and join/leave notices.
+   * They are shown, not simulated: each player's game runs on their own device.
+   */
+  function netFrame(dt) {
+    const N = BF.net;
+    if (!N || !N.ready() || s.loading) return;
+    let pos = null, sc = null;
+    const mine = s.g3 && s.g3.playerRig();
+    if (mine) { const g = mine.group; pos = [g.position.x, g.position.y, g.position.z, g.rotation.y, (mine.state && mine.state.move) || 0]; sc = g.scale.x; }
+    N.gameState({ g: s.gameId, sv: s.server.id, pos, sc });
+    const here = N.playersIn(s.gameId, s.server.id);
+    const seen = new Set();
+    const k = dt > 0 ? 1 - Math.exp(-12 * dt) : 1;
+    for (const p of here) {
+      seen.add(p.key);
+      let r = s.real.get(p.key);
+      if (!r) {
+        r = { x: p.pos ? p.pos[0] : 0, y: p.pos ? p.pos[1] : 0, z: p.pos ? p.pos[2] : 0, ry: p.pos ? p.pos[3] : 0, sayId: p.say ? p.say.id : null };
+        s.real.set(p.key, r);
+        feed(p.person.displayName + ' joined the server (real player)', 'join', '#7fe0ff');
+        BF.sfx.play('join');
+        updateCount();
+      }
+      if (p.say && p.say.id !== r.sayId) {
+        r.sayId = p.say.id;
+        chatLine({ id: p.key, displayName: p.person.displayName, username: p.person.username }, p.say.t, { real: true });
+        bubble(p.key, p.say.t);
+      }
+      if (!s.g3) continue;
+      if (!p.pos) { s.g3.dropActor('net-' + p.key); continue; }
+      const scale = p.sc || sc || 8;
+      r.x += (p.pos[0] - r.x) * k; r.y += (p.pos[1] - r.y) * k; r.z += (p.pos[2] - r.z) * k;
+      r.ry += Math.atan2(Math.sin(p.pos[3] - r.ry), Math.cos(p.pos[3] - r.ry)) * k;
+      const rig = s.g3.actor('net-' + p.key, p.person.avatar, { scale });
+      rig.setPos(r.x, r.y, r.z);
+      rig.group.rotation.y = r.ry;
+      rig.set({ move: Math.max(0, Math.min(1, p.pos[4] || 0)) });
+      s.g3.label(r.x, r.y + scale * 7.6, r.z, { name: p.person.displayName, color: '#7fe0ff', bubble: s.ctx && s.ctx.bubbleText(p.key) });
+    }
+    for (const key of Array.from(s.real.keys())) {
+      if (seen.has(key)) continue;
+      const p = N.person(key);
+      s.real.delete(key);
+      if (s.g3) s.g3.dropActor('net-' + key);
+      feed((p ? p.displayName : 'A real player') + ' left the server.', 'leave', '#ff9d9d');
+      updateCount();
+    }
+  }
+
   // ------------------------------------------------------------ chat + feed
 
   function chatLine(from, text, o) {
@@ -677,7 +744,7 @@
     const el = document.createElement('div');
     el.className = 'gr-msg' + (from === 'system' ? ' sys' : '') + (o.emote ? ' emote' : '');
     const vipTag = (me && s.verified ? '<span class="fame-check" title="Famous">✔</span> ' : '') + (me && passEffect('vip') ? '<span class="vip-tag">VIP</span> ' : '');
-    el.innerHTML = from === 'system' ? esc(text) : vipTag + '<b style="color:' + color + '">[' + esc(name) + ']:</b> ' + esc(text);
+    el.innerHTML = from === 'system' ? esc(text) : vipTag + (o.real ? '<span class="real-dot" title="Real player">' + BF.icon('globe', 11) + '</span> ' : '') + '<b style="color:' + (o.real ? '#7fe0ff' : color) + '">[' + esc(name) + ']:</b> ' + esc(text);
     s.lines.push({ who: me ? 'me' : from === 'system' ? 'system' : from.id, text: String(text) });
     if (s.lines.length > 60) s.lines.shift();
     s.chatLog.appendChild(el);
@@ -823,6 +890,7 @@
     const clean = BF.dialogue.filter(text);
     chatLine('me', clean);
     bubble('me', clean);
+    if (BF.net) BF.net.say(clean); // real players on this server hear it
     BF.sfx.play('chat');
     BF.store.update('player', (st) => { st.player.stats.chatSent += 1; });
     BF.quests.track('chat', 1, { gameId: s.gameId });

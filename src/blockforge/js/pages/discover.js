@@ -213,6 +213,7 @@
   });
 
   function socialButtons(id) {
+    if (BF.net && BF.net.isKey(id)) return BF.ui.realButtons(id);
     if (BF.friends.isFriend(id)) return '<a class="btn btn-xs btn-outline" href="#/messages/' + id + '">Message</a>';
     if (BF.friends.hasOutgoing(id)) return '<span class="pill">Request sent</span>';
     if (BF.friends.hasIncoming(id)) return '<button class="btn btn-xs btn-primary" data-act="accept-friend" data-bot="' + id + '">Accept</button>';

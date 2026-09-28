@@ -142,6 +142,38 @@
       '<div class="ph-meta faint">' + BF.icon('calendar', 14) + ' Joined ' + U.fmtDate(bot.joinDate) + ' · ' + U.plural(st.gamesPlayed, 'game') + ' played</div><div class="ph-actions">' + actions + '</div></div></section>' + tabs + body;
   }
 
+  /** A real player's profile (BF.net): what they publish, and what you can do together. */
+  function realProfile(k) {
+    const p = BF.net.person(k);
+    if (!p) return BF.ui.empty({ icon: 'user', title: 'Player not found', text: 'Real players appear once you have both opened BlockForge on claude.ai.', action: { label: 'Find players', href: '#/friends/find' } });
+    const rel = BF.net.relation(k);
+    const status = BF.net.status(k);
+    const tier = BF.fame && (BF.fame.T.tiers.find((t) => t.id === p.fame) || (p.fame === 'legend' ? BF.fame.T.legend : null));
+    const wearing = BF.AVATAR_SLOTS.map((slot) => p.avatar.equipped[slot]).filter(Boolean).map((id) => BF.ITEMS[id]).filter((i) => i && !i.starter);
+    let actions = '';
+    if (rel === 'blocked') actions = '<button class="btn btn-outline" data-act="rp-unblock" data-rp="' + k + '">Unblock</button>';
+    else {
+      if (rel === 'friends') actions += '<span class="pill success" style="height:36px;padding:0 12px">' + BF.icon('userCheck', 14) + 'Friends</span>';
+      else if (rel === 'incoming') actions += '<button class="btn btn-primary" data-act="rp-accept" data-rp="' + k + '">' + BF.icon('userCheck', 15) + 'Accept request</button><button class="btn btn-ghost" data-act="rp-decline" data-rp="' + k + '">Decline</button>';
+      else if (rel === 'outgoing') actions += '<button class="btn btn-outline" data-act="rp-cancel" data-rp="' + k + '">Request sent · Cancel</button>';
+      else actions += '<button class="btn btn-primary" data-act="rp-add" data-rp="' + k + '">' + BF.icon('userPlus', 15) + 'Add friend</button>';
+      actions += '<a class="btn btn-outline" href="#/messages/' + k + '">' + BF.icon('chat', 15) + 'Message</a>';
+      if (rel === 'friends') actions += '<button class="btn btn-outline" data-act="rp-gift" data-rp="' + k + '">' + BF.icon('gift', 15) + 'Gift</button>';
+      if (status.state === 'ingame') actions += '<button class="btn btn-play" data-act="rp-join" data-rp="' + k + '">' + BF.icon('play', 13) + 'Join game</button>';
+      if (rel === 'friends' && BF.world.session) actions += '<button class="btn btn-ghost" data-act="rp-invite" data-rp="' + k + '">' + BF.icon('gamepad', 14) + 'Invite</button>';
+    }
+    actions += '<button class="icon-btn" data-act="rp-menu" data-rp="' + k + '" aria-label="More">' + BF.icon('dots', 18) + '</button>';
+    const why = BF.net.blocker();
+    return '<section class="profile-hero"><div class="ph-avatar">' + heroAvatar(p.avatar) + '</div><div class="ph-main"><div class="ph-names"><h1 class="page-title">' + esc(p.displayName) + (p.verified ? ' <span class="fame-check" title="Famous">✔</span>' : '') + '</h1><span class="faint">@' + esc(p.username) + '</span><span class="lvl-badge">' + BF.icon('star', 13) + 'Level ' + p.level + '</span>' + BF.ui.realTag() + '</div>' +
+      (tier && BF.pages.fameTier ? '<div class="ph-fame-pill">' + BF.pages.fameTier(tier) + '</div>' : '') +
+      '<div class="ph-status"><span class="status-dot ' + status.state + '" data-live="dot:' + k + '"></span><span data-live="status:' + k + '">' + BF.ui.statusText(status) + '</span></div>' +
+      '<div class="ph-stats"><div><b class="num">' + U.compact(p.followers) + '</b><span>Followers</span></div><div><b class="num">' + p.level + '</b><span>Level</span></div><div><b class="num">' + wearing.length + '</b><span>Items worn</span></div></div>' +
+      (p.joinDate ? '<div class="ph-meta faint">' + BF.icon('calendar', 14) + ' Joined ' + U.fmtDate(p.joinDate) + '</div>' : '') +
+      '<div class="ph-actions">' + actions + '</div>' + (why ? '<p class="faint" style="margin-top:8px;font-size:12.5px">' + esc(why) + '</p>' : '') + '</div></section>' +
+      '<div class="about-grid"><div><div class="panel"><h3 class="panel-title">' + BF.icon('user', 17) + 'About</h3><p class="bio">' + esc(p.bio || 'No bio yet.') + '</p><p class="faint" style="font-size:12.5px">' + BF.icon('globe', 13) + ' A real person playing this BlockForge. Everything else you meet is part of the simulated platform.</p></div></div>' +
+      '<div><div class="panel"><h3 class="panel-title">' + BF.icon('shirt', 17) + 'Currently wearing</h3><div class="wearing-grid">' + (wearing.map((i) => '<button class="wear-chip" data-act="item-detail" data-item="' + i.id + '"><span class="rarity-dot rar-' + i.rarity + '"></span>' + esc(i.name) + '</button>').join('') || '<p class="faint">The starter look.</p>') + '</div></div></div></div>';
+  }
+
   function editProfile() {
     const p = BF.store.state.player;
     BF.ui.modal({
@@ -180,17 +212,18 @@
   });
 
   BF.pages.register('user', {
-    title: (p) => { const b = BF.bots.get(p.id); return b ? b.displayName : 'Player'; },
+    title: (p) => { const b = BF.net && BF.net.isKey(p.id) ? BF.net.person(p.id) : BF.bots.get(p.id); return b ? b.displayName : 'Player'; },
     nav: 'friends',
-    watch: ['social'],
+    watch: ['social', 'net', 'netLive'],
     render(params) {
+      if (BF.net && BF.net.isKey(params.id)) return realProfile(params.id);
       const bot = BF.bots.get(params.id);
       if (!bot) return BF.ui.empty({ icon: 'user', title: 'Player not found', action: { label: 'Find players', href: '#/friends/find' } });
       return botProfile(bot, params.tab || 'about');
     },
     mount(root, params) {
-      const bot = BF.bots.get(params.id);
-      if (bot) mountHero(root, bot.avatar);
+      const who = BF.net && BF.net.isKey(params.id) ? BF.net.person(params.id) : BF.bots.get(params.id);
+      if (who) mountHero(root, who.avatar);
     },
   });
 })((window.BF = window.BF || {}));

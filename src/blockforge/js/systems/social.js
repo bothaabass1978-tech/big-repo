@@ -7,9 +7,14 @@
 
   const U = BF.util;
   const MAX_MSGS = 200;
+  /** Friends list cap and the most pending requests kept (the oldest drop off when a flood overflows it). */
+  const MAX_FRIENDS = 1000;
+  const MAX_INCOMING = 300;
   const typing = new Set();
 
   const friends = (BF.friends = {
+    MAX_FRIENDS,
+    MAX_INCOMING,
     list() {
       const s = BF.store.state;
       return s ? s.social.friends.map((id) => BF.bots.get(id)).filter(Boolean) : [];
@@ -34,7 +39,7 @@
       if (friends.isFriend(id)) return { ok: false, error: 'You are already friends.' };
       if (friends.hasIncoming(id)) return friends.accept(id);
       if (friends.hasOutgoing(id)) return { ok: false, error: 'Request already sent.' };
-      if (BF.store.state.social.friends.length >= 200) return { ok: false, error: 'Your friends list is full (200).' };
+      if (BF.store.state.social.friends.length >= MAX_FRIENDS) return { ok: false, error: 'Your friends list is full (' + U.fmt(MAX_FRIENDS) + ').' };
       BF.store.update('social', (s) => { s.social.outgoing.push({ id, at: BF.clock.now() }); });
       const delay = 1500 + Math.random() * 4000;
       setTimeout(() => friends.resolveOutgoing(id), delay);
@@ -63,15 +68,44 @@
       if (Math.random() < 0.55) setTimeout(() => BF.messages.receive(id, BF.dialogue.styleFor(bot, U.pick(BF.DIALOGUE.friend[bot.personality]))), 2500 + Math.random() * 4000);
     },
 
-    /** A bot sends the player a request (world simulation). */
-    receiveRequest(id) {
+    /**
+     * A bot sends the player a request (world simulation). quiet skips the
+     * per-request notification (a fame flood posts one summary instead).
+     */
+    receiveRequest(id, opts) {
       const s = BF.store.state;
       const bot = BF.bots.get(id);
       if (!bot || s.settings.privacy.friendRequests === 'none') return false;
       if (friends.isFriend(id) || friends.isBlocked(id) || friends.hasIncoming(id) || friends.hasOutgoing(id)) return false;
-      BF.store.update('social', (st) => { st.social.incoming.push({ id, at: BF.clock.now() }); });
-      BF.notify.push({ type: 'friend', title: 'Friend request', body: bot.displayName + ' (@' + bot.username + ') wants to be your friend.', icon: 'userPlus', route: '#/friends/requests', action: { kind: 'friendRequest', id } });
+      BF.store.update('social', (st) => {
+        st.social.incoming.push({ id, at: BF.clock.now() });
+        if (st.social.incoming.length > MAX_INCOMING) st.social.incoming.splice(0, st.social.incoming.length - MAX_INCOMING);
+      });
+      if (!(opts && opts.quiet)) BF.notify.push({ type: 'friend', title: 'Friend request', body: bot.displayName + ' (@' + bot.username + ') wants to be your friend.', icon: 'userPlus', route: '#/friends/requests', action: { kind: 'friendRequest', id } });
       return true;
+    },
+
+    /** Accept every pending request, up to the friends cap. Returns how many were accepted. */
+    acceptAll() {
+      const s = BF.store.state;
+      const room = Math.max(0, MAX_FRIENDS - s.social.friends.length);
+      const take = s.social.incoming.slice(0, room).map((r) => r.id).filter((id) => BF.bots.get(id));
+      if (!take.length) return { ok: false, count: 0, error: room ? 'No pending requests.' : 'Your friends list is full (' + U.fmt(MAX_FRIENDS) + ').' };
+      BF.store.update('social', (st) => {
+        const set = new Set(take);
+        st.social.incoming = st.social.incoming.filter((r) => !set.has(r.id));
+        for (const id of take) if (!st.social.friends.includes(id)) st.social.friends.push(id);
+      });
+      BF.quests.track('friend_added', take.length);
+      BF.bus.emit('friends:added', { bot: BF.bots.get(take[take.length - 1]), count: take.length });
+      return { ok: true, count: take.length, left: s.social.incoming.length };
+    },
+
+    /** Decline every pending request. */
+    declineAll() {
+      const n = BF.store.state.social.incoming.length;
+      BF.store.update('social', (st) => { st.social.incoming = []; });
+      return { ok: true, count: n };
     },
 
     /** A bot accepts your pending request straight away (asked in chat). */
@@ -91,6 +125,7 @@
     accept(id) {
       const bot = BF.bots.get(id);
       if (!bot || !friends.hasIncoming(id)) return { ok: false, error: 'No request from that player.' };
+      if (BF.store.state.social.friends.length >= MAX_FRIENDS) return { ok: false, error: 'Your friends list is full (' + U.fmt(MAX_FRIENDS) + ').' };
       BF.store.update('social', (s) => {
         s.social.incoming = s.social.incoming.filter((r) => r.id !== id);
         if (!s.social.friends.includes(id)) s.social.friends.push(id);
@@ -192,7 +227,7 @@
     unreadCount() {
       const s = BF.store.state;
       if (!s) return 0;
-      let n = 0;
+      let n = BF.net ? BF.net.unreadCount() : 0; // conversations with real players count too
       for (const c of Object.values(s.messages)) for (const m of c.msgs) if (m.from === 'them' && !m.read) n++;
       return n;
     },

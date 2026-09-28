@@ -19,7 +19,7 @@
 
   function defaultSettings() {
     return {
-      privacy: { messages: 'everyone', friendRequests: 'everyone', showOnline: true, invites: true, inventoryPublic: true, gifts: 'friends' },
+      privacy: { messages: 'everyone', friendRequests: 'everyone', showOnline: true, invites: true, inventoryPublic: true, gifts: 'friends', realPlayers: true },
       notifications: {
         popups: true,
         popupMode: 'all', // all | important | off
@@ -33,6 +33,11 @@
       gameplay: { volume: 0.6, sfx: true, touchControls: 'auto', showFps: false, botChat: 'normal', chatFilter: true, autoJoinBest: true, botAI: 'smart', graphics: 'auto', camera: 'classic' },
       data: { autosave: true },
     };
+  }
+
+  /** Real-player slice (BF.net, ADR-0017). */
+  function emptyNet() {
+    return { people: {}, out: {}, threads: {}, claimed: [], blocked: [], seen: { req: {}, inv: {}, fr: {} } };
   }
 
   function emptyStats() {
@@ -108,6 +113,7 @@
       devs: { hires: [], candidates: [], rolledAt: 0, log: [] },
       company: null,
       community: { joined: [], posts: {}, members: 0, giveaways: [], nextPostAt: 0, nextGiveawayAt: 0 },
+      net: emptyNet(), // real players (BF.net): people you know, your outbox to them, conversations
       settings: defaultSettings(),
       secrets: { forgecore: { unlocked: false, at: 0, uses: 0, total: 0, wordSolved: false } },
       bots: {},
@@ -254,6 +260,13 @@
     if (!state.devs || typeof state.devs !== 'object' || !Array.isArray(state.devs.hires)) state.devs = { hires: [], candidates: [], rolledAt: 0, log: [] };
     if (state.company === undefined) state.company = null;
     if (!state.community || typeof state.community !== 'object' || !Array.isArray(state.community.joined)) state.community = { joined: [], posts: {}, members: 0, giveaways: [], nextPostAt: 0, nextGiveawayAt: 0 };
+    // saves from before real players (ADR-0017) get an empty slice; partial ones are filled in
+    if (!state.net || typeof state.net !== 'object' || Array.isArray(state.net)) state.net = emptyNet();
+    else {
+      deepDefaults(state.net, emptyNet());
+      if (!Array.isArray(state.net.claimed)) state.net.claimed = [];
+      if (!Array.isArray(state.net.blocked)) state.net.blocked = [];
+    }
     state.version = BF.SAVE_VERSION;
     return state;
   }

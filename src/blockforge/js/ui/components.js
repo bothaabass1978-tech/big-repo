@@ -448,8 +448,23 @@
       const st = BF.world.botStatus(bot.id);
       return '<div class="list-row" data-ctx="user" data-bot="' + bot.id + '">' +
         '<a href="#/user/' + bot.id + '">' + ui.avatarChip(bot.avatar, { status: st.state, id: bot.id }) + '</a>' +
-        '<div class="row-main"><a class="row-title" href="#/user/' + bot.id + '">' + esc(bot.displayName) + '</a><div class="row-sub">@' + esc(bot.username) + ' · <span data-live="status:' + bot.id + '">' + ui.statusText(st) + '</span>' + (opts.sub ? ' · ' + opts.sub : '') + '</div></div>' +
+        '<div class="row-main"><a class="row-title" href="#/user/' + bot.id + '">' + esc(bot.displayName) + '</a>' + (bot.real ? ' ' + ui.realTag() : '') + '<div class="row-sub">@' + esc(bot.username) + ' · <span data-live="status:' + bot.id + '">' + ui.statusText(st) + '</span>' + (opts.sub ? ' · ' + opts.sub : '') + '</div></div>' +
         '<div class="row-actions">' + (actions || '') + '</div></div>';
+    },
+
+    /** "Real player" marker for people (BF.net), as opposed to the platform's simulated players. */
+    realTag() {
+      return '<span class="pill real-tag" data-tip="A real person playing this BlockForge">' + BF.icon('globe', 11) + 'Real player</span>';
+    },
+
+    /** Friend / message buttons for a real player row (see BF.net.relation). */
+    realButtons(k) {
+      const rel = BF.net.relation(k);
+      if (rel === 'friends') return (BF.net.status(k).state === 'ingame' ? '<button class="btn btn-xs btn-play" data-act="rp-join" data-rp="' + k + '">' + BF.icon('play', 11) + 'Join</button>' : '') + '<a class="btn btn-xs btn-outline" href="#/messages/' + k + '">' + BF.icon('chat', 13) + 'Message</a>';
+      if (rel === 'outgoing') return '<span class="pill">Request sent</span>';
+      if (rel === 'incoming') return '<button class="btn btn-xs btn-primary" data-act="rp-accept" data-rp="' + k + '">' + BF.icon('check', 13) + 'Accept</button><button class="btn btn-xs btn-ghost" data-act="rp-decline" data-rp="' + k + '">Decline</button>';
+      if (rel === 'blocked') return '<button class="btn btn-xs btn-outline" data-act="rp-unblock" data-rp="' + k + '">Unblock</button>';
+      return '<button class="btn btn-xs btn-primary" data-act="rp-add" data-rp="' + k + '">' + BF.icon('userPlus', 13) + 'Add</button>';
     },
 
     /** Achievement icon, supporting the ForgeCoin mark. */

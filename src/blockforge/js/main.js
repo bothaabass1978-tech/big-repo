@@ -165,6 +165,8 @@
       } else if (!opts.resume) {
         BF.ui.toast({ title: 'Welcome back, ' + s.player.displayName, kind: 'success', icon: 'user' });
       }
+      // real players: connect once per page load (the same person across accounts); solo without the platform
+      if (BF.net && !BF.net.ready()) BF.net.connect().catch((e) => console.warn('[BF.net]', e));
       if (firstVisitToday && BF.daily.status().canClaim) setTimeout(() => { if (BF.store.state && !document.querySelector('.modal-scrim')) BF.actions.run('open-daily'); }, opts.welcome ? 1400 : 700);
     },
 

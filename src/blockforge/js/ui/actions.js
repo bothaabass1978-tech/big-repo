@@ -352,6 +352,7 @@
   // ------------------------------------------------------------------ social
 
   function userMenu(anchor, botId) {
+    if (BF.net && BF.net.isKey(botId)) return realMenu(anchor, botId);
     const bot = BF.bots.get(botId);
     if (!bot) return;
     const F = BF.friends;
@@ -371,12 +372,88 @@
   }
   A['user-menu'] = (p, el) => userMenu(el, p.bot);
 
+  // ------------------------------------------------------------ real players (BF.net)
+
+  const N = () => BF.net;
+  const who = (k) => { const p = N().person(k); return p ? p.displayName : 'that player'; };
+  const said = (r, ok) => BF.ui.toast(r.ok ? ok : { title: r.error || 'That did not work.', kind: 'info' });
+
+  function realMenu(anchor, k) {
+    const p = N().person(k);
+    if (!p) return;
+    const rel = N().relation(k);
+    const st = N().status(k);
+    const items = [{ html: '<b>' + esc(p.displayName) + '</b><div class="faint" style="font-size:12px">@' + esc(p.username) + ' · real player</div>' }, { label: 'View profile', icon: 'user', href: '#/user/' + k }];
+    if (rel !== 'blocked') items.push({ label: 'Send message', icon: 'chat', href: '#/messages/' + k });
+    if (rel === 'friends') items.push({ label: 'Send a gift', icon: 'gift', onClick: () => A['rp-gift']({ rp: k }) });
+    if (st.state === 'ingame' && rel !== 'blocked') items.push({ label: 'Join game', icon: 'play', onClick: () => A['rp-join']({ rp: k }) });
+    if (rel === 'friends' && BF.world.session) items.push({ label: 'Invite to my server', icon: 'gamepad', onClick: () => A['rp-invite']({ rp: k }) });
+    items.push({ sep: true });
+    if (rel === 'friends') items.push({ label: 'Remove friend', icon: 'userX', danger: true, onClick: () => A['rp-unfriend']({ rp: k }) });
+    else if (rel === 'incoming') items.push({ label: 'Accept friend request', icon: 'userCheck', onClick: () => A['rp-accept']({ rp: k }) });
+    else if (rel === 'outgoing') items.push({ label: 'Cancel friend request', icon: 'x', onClick: () => A['rp-cancel']({ rp: k }) });
+    else if (rel !== 'blocked') items.push({ label: 'Add friend', icon: 'userPlus', onClick: () => A['rp-add']({ rp: k }) });
+    items.push(rel === 'blocked' ? { label: 'Unblock', icon: 'block', onClick: () => A['rp-unblock']({ rp: k }) } : { label: 'Block', icon: 'block', danger: true, onClick: () => A['rp-block']({ rp: k }) });
+    BF.ui.menu(anchor, items);
+  }
+  A['rp-menu'] = (p, el) => realMenu(el, p.rp);
+  A['rp-add'] = (p) => { const r = N().request(p.rp); said(r, { title: r.accepted ? 'You are now friends with ' + who(p.rp) : 'Friend request sent to ' + who(p.rp), text: r.accepted ? '' : 'They see it next time they open BlockForge.', kind: 'success', icon: r.accepted ? 'userCheck' : 'userPlus' }); };
+  A['rp-accept'] = (p) => { const r = N().accept(p.rp); if (r.ok) BF.sfx.play('notify'); said(r, { title: 'You are now friends with ' + who(p.rp), kind: 'success', icon: 'userCheck' }); };
+  A['rp-decline'] = (p) => { N().decline(p.rp); BF.ui.toast({ title: 'Request declined', kind: 'info' }); };
+  A['rp-cancel'] = (p) => { N().cancel(p.rp); BF.ui.toast({ title: 'Friend request canceled', kind: 'info' }); };
+  A['rp-unfriend'] = async (p) => {
+    const ok = await BF.ui.confirm({ title: 'Remove ' + who(p.rp) + '?', message: 'They will be removed from your friends list. Either of you can send a new request later.', confirmLabel: 'Remove friend', danger: true, icon: 'userX' });
+    if (ok) { N().unfriend(p.rp); BF.ui.toast({ title: 'Removed ' + who(p.rp) + ' from friends', kind: 'info' }); }
+  };
+  A['rp-block'] = async (p) => {
+    const ok = await BF.ui.confirm({ title: 'Block ' + who(p.rp) + '?', message: 'You will not see their messages, requests, gifts or their character in games. They are removed from your friends.', confirmLabel: 'Block', danger: true, icon: 'block' });
+    if (ok) { N().block(p.rp); BF.ui.toast({ title: who(p.rp) + ' is blocked', kind: 'info', icon: 'block' }); }
+  };
+  A['rp-unblock'] = (p) => { N().unblock(p.rp); BF.ui.toast({ title: 'Unblocked', kind: 'success' }); };
+  A['rp-join'] = (p) => { const r = N().join(p.rp); if (!r.ok) BF.ui.toast({ title: r.error, kind: 'info' }); };
+  A['rp-invite'] = (p) => { const r = N().invite(p.rp); said(r, { title: 'Invite sent to ' + who(p.rp), text: 'They can join your server from their notifications.', kind: 'success', icon: 'gamepad' }); };
+
+  /** Gift ForgeCoins to a real friend. */
+  A['rp-gift'] = (p) => {
+    const k = p.rp;
+    const person = N().person(k);
+    const can = N().canGift(k);
+    if (!person || !can.ok) return BF.ui.toast({ title: can.error || 'Player not found.', kind: 'info' });
+    let armed = false;
+    const h = BF.ui.modal({
+      title: 'Send a gift',
+      icon: 'gift',
+      cls: 'gift-modal',
+      body: '<div class="gift-to">' + BF.ui.avatarChip(person.avatar, { id: k }) + '<div class="row-main"><div class="row-title">' + esc(person.displayName) + ' ' + BF.ui.realTag() + '</div><div class="row-sub">@' + esc(person.username) + ' · it arrives next time they open BlockForge</div></div></div>' +
+        '<label class="field"><span class="label">Amount</span><div class="gift-amount">' + BF.coinIcon(20) + '<input class="input num" id="gift-amt" type="number" inputmode="numeric" min="1" max="' + can.max + '" step="1" value="100" aria-label="Amount in ForgeCoins"></div></label>' +
+        '<div class="chips gift-chips">' + GIFT_CHIPS.map((a) => '<button class="chip" type="button" data-amt="' + a + '">' + U.fmt(a) + '</button>').join('') + '</div><div class="gift-foot faint" id="gift-info"></div>',
+      actions: [
+        { label: 'Cancel', kind: 'ghost' },
+        { label: 'Send gift', kind: 'gold', icon: 'gift', id: 'gift-send', onClick: () => {
+          const amt = Math.floor(Number(input.value));
+          if (!armed && amt >= 1000) { armed = true; send.lastChild.textContent = 'Confirm: send ' + U.fmt(amt); info.textContent = 'Gifts cannot be undone. Press again to send.'; return false; }
+          const r = N().gift(k, amt);
+          if (!r.ok) { info.textContent = r.error; info.classList.add('err'); BF.sfx.play('error'); return false; }
+          BF.sfx.play('purchase');
+          BF.ui.toast({ title: 'Gift sent', text: U.fmt(amt) + ' ForgeCoins to ' + person.displayName + '.', kind: 'success', icon: 'gift' });
+          return true;
+        } },
+      ],
+    });
+    const input = h.el.querySelector('#gift-amt'), info = h.el.querySelector('#gift-info'), send = h.el.querySelector('#gift-send');
+    const refresh = () => { armed = false; send.lastChild.textContent = 'Send gift'; info.classList.remove('err'); info.textContent = 'Balance ' + U.fmt(BF.economy.balance()); };
+    h.el.querySelectorAll('[data-amt]').forEach((b) => b.addEventListener('click', () => { input.value = b.dataset.amt; refresh(); }));
+    input.addEventListener('input', refresh);
+    refresh();
+  };
+
   // ------------------------------------------------------------------ gifts
 
   const GIFT_CHIPS = [25, 100, 500, 1000, 10000];
 
   /** Gift ForgeCoins to a player: amount, optional note, confirm big gifts. */
   A.gift = (p) => {
+    if (BF.net && BF.net.isKey(p.bot)) return A['rp-gift']({ rp: p.bot });
     const bot = BF.bots.get(p.bot);
     if (!bot) return;
     if (BF.friends.isBlocked(bot.id)) return BF.ui.toast({ title: 'Unblock ' + bot.displayName + ' to send a gift.', kind: 'info' });

@@ -10,6 +10,8 @@
   // ---------------------------------------------------------------- friends
 
   let findQ = '';
+  /** Rows shown in one Friends or Requests list before "and N more". */
+  const LIST_MAX = 120;
 
   function friendActions(b) {
     const st = BF.world.botStatus(b.id);
@@ -18,10 +20,28 @@
       '<button class="icon-btn sm" data-act="user-menu" data-bot="' + b.id + '" aria-label="More actions for ' + esc(b.displayName) + '">' + BF.icon('dots', 16) + '</button>';
   }
 
+  /** Rows for real players (BF.net) with their buttons and a "more" menu. */
+  function realRows(list, sub) {
+    return '<div class="list panel tight real-list">' + list.map((p) => BF.ui.userRow(p, BF.ui.realButtons(p.id) + '<button class="icon-btn sm" data-act="rp-menu" data-rp="' + p.id + '" aria-label="More actions for ' + esc(p.displayName) + '">' + BF.icon('dots', 16) + '</button>', { sub: sub ? sub(p) : 'Lv ' + p.level })).join('') + '</div>';
+  }
+
+  /** One line about the connection to real players, or '' when there is nothing to say. */
+  function realStatus() {
+    if (!BF.net) return '';
+    const st = BF.net.state();
+    const why = BF.net.blocker();
+    if (st.state === 'online' && !why) {
+      const n = BF.net.onlineCount();
+      return '<div class="real-status on">' + BF.icon('globe', 15) + '<span><b>Real players connected</b> · ' + (n ? U.plural(n, 'other real player') + ' online now' : 'nobody else is online right now') + (st.hidden ? ' · you are invisible (Settings > Privacy)' : '') + '</span></div>';
+    }
+    return why ? '<div class="real-status">' + BF.icon('globe', 15) + '<span>' + esc(why) + '</span></div>' : '';
+  }
+  BF.pages.realStatus = realStatus;
+
   BF.pages.register('friends', {
     title: 'Friends',
     nav: 'friends',
-    watch: ['social'],
+    watch: ['social', 'net', 'netLive'],
     render(params) {
       const s = BF.store.state;
       const so = s.social;
@@ -29,10 +49,11 @@
       const friends = BF.friends.list().map((b) => ({ b, st: BF.world.botStatus(b.id) }));
       const order = { ingame: 0, online: 1, offline: 2 };
       friends.sort((a, b) => order[a.st.state] - order[b.st.state] || a.b.displayName.localeCompare(b.b.displayName));
-      const onlineCount = friends.filter((f) => f.st.state !== 'offline').length;
+      const real = BF.net ? { friends: BF.net.friends(), incoming: BF.net.incoming(), outgoing: BF.net.outgoing() } : { friends: [], incoming: [], outgoing: [] };
+      const onlineCount = friends.filter((f) => f.st.state !== 'offline').length + real.friends.filter((p) => BF.net.status(p.id).state !== 'offline').length;
       const tabs = BF.ui.tabs([
-        { id: 'friends', label: 'Friends', href: '#/friends', count: so.friends.length, icon: 'users' },
-        { id: 'requests', label: 'Requests', href: '#/friends/requests', count: so.incoming.length, icon: 'userPlus' },
+        { id: 'friends', label: 'Friends', href: '#/friends', count: so.friends.length + real.friends.length, icon: 'users' },
+        { id: 'requests', label: 'Requests', href: '#/friends/requests', count: so.incoming.length + real.incoming.length, icon: 'userPlus' },
         { id: 'recent', label: 'Recently Played', href: '#/friends/recent', icon: 'history' },
         { id: 'followers', label: 'Followers', href: '#/friends/followers', count: BF.followers ? BF.followers.total() : so.followers.length },
         { id: 'following', label: 'Following', href: '#/friends/following', count: so.following.length },
@@ -41,12 +62,18 @@
       ], tab);
       let body = '';
       if (tab === 'friends') {
-        body = friends.length ? '<div class="friend-summary"><span><span class="status-dot ingame"></span>' + friends.filter((f) => f.st.state === 'ingame').length + ' in game</span><span><span class="status-dot online"></span>' + friends.filter((f) => f.st.state === 'online').length + ' online</span><span><span class="status-dot offline"></span>' + (friends.length - onlineCount) + ' offline</span></div><div class="list panel tight">' + friends.map((f) => BF.ui.userRow(f.b, friendActions(f.b))).join('') + '</div>'
+        const shown = friends.slice(0, LIST_MAX);
+        const statusOf = (p) => BF.net.status(p.id);
+        const realFriends = real.friends.slice().sort((a, b) => (order[statusOf(a).state] - order[statusOf(b).state]) || a.displayName.localeCompare(b.displayName));
+        body = realStatus() + (realFriends.length ? '<h3 class="section-title real-head">' + BF.icon('globe', 16) + 'Real friends</h3>' + realRows(realFriends) + '<h3 class="section-title real-head">BlockForge friends</h3>' : '');
+        body += friends.length ? '<div class="friend-summary"><span><span class="status-dot ingame"></span>' + friends.filter((f) => f.st.state === 'ingame').length + ' in game</span><span><span class="status-dot online"></span>' + friends.filter((f) => f.st.state === 'online').length + ' online</span><span><span class="status-dot offline"></span>' + (friends.length - onlineCount) + ' offline</span></div><div class="list panel tight">' + shown.map((f) => BF.ui.userRow(f.b, friendActions(f.b))).join('') + '</div>' + (friends.length > shown.length ? '<p class="faint" style="margin-top:10px">and ' + U.fmt(friends.length - shown.length) + ' more friends</p>' : '')
           : BF.ui.empty({ icon: 'users', title: 'No friends yet', text: 'Add players you meet in servers, or find them by name.', action: { label: 'Find players', href: '#/friends/find' } });
       } else if (tab === 'requests') {
-        const inc = so.incoming.map((r) => ({ b: BF.bots.get(r.id), at: r.at })).filter((x) => x.b);
+        // newest first; a famous player's flood is capped on screen so the page stays fast
+        const incAll = so.incoming.slice().reverse().map((r) => ({ b: BF.bots.get(r.id), at: r.at })).filter((x) => x.b);
+        const inc = incAll.slice(0, LIST_MAX);
         const out = so.outgoing.map((r) => ({ b: BF.bots.get(r.id), at: r.at })).filter((x) => x.b);
-        body = '<h3 class="section-title" style="margin-bottom:10px">Received</h3>' + (inc.length ? '<div class="list panel tight">' + inc.map((x) => BF.ui.userRow(x.b, '<button class="btn btn-xs btn-primary" data-act="accept-friend" data-bot="' + x.b.id + '">' + BF.icon('check', 13) + 'Accept</button><button class="btn btn-xs btn-ghost" data-act="decline-friend" data-bot="' + x.b.id + '">Decline</button><button class="icon-btn sm" data-act="user-menu" data-bot="' + x.b.id + '" aria-label="More">' + BF.icon('dots', 16) + '</button>', { sub: U.timeAgo(x.at, BF.clock.now()) })).join('') + '</div>' : '<p class="faint" style="margin-bottom:10px">No pending requests.</p>') +
+        body = realStatus() + (real.incoming.length || real.outgoing.length ? '<h3 class="section-title real-head">' + BF.icon('globe', 16) + 'From real players</h3>' + realRows(real.incoming.concat(real.outgoing), (p) => (BF.net.relation(p.id) === 'incoming' ? 'wants to be your friend' : 'request sent')) : '') + '<div class="req-head"><h3 class="section-title">Received' + (incAll.length ? ' <span class="count">' + U.fmt(incAll.length) + '</span>' : '') + '</h3>' + (incAll.length > 1 ? '<div class="req-bulk"><button class="btn btn-sm btn-primary" data-accept-all>' + BF.icon('check', 14) + 'Accept all</button><button class="btn btn-sm btn-ghost" data-decline-all>Decline all</button></div>' : '') + '</div>' + (inc.length ? '<div class="list panel tight">' + inc.map((x) => BF.ui.userRow(x.b, '<button class="btn btn-xs btn-primary" data-act="accept-friend" data-bot="' + x.b.id + '">' + BF.icon('check', 13) + 'Accept</button><button class="btn btn-xs btn-ghost" data-act="decline-friend" data-bot="' + x.b.id + '">Decline</button><button class="icon-btn sm" data-act="user-menu" data-bot="' + x.b.id + '" aria-label="More">' + BF.icon('dots', 16) + '</button>', { sub: U.timeAgo(x.at, BF.clock.now()) })).join('') + '</div>' + (incAll.length > inc.length ? '<p class="faint" style="margin-top:10px">and ' + U.fmt(incAll.length - inc.length) + ' more requests</p>' : '') : '<p class="faint" style="margin-bottom:10px">No pending requests.</p>') +
           '<h3 class="section-title" style="margin:22px 0 10px">Sent</h3>' + (out.length ? '<div class="list panel tight">' + out.map((x) => BF.ui.userRow(x.b, '<span class="pill">Pending</span><button class="btn btn-xs btn-ghost" data-act="cancel-request" data-bot="' + x.b.id + '">Cancel</button>', { sub: 'sent ' + U.timeAgo(x.at, BF.clock.now()) })).join('') + '</div>' : '<p class="faint">You have not sent any requests.</p>');
       } else if (tab === 'recent') {
         const rec = so.recent.map((r) => ({ b: BF.bots.get(r.id), r })).filter((x) => x.b && !BF.friends.isBlocked(x.b.id));
@@ -76,15 +103,27 @@
       } else {
         const q = findQ.trim();
         const list = q ? BF.bots.search(q, 30) : BF.bots.list.filter((b) => !BF.friends.isFriend(b.id) && BF.world.botStatus(b.id).state !== 'offline').slice(0, 24);
-        body = '<div class="search-box inline" style="max-width:420px;margin-bottom:14px"><input class="input" id="find-q" type="search" placeholder="Search by username or display name" value="' + esc(findQ) + '" autocomplete="off">' + BF.icon('search', 16) + '</div>' +
+        const people = BF.net ? (q ? BF.net.search(q, 20) : BF.net.people().filter((p) => BF.net.relation(p.id) !== 'friends').slice(0, 20)) : [];
+        body = '<div class="search-box inline" style="max-width:420px;margin-bottom:14px"><input class="input" id="find-q" type="search" placeholder="Search by username or display name" value="' + esc(findQ) + '" autocomplete="off">' + BF.icon('search', 16) + '</div>' + realStatus() +
+          (people.length ? '<h3 class="section-title real-head">' + BF.icon('globe', 16) + (q ? 'Real players' : 'Real players on this BlockForge') + '</h3>' + realRows(people, (p) => 'Lv ' + p.level) + '<h3 class="section-title real-head">BlockForge players</h3>' : '') +
           '<div class="faint" style="margin-bottom:10px;font-size:12.5px">' + (q ? U.plural(list.length, 'player') + ' found' : 'Suggested players online right now') + '</div>' +
-          (list.length ? '<div class="list panel tight" id="find-results">' + list.map((b) => BF.ui.userRow(b, BF.ui.socialButtons(b.id) + '<button class="icon-btn sm" data-act="user-menu" data-bot="' + b.id + '" aria-label="More">' + BF.icon('dots', 16) + '</button>', { sub: esc(BF.PERSONALITIES[b.personality].label) + ' · Lv ' + BF.bots.level(b) })).join('') + '</div>' : BF.ui.empty({ icon: 'search', title: 'No players match “' + q + '”' }));
+          (!list.length && people.length ? '<p class="faint">No other players match.</p>' : list.length ? '<div class="list panel tight" id="find-results">' + list.map((b) => BF.ui.userRow(b, BF.ui.socialButtons(b.id) + '<button class="icon-btn sm" data-act="user-menu" data-bot="' + b.id + '" aria-label="More">' + BF.icon('dots', 16) + '</button>', { sub: esc(BF.PERSONALITIES[b.personality].label) + ' · Lv ' + BF.bots.level(b) })).join('') + '</div>' : BF.ui.empty({ icon: 'search', title: 'No players match “' + q + '”' }));
       }
-      return '<div class="page-head"><div><h1 class="page-title">Friends</h1><p class="page-sub">' + so.friends.length + ' friends · ' + onlineCount + ' online now</p></div><a class="btn btn-primary" href="#/friends/find">' + BF.icon('userPlus', 15) + 'Add friends</a></div>' + tabs + body;
+      return '<div class="page-head"><div><h1 class="page-title">Friends</h1><p class="page-sub">' + U.fmt(so.friends.length + real.friends.length) + ' friends · ' + onlineCount + ' online now</p></div><a class="btn btn-primary" href="#/friends/find">' + BF.icon('userPlus', 15) + 'Add friends</a></div>' + tabs + body;
     },
     mount(root) {
       const q = root.querySelector('#find-q');
       if (q) q.addEventListener('input', U.debounce(() => { findQ = q.value; BF.router.refresh(); }, 200));
+      const all = root.querySelector('[data-accept-all]');
+      if (all) all.addEventListener('click', () => {
+        const r = BF.friends.acceptAll();
+        BF.ui.toast(r.ok ? { title: 'You have ' + U.plural(r.count, 'new friend') + '!', text: r.left ? U.fmt(r.left) + ' requests left: your friends list is full.' : '', kind: 'success', icon: 'userCheck' } : { title: r.error, kind: 'info' });
+      });
+      const none = root.querySelector('[data-decline-all]');
+      if (none) none.addEventListener('click', async () => {
+        const ok = await BF.ui.confirm({ title: 'Decline every request?', message: U.plural(BF.store.state.social.incoming.length, 'request') + ' will be removed.', confirmLabel: 'Decline all', danger: true });
+        if (ok) BF.friends.declineAll();
+      });
     },
   });
 
@@ -120,27 +159,56 @@
         '<form class="thread-foot" id="compose"><textarea class="textarea" id="compose-text" rows="1" maxlength="500" placeholder="Message ' + esc(who.displayName) + '…" aria-label="Message">' + esc(drafts[withId] || '') + '</textarea><button class="btn btn-primary" type="submit" aria-label="Send">' + BF.icon('send', 16) + '<span class="hide-phone">Send</span></button></form>');
   }
 
+  /** A conversation with a real player (BF.net): same look, plus delivery marks and a privacy note. */
+  function realThreadHtml(k) {
+    const who = BF.net.person(k);
+    if (!who) return BF.ui.empty({ icon: 'chat', title: 'Conversation not found' });
+    const th = BF.net.thread(k);
+    const st = BF.net.status(k);
+    const blocked = BF.net.isBlocked(k);
+    const why = BF.net.blocker();
+    let lastDay = '';
+    const msgs = (th ? th.msgs : []).map((m) => {
+      const day = U.fmtDate(m.ts);
+      const sep = day !== lastDay ? '<div class="msg-day">' + day + '</div>' : '';
+      lastDay = day;
+      const delivered = m.gift && m.gift.dir === 'out' ? (BF.net.giftDelivered(k, m.id.replace(/^gift_/, '')) ? ' · received' : ' · on its way') : '';
+      const gift = m.gift ? '<div class="msg-gift ' + m.gift.dir + '">' + BF.icon('gift', 20) + '<div><b class="num">' + BF.coinIcon(14) + U.fmt(m.gift.amount) + '</b><span>' + (m.gift.dir === 'out' ? 'You sent a gift' + delivered : esc(who.displayName) + ' sent you a gift') + '</span></div></div>' : '';
+      return sep + '<div class="msg ' + (m.from === 'me' ? 'me' : 'them') + (m.gift ? ' has-gift' : '') + '" data-mid="' + m.id + '"><div class="bubble">' + gift + (m.text ? '<span class="msg-text">' + esc(m.text) + '</span>' : '') + '</div><div class="msg-meta"><span>' + U.fmtClockTime(m.ts) + '</span></div></div>';
+    }).join('');
+    const rel = BF.net.relation(k);
+    return '<div class="thread-head"><a class="icon-btn mobile-only" href="#/messages" aria-label="Back">' + BF.icon('arrowLeft', 18) + '</a>' +
+      '<a href="#/user/' + k + '">' + BF.ui.avatarChip(who.avatar, { status: st.state, id: k }) + '</a>' +
+      '<div class="row-main"><div class="row-title">' + esc(who.displayName) + ' ' + BF.ui.realTag() + '</div><div class="row-sub">@' + esc(who.username) + ' · <span data-live="status:' + k + '">' + BF.ui.statusText(st) + '</span></div></div>' +
+      '<div class="row-actions">' + (rel === 'friends' ? '<button class="btn btn-xs btn-gold" data-act="rp-gift" data-rp="' + k + '">' + BF.icon('gift', 13) + '<span class="hide-phone">Gift</span></button>' : '') + '<button class="icon-btn sm" data-act="rp-menu" data-rp="' + k + '" aria-label="More">' + BF.icon('dots', 16) + '</button><button class="icon-btn sm" data-del-conv aria-label="Delete conversation" data-tip="Delete conversation">' + BF.icon('trash', 16) + '</button></div></div>' +
+      '<div class="thread-body" id="thread-body">' + (msgs || '<div class="faint" style="text-align:center;padding:30px">Say hi to ' + esc(who.displayName) + '! They get your message next time they open BlockForge.</div>') + '</div>' +
+      (blocked ? '<div class="thread-foot faint" style="justify-content:center">You blocked this player. <button class="btn btn-xs btn-outline" data-act="rp-unblock" data-rp="' + k + '">Unblock</button></div>'
+        : why ? '<div class="thread-foot faint" style="justify-content:center">' + esc(why) + '</div>'
+        : '<form class="thread-foot" id="compose"><textarea class="textarea" id="compose-text" rows="1" maxlength="' + BF.net.T.maxText + '" placeholder="Message ' + esc(who.displayName) + '…" aria-label="Message">' + esc(drafts[k] || '') + '</textarea><button class="btn btn-primary" type="submit" aria-label="Send">' + BF.icon('send', 16) + '<span class="hide-phone">Send</span></button></form><div class="real-note">Messages with real players are stored in this BlockForge\'s shared data, so people with access to it could read them.</div>');
+  }
+
   BF.pages.register('messages', {
     title: 'Messages',
     nav: 'messages',
-    watch: ['messages', 'social'],
+    watch: ['messages', 'social', 'net'],
     render(params) {
-      const convs = BF.messages.conversations();
+      const convs = BF.messages.conversations().concat(BF.net ? BF.net.conversations() : []).sort((a, b) => b.updated - a.updated);
       const active = params.with;
       const q = convFilter.trim().toLowerCase();
       const list = convs.filter((c) => !q || c.who.displayName.toLowerCase().includes(q) || (c.who.username || '').toLowerCase().includes(q));
       const listHtml = list.length ? list.map((c) => '<a class="conv' + (c.with === active ? ' on' : '') + (c.unread ? ' unread' : '') + '" href="#/messages/' + c.with + '">' +
         (c.with === 'system' ? '<span class="avatar-chip sys">' + BF.logoMark(24) + '</span>' : BF.ui.avatarChip(c.who.avatar, { status: BF.world.botStatus(c.with).state, id: c.with })) +
-        '<span class="conv-main"><span class="conv-top"><b>' + esc(c.who.displayName) + '</b><span class="faint">' + U.timeAgo(c.last.ts, BF.clock.now()) + '</span></span><span class="conv-last">' + (c.last.from === 'me' ? 'You: ' : '') + esc(c.last.text || (c.last.gift ? 'Gift: ' + U.fmt(c.last.gift.amount) + ' ForgeCoins' : '')) + '</span></span>' + (c.unread ? '<span class="count-badge">' + c.unread + '</span>' : '') + '</a>').join('')
+        '<span class="conv-main"><span class="conv-top"><b>' + esc(c.who.displayName) + (c.real ? ' <span class="real-dot" title="Real player">' + BF.icon('globe', 11) + '</span>' : '') + '</b><span class="faint">' + U.timeAgo(c.last.ts, BF.clock.now()) + '</span></span><span class="conv-last">' + (c.last.from === 'me' ? 'You: ' : '') + esc(c.last.text || (c.last.gift ? 'Gift: ' + U.fmt(c.last.gift.amount) + ' ForgeCoins' : '')) + '</span></span>' + (c.unread ? '<span class="count-badge">' + c.unread + '</span>' : '') + '</a>').join('')
         : '<div class="faint" style="padding:20px;text-align:center">No conversations' + (q ? ' match' : ' yet') + '.</div>';
       return '<div class="page-head"><div><h1 class="page-title">Messages</h1><p class="page-sub">Private chats with players. Bots reply on their own time.</p></div><button class="btn btn-primary" data-new-msg>' + BF.icon('edit', 15) + 'New message</button></div>' +
         '<div class="messenger' + (active ? ' has-active' : '') + '"><aside class="conv-list"><div class="search-box inline"><input class="input" id="conv-q" type="search" placeholder="Search conversations" value="' + esc(convFilter) + '">' + BF.icon('search', 16) + '</div><div class="conv-scroll">' + listHtml + '</div></aside>' +
-        '<section class="thread" id="thread">' + (active ? threadHtml(active) : BF.ui.empty({ icon: 'chat', title: 'Pick a conversation', text: 'Or start a new one with a friend.' })) + '</section></div>';
+        '<section class="thread" id="thread">' + (active ? (BF.net && BF.net.isKey(active) ? realThreadHtml(active) : threadHtml(active)) : BF.ui.empty({ icon: 'chat', title: 'Pick a conversation', text: 'Or start a new one with a friend.' })) + '</section></div>';
     },
     mount(root, params) {
       const active = params.with;
       BF.ui.currentConversation = active || null;
-      if (active) BF.messages.markRead(active);
+      const real = !!(active && BF.net && BF.net.isKey(active));
+      if (active) (real ? BF.net.markRead(active) : BF.messages.markRead(active));
       const body = root.querySelector('#thread-body');
       if (body) body.scrollTop = body.scrollHeight;
       const q = root.querySelector('#conv-q');
@@ -149,7 +217,7 @@
       if (form) {
         const ta = form.querySelector('#compose-text');
         const send = () => {
-          const r = BF.messages.send(active, ta.value);
+          const r = real ? BF.net.send(active, ta.value) : BF.messages.send(active, ta.value);
           if (!r.ok) return BF.ui.toast({ title: r.error, kind: 'error' });
           ta.value = '';
           drafts[active] = '';
@@ -166,7 +234,7 @@
         if (e.target.closest('[data-mark-unread]')) { BF.messages.markUnread(active); BF.ui.currentConversation = null; BF.router.go('#/messages'); BF.ui.toast({ title: 'Marked as unread', kind: 'info', icon: 'mail' }); return; }
         if (e.target.closest('[data-del-conv]')) {
           const ok = await BF.ui.confirm({ title: 'Delete this conversation?', message: 'All messages in it are removed from this device.', confirmLabel: 'Delete', danger: true, icon: 'trash' });
-          if (ok) { BF.messages.deleteConversation(active); BF.router.go('#/messages'); }
+          if (ok) { (real ? BF.net.deleteConversation(active) : BF.messages.deleteConversation(active)); BF.router.go('#/messages'); }
           return;
         }
         if (e.target.closest('[data-new-msg]')) newMessage();
@@ -180,11 +248,11 @@
   });
 
   function newMessage() {
-    const friends = BF.friends.list();
+    const friends = (BF.net ? BF.net.friends() : []).concat(BF.friends.list());
     const h = BF.ui.modal({
       title: 'New message',
       icon: 'edit',
-      body: friends.length ? '<div class="search-box inline" style="margin-bottom:10px"><input class="input" id="nm-q" type="search" placeholder="Search friends">' + BF.icon('search', 16) + '</div><div class="list nm-list">' + friends.map((b) => '<button class="list-row nm-row" data-to="' + b.id + '" data-name="' + esc(b.displayName.toLowerCase() + ' ' + b.username.toLowerCase()) + '">' + BF.ui.avatarChip(b.avatar, { size: 'sm' }) + '<span class="row-main" style="text-align:left"><span class="row-title">' + esc(b.displayName) + '</span><span class="row-sub">@' + esc(b.username) + '</span></span></button>').join('') + '</div>' : BF.ui.empty({ icon: 'users', title: 'Add friends first', action: { label: 'Find players', href: '#/friends/find' } }),
+      body: friends.length ? '<div class="search-box inline" style="margin-bottom:10px"><input class="input" id="nm-q" type="search" placeholder="Search friends">' + BF.icon('search', 16) + '</div><div class="list nm-list">' + friends.map((b) => '<button class="list-row nm-row" data-to="' + b.id + '" data-name="' + esc(b.displayName.toLowerCase() + ' ' + b.username.toLowerCase()) + '">' + BF.ui.avatarChip(b.avatar, { size: 'sm' }) + '<span class="row-main" style="text-align:left"><span class="row-title">' + esc(b.displayName) + (b.real ? ' ' + BF.ui.realTag() : '') + '</span><span class="row-sub">@' + esc(b.username) + '</span></span></button>').join('') + '</div>' : BF.ui.empty({ icon: 'users', title: 'Add friends first', action: { label: 'Find players', href: '#/friends/find' } }),
     });
     const q = h.el.querySelector('#nm-q');
     if (q) q.addEventListener('input', () => h.el.querySelectorAll('.nm-row').forEach((r) => { r.hidden = !r.dataset.name.includes(q.value.toLowerCase()); }));

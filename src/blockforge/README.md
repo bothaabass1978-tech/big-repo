@@ -48,6 +48,8 @@ online and fall back to system fonts when you are not.
 | **Updates** | The studios behind the games ship an update now and then, never often: the first a day after you start, then one every 4 to 7 days. Each brings patch notes in the game's update log and a three-day event (bonus XP, a bigger crowd, a pass sale) and some bring a new limited item |
 | **Create** | Build games from 6 templates (Arena, Racing, Obby, Simulator, Tower Defense, and **Custom** from scratch). Hand-build Obby, Tower Defense, Arena and Custom levels in the **Studio** tile editor. Custom games have 14 tiles (walls, coins, gems, lava, spikes, enemies, keys and doors, pads, checkpoints, a goal) and their own rules (goal, timer, lives, speeds, theme, bots). Add up to 25 passes priced up to 100,000,000 ForgeCoins (pricier passes sell less often, and big-ticket buyers are rich players), publish, and run **ad campaigns**: Standard / Boosted / Premium tiers; Home, Discover and Search placements; prepaid budgets up to 50,000,000 with refunds; and a spending pace from Steady (an hour) to Burst (about 30 seconds), with **Spend faster** on running campaigns. Players brought in by ads don't all vanish: part of every crowd becomes **regulars**, more for better games, who keep coming back and fade over days. Every creation gets its own 3D thumbnail in its colour. Follow earnings from visits and pass sales on per-minute charts with **Collect all** |
 | **Camera views** | In any 3D game, press **V** or the eye button to switch between Classic, Close-up, Wide, Overhead, Low angle, Angled and **Behind the back**, a third-person camera over your shoulder: WASD moves where the camera looks, right-drag looks around, and it pulls in past walls. Your choice is remembered, and you can also set it in Settings |
+| **Real multiplayer** | Open BlockForge on claude.ai and the other real people who have it are there too: find them by username (marked "Real player"), add them as friends, message them, gift ForgeCoins, invite them, and join their exact server to see their character move and chat in the game. It runs on the artifact runtime's `user`, `db` and `room` capabilities ([ADR-0017](../../docs/architecture/adr-0017-blockforge-real-multiplayer.md)). Without them (a saved copy, a public link) BlockForge plays solo exactly as before. Settings > Privacy has "Show me to real players". |
+| **Fame floods** | The more famous you are, the more fans send friend requests: a steady stream when Famous, a flood as a Superstar or the Legend, rolled into one notification, with Accept all and Decline all |
 | **Search** | Games, items and players, with autocomplete (press `/`) |
 | **Fame** | Everyone has a fame score (followers and fans, the players in your games right now, level and wins) and a tier: Newcomer, Rising Star, Known, Popular, Famous, Superstar, and the #1 player is the **Legend**. Each new tier pays a bonus. Join a server when you are famous and players react: at Popular someone notices you, at Famous they freak out, follow you around, follow and add you (and you get a ✔ in chat), and Superstars get mobbed while fans pour into the server. Fans also play your games. See the **Most Famous** leaderboard, the fame card on your profile and the tier on Home |
 | **Dev teams** | Hire developers for your games from the **Team** tab: builders, scripters, artists and game designers ship real updates (new versions with patch notes, a lasting quality boost, regulars rushing back and a 30-minute surge of players), marketers bring steady new players and community managers keep them around. Salaries (1-5★, paid hourly) come out of the game's earnings first, then your wallet; unpaid devs quit. The best developers only work for famous creators |
@@ -145,9 +147,14 @@ node --test 'tests/blockforge/unit/*_test.js'
 # Richest and Top Creators boards, a community game, gifts, and a phone viewport
 npm i -D playwright   # once, if Playwright is not installed globally
 node tests/blockforge/e2e/platform_smoke_e2e_test.js --shots /tmp/blockforge-shots
+
+# real multiplayer: two separate browsers on a shared stand-in for the artifact
+# runtime (tests/blockforge/mock_claude.js): search, friends, messages, gifts,
+# joining the same server and seeing each other in the game, a view-only player
+node tests/blockforge/e2e/multiplayer_e2e_test.js --shots /tmp/blockforge-shots
 ```
 
-Current status: 164 unit tests and 143 end-to-end checks, all passing.
+Current status: 192 unit tests, 146 smoke checks and 19 multiplayer checks, all passing.
 
 ## Code layout
 
@@ -196,6 +203,7 @@ Design decisions are recorded in `docs/architecture/`:
 - [ADR-0014 Fame and dev teams](../../docs/architecture/adr-0014-blockforge-fame-and-dev-teams.md)
 - [ADR-0015 Studios, communities, giveaways and acquisitions](../../docs/architecture/adr-0015-blockforge-studios-communities-giveaways.md)
 - [ADR-0016 The extended avatar catalog](../../docs/architecture/adr-0016-blockforge-extended-avatar-catalog.md)
+- [ADR-0017 Real multiplayer through the artifact runtime](../../docs/architecture/adr-0017-blockforge-real-multiplayer.md)
 
 To **add a game**, register a module with `BF.GameModules.register(type, {...})`
 in a new `js/games/*.js` file (see ADR-0003). Add `three: true` with a

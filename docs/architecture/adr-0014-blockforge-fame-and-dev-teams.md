@@ -210,6 +210,38 @@ Rejected: templates are generated, so updates act on the simulation
   20/20, with 19 players swarming and every player freaking out in chat. The
   Team tab hired three developers and shipped an update.
 
+## Amendment (2026-09-28): friend-request floods
+
+Famous players are flooded with friend requests from fans. Every world tick
+(4 seconds), `BF.fame.requests(seconds)` draws requests at a per-minute
+rate that depends on your tier:
+
+| Tier | Requests per minute |
+|------|---------------------|
+| Newcomer | 0 |
+| Rising Star | 0.15 |
+| Known | 0.5 |
+| Popular | 2 |
+| Famous | 6 |
+| Superstar | 16 |
+| Legend | 40 |
+
+This is on top of the world's usual trickle of about one request every
+5 minutes.
+
+- **Privacy.** "Who can send friend requests: No one" stops the flood.
+- **One notification.** Arrivals roll into a single notification, updated in
+  place for a minute ("37 new friend requests … 120 waiting"). It pops up at
+  most every 30 seconds.
+- **Limits.**
+  - Pending requests are capped at 300, and the oldest drop off.
+  - The friends list cap rises from 200 to 1,000.
+- **Requests tab.**
+  - It shows the newest 120, then "and N more".
+  - It adds Accept all (up to the cap) and Decline all (with a confirmation).
+- **Tested by** `test_fame_superstars_are_flooded_…` and
+  `test_fame_newcomers_get_no_extra_requests_…`.
+
 ## Related Decisions
 
 ADR-0006, ADR-0007, ADR-0008, ADR-0009, ADR-0010.

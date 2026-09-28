@@ -45,6 +45,10 @@
     rush: { 3: [3, 7], 4: [6, 12] }, // extra fans who join your server, by reaction level
     followShare: { 1: 0.1, 2: 0.45, 3: 0.8, 4: 0.95 },
     fansFromNews: { 2: [20, 120], 3: [150, 900], 4: [800, 4000] },
+    // friend requests from players who know who you are, per minute, by tier (on top of the world's trickle)
+    requestsPerMin: { newcomer: 0, rising: 0.15, known: 0.5, popular: 2, famous: 6, superstar: 16, legend: 40 },
+    floodMergeMs: 60000, // arrivals within a minute update one notification
+    floodPopupMs: 30000, // and it pops up at most this often
   };
 
   const LINES = {
@@ -57,6 +61,7 @@
   };
 
   let botCache = null, botCacheAt = 0;
+  let flood = null, lastFloodPopup = 0;
 
   function tierFor(score, rank) {
     if (rank === 1 && score >= T.tiers[T.tiers.length - 1].min) return T.legend;
@@ -229,8 +234,59 @@
       return fame.me().level >= 2;
     },
 
+    /**
+     * Friend requests from fans (world tick, every `seconds`). Famous players get a
+     * steady stream and the Legend a flood; one grouped notification per tick.
+     * Returns how many arrived.
+     */
+    requests(seconds, rng) {
+      const s = BF.store.state;
+      if (!s || !BF.friends || s.settings.privacy.friendRequests === 'none') return 0;
+      rng = rng || Math.random;
+      const rate = T.requestsPerMin[fame.me().tier.id] || 0;
+      const expected = rate * (seconds / 60);
+      let n = Math.floor(expected) + (rng() < expected % 1 ? 1 : 0);
+      if (!n) return 0;
+      const F = BF.friends;
+      const pool = BF.bots.list;
+      const got = [];
+      for (let tries = 0; got.length < n && tries < n * 6; tries++) {
+        const b = pool[Math.floor(rng() * pool.length)];
+        if (b && !got.includes(b) && F.receiveRequest(b.id, { quiet: true })) got.push(b);
+      }
+      if (got.length && BF.notify) fame.floodNotice(got);
+      return got.length;
+    },
+
+    /**
+     * One rolling notification for a request flood: new arrivals within a minute
+     * update the same entry, and it pops up at most every 30 seconds.
+     */
+    floodNotice(got) {
+      const s = BF.store.state;
+      const now = BF.clock.now();
+      const pending = s.social.incoming.length;
+      const note = flood && now - flood.at < T.floodMergeMs ? s.notifications.find((n) => n.id === flood.id && !n.read) : null;
+      const count = (note ? flood.count : 0) + got.length;
+      const names = got.slice(0, 2).map((b) => b.displayName).join(', ');
+      const title = count === 1 ? 'Friend request' : U.fmt(count) + ' new friend requests';
+      const body = (count === 1 ? got[0].displayName + ' (@' + got[0].username + ') wants to be your friend.' : names + ' and ' + U.fmt(count - Math.min(2, got.length)) + ' more fans want to be your friend.') + ' ' + U.fmt(pending) + ' waiting.';
+      if (note) {
+        BF.store.update('notifications', () => { note.title = title; note.body = body; note.ts = now; note.action = null; });
+        flood.count = count;
+        flood.at = now;
+        return note;
+      }
+      const loud = now - lastFloodPopup > T.floodPopupMs;
+      if (loud) lastFloodPopup = now;
+      const item = BF.notify.push({ type: 'friend', title, body, icon: 'userPlus', route: '#/friends/requests', action: count === 1 ? { kind: 'friendRequest', id: got[0].id } : null, silent: !loud });
+      flood = item ? { id: item.id, count, at: now } : null;
+      return item;
+    },
+
     worldTick() {
       fame.check();
+      fame.requests(4);
     },
   });
 })((window.BF = window.BF || {}));

@@ -254,6 +254,21 @@
       return srv;
     },
 
+    /** Open a server with a given number (a real player's, see BF.net.isShared). */
+    openServer(gameId, serverId) {
+      const g = catalog.get(gameId);
+      if (!g) return null;
+      const id = String(serverId);
+      const found = world.findServer(gameId, id);
+      if (found) return found;
+      const srv = world.newServer(gameId);
+      if (!srv) return null;
+      usedServerIds.delete(srv.id);
+      srv.id = id;
+      usedServerIds.add(id);
+      return srv;
+    },
+
     /** Put a bot into a game, filling servers to a natural 60-95% before opening another. */
     place(bot, gameId) {
       if (!world.servers.has(gameId)) world.servers.set(gameId, []);
@@ -359,6 +374,8 @@
 
     /** Where a bot is right now. */
     botStatus(id) {
+      // real players (BF.net) share the same status shape
+      if (BF.net && BF.net.isKey(id)) return BF.net.status(id);
       const l = world.loc.get(id);
       if (l) return { state: 'ingame', gameId: l.gameId, serverId: l.serverId };
       if (world.menuOnline.has(id)) return { state: 'online' };
@@ -371,6 +388,8 @@
     join(gameId, serverId) {
       world.leave();
       let srv = serverId ? world.findServer(gameId, serverId) : null;
+      // a real player's server (their number, from their own world): open it here so you land together
+      if (serverId && !srv && BF.net && BF.net.isShared(gameId, serverId)) srv = world.openServer(gameId, serverId);
       if (serverId && !srv) return { ok: false, reason: 'gone' };
       if (srv && srv.bots.length + 1 > srv.max) return { ok: false, reason: 'full' };
       if (!srv) {
@@ -709,6 +728,8 @@
       const s = BF.store.state;
       const players = [];
       if (s && (score(s.player.username, q) || score(s.player.displayName, q))) players.push({ me: true, id: 'me', username: s.player.username, displayName: s.player.displayName });
+      // real people first (BF.net), then the platform's players
+      if (BF.net) BF.net.search(q, limit).forEach((p) => players.push(p));
       BF.bots.list
         .map((b) => ({ b, sc: Math.max(score(b.username, q), score(b.displayName, q)) }))
         .filter((x) => x.sc > 0).sort((a, b) => b.sc - a.sc || a.b.username.length - b.b.username.length).slice(0, limit)

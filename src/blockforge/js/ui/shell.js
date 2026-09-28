@@ -71,7 +71,7 @@
       shell.updateSidebarFoot();
       shell.updateDnd();
       bindSearch();
-      BF.store.on(['notifications', 'messages', 'social', 'quests', 'daily'], () => { shell.updateBadges(); shell.updateSidebarFoot(); });
+      BF.store.on(['notifications', 'messages', 'social', 'quests', 'daily', 'net'], () => { shell.updateBadges(); shell.updateSidebarFoot(); });
       BF.store.on(['avatar', 'player'], shell.updateAvatar);
       BF.bus.on('wallet:changed', (e) => shell.animateBalance(e.delta));
       BF.bus.on('world:tick', () => { shell.updateLive(); shell.updateOnline(); });
@@ -96,7 +96,7 @@
       };
       const notif = BF.notify.unread();
       const msgs = BF.messages.unreadCount();
-      const reqs = s.social.incoming.length;
+      const reqs = s.social.incoming.length + (BF.net ? BF.net.incoming().length : 0);
       const quests = BF.quests.claimable();
       set('notif-badge', notif);
       set('msg-badge', msgs);
@@ -296,7 +296,7 @@
         list.forEach((x) => { const it = fn(x); it.idx = suggestItems.length; suggestItems.push(it); html += '<div class="suggest-item" role="option" data-si="' + it.idx + '">' + it.html + '</div>'; });
       };
       group('Games', r.games, (g) => ({ kind: 'game', id: g.id, html: '<img src="' + BF.thumbs.url(g) + '" alt=""><div><div>' + highlight(g.name, q) + '</div><div class="s-sub">' + esc(g.genre) + ' · ' + U.compact(BF.world.playerCount(g.id)) + ' playing</div></div>' }));
-      group('Players', r.players, (p) => ({ kind: 'player', id: p.id, html: BF.ui.avatarChip(p.me ? BF.store.state.avatar : p.avatar, { size: 'sm' }) + '<div><div>' + highlight(p.username, q) + (p.me ? ' <span class="pill accent">You</span>' : '') + '</div><div class="s-sub">' + esc(p.displayName) + '</div></div>' }));
+      group('Players', r.players, (p) => ({ kind: 'player', id: p.id, html: BF.ui.avatarChip(p.me ? BF.store.state.avatar : p.avatar, { size: 'sm' }) + '<div><div>' + highlight(p.username, q) + (p.me ? ' <span class="pill accent">You</span>' : p.real ? ' ' + BF.ui.realTag() : '') + '</div><div class="s-sub">' + esc(p.displayName) + '</div></div>' }));
       group('Avatar items', r.items, (i) => ({ kind: 'item', id: i.id, html: '<span class="rar-' + i.rarity + '" style="width:32px;display:grid;place-items:center">' + BF.ui.rarityTag(i.rarity).replace(/>\w+</, '>●<') + '</span><div><div>' + highlight(i.name, q) + '</div><div class="s-sub">' + esc(BF.ITEM_CATS[i.cat].label) + ' · ' + (i.notForSale ? 'Found in game' : U.fmt(i.price) + ' FC') + '</div></div>' }));
       group('Creators', r.creators, (c) => ({ kind: 'creator', id: c.name, html: '<span class="avatar-chip sm" style="display:grid;place-items:center;color:var(--accent)">' + BF.icon('anvil', 16) + '</span><div><div>' + highlight(c.name, q) + '</div><div class="s-sub">' + U.plural(c.games, 'game') + ' · ' + U.plural(c.items, 'item') + '</div></div>' }));
       const allIdx = suggestItems.length;
